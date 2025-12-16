@@ -66,7 +66,7 @@ class RockPaperScissorsGame(Game):
             result_msg = "🎉 승리!"
             # 승리 시 골드 지급
             if self.point_system:
-                self.award_points(self.win_reward, "가위바위보 게임 승리")
+                self.award_gold(self.win_reward, "가위바위보 게임 승리")
                 point_msg = f"\n💰 +{self.win_reward}G 획득!"
         elif result == 'lose':
             self.losses += 1
@@ -74,7 +74,7 @@ class RockPaperScissorsGame(Game):
             result_msg = "😢 패배..."
             # 패배 시 골드 차감
             if self.point_system:
-                deducted = self.deduct_points(self.lose_cost, "가위바위보 게임 패배")
+                deducted = self.deduct_gold(self.lose_cost, "가위바위보 게임 패배")
                 if deducted is not None:
                     point_msg = f"\n💸 -{self.lose_cost}G 차감"
                 else:

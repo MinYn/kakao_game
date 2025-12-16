@@ -22,14 +22,14 @@ class NumberGuessGame(Game):
     def start(self) -> str:
         """게임 시작"""
         if (self.point_system and
-                not self.point_system.has_points(self.user_id,
+                not self.point_system.has_gold(self.user_id,
                                                  self.entry_cost)):
             return (f"❌ 게임을 시작하려면 {self.entry_cost}골드가 "
                     f"필요합니다.\n현재 골드: {self.get_user_points()}G\n"
                     f"'골드' 명령어로 골드를 확인하세요.")
 
         if self.point_system:
-            self.deduct_points(self.entry_cost, "숫자맞추기 게임 입장료")
+            self.deduct_gold(self.entry_cost, "숫자맞추기 게임 입장료")
 
         self.is_active = True
         self.target_number = random.randint(self.min_num, self.max_num)
@@ -79,7 +79,7 @@ class NumberGuessGame(Game):
             total_reward = self.base_reward + bonus
 
             if self.point_system:
-                self.award_points(
+                self.award_gold(
                     total_reward,
                     f"숫자맞추기 게임 클리어 ({self.attempts}번 시도)"
                 )
@@ -94,7 +94,7 @@ class NumberGuessGame(Game):
         if self.attempts >= self.max_attempts:
             # 실패 시 작은 보상 (참여 골드)
             if self.point_system:
-                self.award_points(self.consolation,
+                self.award_gold(self.consolation,
                                   "숫자맞추기 게임 참여 보상")
             result = (f"😢 기회를 모두 사용했습니다. "
                       f"정답은 {self.target_number}였습니다.\n"

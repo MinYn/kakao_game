@@ -3,16 +3,16 @@ from games.base_game import Game
 from games.number_guess import NumberGuessGame
 from games.rps import RockPaperScissorsGame
 from games.adventure import AdventureGame
-from point_system import PointSystem
+from gold_system import GoldSystem
 from config import Config
 
 
 class GameEngine:
     """게임 엔진 - 게임 관리 및 명령 처리"""
     
-    def __init__(self, point_system: Optional[PointSystem] = None):
+    def __init__(self, gold_system: Optional[GoldSystem] = None):
         self.active_games: Dict[str, Game] = {}
-        self.point_system = point_system or PointSystem()
+        self.gold_system = gold_system or GoldSystem()
         self.available_games = {
             '숫자맞추기': NumberGuessGame,
             'number': NumberGuessGame,
@@ -26,7 +26,7 @@ class GameEngine:
     def process_message(self, user_id: str, message: str) -> str:
         """사용자 메시지 처리"""
         # 신규 사용자 초기 골드 지급
-        is_new_user = self.point_system.ensure_initial_points(user_id)
+        is_new_user = self.gold_system.ensure_initial_gold(user_id)
         
         message = message.strip()
 
@@ -51,11 +51,11 @@ class GameEngine:
             '잔액', '내골드', 'p', 'pt'
         ]
         if message.lower() in gold_commands:
-            response = self._get_points(user_id)
+            response = self._get_gold(user_id)
             if is_new_user:
                 response = (
                     f"🎉 환영합니다! 신규 사용자에게 "
-                    f"{Config.INITIAL_POINTS}G를 지급했습니다!\n\n"
+                    f"{Config.INITIAL_GOLD}G를 지급했습니다!\n\n"
                     f"{response}"
                 )
             return response
@@ -71,7 +71,7 @@ class GameEngine:
                 message = '골드주기 ' + message[4:]
             elif msg_lower.startswith('send '):
                 message = '골드주기 ' + message[5:]
-            return self._transfer_points(user_id, message)
+            return self._transfer_gold(user_id, message)
         
         # 리더보드 (단축키: l, lb, rank)
         leaderboard_commands = [
@@ -227,7 +227,7 @@ class GameEngine:
         # 게임 생성 및 시작
         try:
             game = game_class(
-                user_id, point_system=self.point_system
+                user_id, point_system=self.gold_system
             )
             self.active_games[user_id] = game
             return game.start()
@@ -248,12 +248,12 @@ class GameEngine:
         """사용자가 활성 게임을 가지고 있는지 확인"""
         return user_id in self.active_games and self.active_games[user_id].is_game_active()
     
-    def _get_points(self, user_id: str) -> str:
+    def _get_gold(self, user_id: str) -> str:
         """골드 조회"""
-        points = self.point_system.get_points(user_id)
-        return f"💰 현재 골드: {points}G"
+        gold = self.gold_system.get_gold(user_id)
+        return f"💰 현재 골드: {gold}G"
     
-    def _transfer_points(self, from_user: str, message: str) -> str:
+    def _transfer_gold(self, from_user: str, message: str) -> str:
         """골드 전송 처리"""
         # 명령 파싱: "골드주기 [사용자] [금액]" 또는 "골드주기 [금액] [사용자]"
         parts = message.replace('골드주기', '').replace('골드전송', '').strip().split()
@@ -287,16 +287,16 @@ class GameEngine:
             return "❌ 자기 자신에게 골드를 전송할 수 없습니다."
         
         # 골드 확인
-        current_points = self.point_system.get_points(from_user)
-        if current_points < amount:
+        current_gold = self.gold_system.get_gold(from_user)
+        if current_gold < amount:
             return (
                 f"❌ 골드가 부족합니다.\n"
-                f"현재 골드: {current_points}G\n"
+                f"현재 골드: {current_gold}G\n"
                 f"전송하려는 골드: {amount}G"
             )
         
         # 골드 전송
-        result = self.point_system.transfer_points(
+        result = self.gold_system.transfer_gold(
             from_user, 
             to_user, 
             amount, 
@@ -312,20 +312,20 @@ class GameEngine:
 받은 사람: {to_user}
 전송 금액: {amount}G
 
-{from_user}의 남은 골드: {self.point_system.get_points(from_user)}G
+{from_user}의 남은 골드: {self.gold_system.get_gold(from_user)}G
 {to_user}의 현재 골드: {result}G"""
     
     def _get_leaderboard(self, limit: int = 10) -> str:
         """리더보드 조회"""
-        leaderboard = self.point_system.get_leaderboard(limit)
+        leaderboard = self.gold_system.get_leaderboard(limit)
         
         if not leaderboard:
             return "📊 아직 랭킹 데이터가 없습니다."
         
         result = ["🏆 골드 리더보드", ""]
-        for idx, (user_id, points) in enumerate(leaderboard, 1):
+        for idx, (user_id, gold) in enumerate(leaderboard, 1):
             medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-            result.append(f"{medal} {user_id}: {points}G")
+            result.append(f"{medal} {user_id}: {gold}G")
         
         return "\n".join(result)
     

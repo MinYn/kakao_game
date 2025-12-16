@@ -95,7 +95,7 @@ class GameBot:
                                 print(f"게임 종료 오류 (user_id: {user_id}): {e}")
                     
                     # 데이터베이스 연결 정리
-                    if hasattr(self.engine, 'point_system') and self.engine.point_system:
+                    if hasattr(self.engine, 'point_system') and self.engine.gold_system:
                         # SQLite는 자동으로 커밋되므로 명시적 저장 불필요
                         # 하지만 연결을 명시적으로 닫을 수 있음
                         pass

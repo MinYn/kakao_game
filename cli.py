@@ -37,17 +37,17 @@ class CLIMode:
 
         # 신규 사용자 초기 골드 지급
         is_new_user = (
-            self.engine.point_system.ensure_initial_points(self.current_user)
+            self.engine.gold_system.ensure_initial_gold(self.current_user)
         )
-        points = self.engine.point_system.get_points(self.current_user)
+        gold = self.engine.gold_system.get_gold(self.current_user)
 
         if is_new_user:
             print(
                 f"🎉 환영합니다! 신규 사용자에게 "
-                f"{Config.INITIAL_POINTS}G를 지급했습니다!"
+                f"{Config.INITIAL_GOLD}G를 지급했습니다!"
             )
 
-        print(f"💰 골드: {points}G")
+        print(f"💰 골드: {gold}G")
         print("\n💡 '도움말' 또는 'h'를 입력하면 명령어를 확인할 수 있습니다.")
         print("💡 '종료' 또는 'q'를 입력하면 프로그램을 종료합니다.")
         print(
@@ -115,22 +115,22 @@ class CLIMode:
                 self.current_user = new_user
                 # 신규 사용자 초기 골드 지급
                 is_new_user = (
-                    self.engine.point_system.ensure_initial_points(
+                    self.engine.gold_system.ensure_initial_gold(
                         self.current_user
                     )
                 )
-                points = self.engine.point_system.get_points(self.current_user)
+                gold = self.engine.gold_system.get_gold(self.current_user)
 
                 response = (
                     f"✅ 사용자가 '{self.current_user}'로 "
-                    f"변경되었습니다.\n💰 골드: {points}G"
+                    f"변경되었습니다.\n💰 골드: {gold}G"
                 )
                 if is_new_user:
                     response = (
                         f"✅ 사용자가 '{self.current_user}'로 "
                         f"변경되었습니다.\n🎉 신규 사용자에게 "
-                        f"{Config.INITIAL_POINTS}G를 지급했습니다!\n"
-                        f"💰 골드: {points}G"
+                        f"{Config.INITIAL_GOLD}G를 지급했습니다!\n"
+                        f"💰 골드: {gold}G"
                     )
                 return response
             return "❌ 사용자 이름을 입력해주세요."

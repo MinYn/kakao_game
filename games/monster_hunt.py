@@ -241,7 +241,7 @@ class MonsterHuntGame(Game):
             reward = self._calculate_reward(monster_type)
             
             if self.point_system:
-                self.award_points(reward, f"{monster_type.name} 사냥 성공 ({monster_name})")
+                self.award_gold(reward, f"{monster_type.name} 사냥 성공 ({monster_name})")
             
             self.hunted_count += 1
             self.total_reward += reward

@@ -36,21 +36,21 @@ class Game(ABC):
         """게임 활성 상태 확인"""
         return self.is_active
     
-    def award_points(self, amount: int, reason: str = "") -> int:
+    def award_gold(self, amount: int, reason: str = "") -> int:
         """골드 지급"""
         if self.point_system:
-            return self.point_system.add_points(self.user_id, amount, reason)
+            return self.point_system.add_gold(self.user_id, amount, reason)
         return 0
     
-    def deduct_points(self, amount: int, reason: str = "") -> Optional[int]:
+    def deduct_gold(self, amount: int, reason: str = "") -> Optional[int]:
         """골드 차감"""
         if self.point_system:
-            return self.point_system.deduct_points(self.user_id, amount, reason)
+            return self.point_system.deduct_gold(self.user_id, amount, reason)
         return None
     
     def get_user_points(self) -> int:
         """사용자 골드 조회"""
         if self.point_system:
-            return self.point_system.get_points(self.user_id)
+            return self.point_system.get_gold(self.user_id)
         return 0
 

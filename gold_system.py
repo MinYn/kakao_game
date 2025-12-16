@@ -4,33 +4,34 @@ from typing import Dict, Optional, Callable
 from config import Config
 
 
-class PointSystem:
+class GoldSystem:
     """골드 관리 시스템 (SQLite 사용)"""
     
     def __init__(self, db_file: Optional[str] = None):
-        self.db_file = db_file or Config.POINTS_DATA_FILE
-        self.point_callbacks: Dict[str, Callable[[str, int, str], None]] = {}
+        self.db_file = db_file or Config.DATA_FILE
+        self.gold_callbacks: Dict[str, Callable[[str, int, str], None]] = {}
         self._init_database()
         self._migrate_from_json()
+        self._migrate_points_to_gold()
     
     def _init_database(self) -> None:
         """데이터베이스 초기화"""
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         
-        # 포인트 테이블 생성
+        # 골드 테이블 생성
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS points (
+            CREATE TABLE IF NOT EXISTS gold (
                 user_id TEXT PRIMARY KEY,
-                points INTEGER NOT NULL DEFAULT 0,
+                gold INTEGER NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         
-        # 포인트 이력 테이블 생성 (선택사항)
+        # 골드 이력 테이블 생성 (선택사항)
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS point_history (
+            CREATE TABLE IF NOT EXISTS gold_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
                 amount INTEGER NOT NULL,
@@ -92,13 +93,13 @@ class PointSystem:
                     conn = sqlite3.connect(self.db_file)
                     cursor = conn.cursor()
                     
-                    for user_id, points in json_data.items():
+                    for user_id, gold in json_data.items():
                         # 기존 데이터가 없을 때만 마이그레이션
-                        cursor.execute('SELECT points FROM points WHERE user_id = ?', (user_id,))
+                        cursor.execute('SELECT gold FROM gold WHERE user_id = ?', (user_id,))
                         if cursor.fetchone() is None:
                             cursor.execute(
-                                'INSERT INTO points (user_id, points) VALUES (?, ?)',
-                                (user_id, points)
+                                'INSERT INTO gold (user_id, gold) VALUES (?, ?)',
+                                (user_id, gold)
                             )
                     
                     conn.commit()
@@ -119,59 +120,59 @@ class PointSystem:
         conn.row_factory = sqlite3.Row
         return conn
     
-    def get_points(self, user_id: str) -> int:
+    def get_gold(self, user_id: str) -> int:
         """사용자 골드 조회"""
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT points FROM points WHERE user_id = ?', (user_id,))
+        cursor.execute('SELECT gold FROM gold WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
         
         conn.close()
-        return result['points'] if result else 0
+        return result['gold'] if result else 0
     
-    def ensure_initial_points(self, user_id: str) -> bool:
+    def ensure_initial_gold(self, user_id: str) -> bool:
         """사용자가 처음 접속한 경우 초기 골드 지급"""
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT points FROM points WHERE user_id = ?', (user_id,))
+        cursor.execute('SELECT gold FROM gold WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
         
         if result is None:
             conn.close()
-            self.add_points(user_id, Config.INITIAL_POINTS, "신규 사용자 환영 골드")
+            self.add_gold(user_id, Config.INITIAL_GOLD, "신규 사용자 환영 골드")
             return True
         
         conn.close()
         return False
     
-    def add_points(self, user_id: str, amount: int, reason: str = "") -> int:
+    def add_gold(self, user_id: str, amount: int, reason: str = "") -> int:
         """골드 추가"""
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        # 기존 포인트 조회 또는 생성
-        cursor.execute('SELECT points FROM points WHERE user_id = ?', (user_id,))
+        # 기존 골드 조회 또는 생성
+        cursor.execute('SELECT gold FROM gold WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
         
         if result:
-            new_points = result['points'] + amount
+            new_gold = result['gold'] + amount
             cursor.execute(
-                'UPDATE points SET points = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
-                (new_points, user_id)
+                'UPDATE gold SET gold = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
+                (new_gold, user_id)
             )
         else:
-            new_points = amount
+            new_gold = amount
             cursor.execute(
-                'INSERT INTO points (user_id, points) VALUES (?, ?)',
-                (user_id, new_points)
+                'INSERT INTO gold (user_id, gold) VALUES (?, ?)',
+                (user_id, new_gold)
             )
         
         # 이력 기록
         if reason:
             cursor.execute(
-                'INSERT INTO point_history (user_id, amount, reason) VALUES (?, ?, ?)',
+                'INSERT INTO gold_history (user_id, amount, reason) VALUES (?, ?, ?)',
                 (user_id, amount, reason)
             )
         
@@ -179,31 +180,31 @@ class PointSystem:
         conn.close()
         
         # 콜백 호출
-        if 'add' in self.point_callbacks:
-            self.point_callbacks['add'](user_id, amount, reason)
+        if 'add' in self.gold_callbacks:
+            self.gold_callbacks['add'](user_id, amount, reason)
         
-        return new_points
+        return new_gold
     
-    def deduct_points(self, user_id: str, amount: int, reason: str = "") -> Optional[int]:
+    def deduct_gold(self, user_id: str, amount: int, reason: str = "") -> Optional[int]:
         """골드 차감 (잔액 부족 시 None 반환)"""
-        current_points = self.get_points(user_id)
+        current_gold = self.get_gold(user_id)
         
-        if current_points < amount:
+        if current_gold < amount:
             return None
         
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        new_points = current_points - amount
+        new_gold = current_gold - amount
         cursor.execute(
-            'UPDATE points SET points = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
-            (new_points, user_id)
+            'UPDATE gold SET gold = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
+            (new_gold, user_id)
         )
         
         # 이력 기록
         if reason:
             cursor.execute(
-                'INSERT INTO point_history (user_id, amount, reason) VALUES (?, ?, ?)',
+                'INSERT INTO gold_history (user_id, amount, reason) VALUES (?, ?, ?)',
                 (user_id, -amount, reason)
             )
         
@@ -211,50 +212,50 @@ class PointSystem:
         conn.close()
         
         # 콜백 호출
-        if 'deduct' in self.point_callbacks:
-            self.point_callbacks['deduct'](user_id, amount, reason)
+        if 'deduct' in self.gold_callbacks:
+            self.gold_callbacks['deduct'](user_id, amount, reason)
         
-        return new_points
+        return new_gold
     
-    def set_points(self, user_id: str, amount: int) -> None:
+    def set_gold(self, user_id: str, amount: int) -> None:
         """골드 설정"""
         conn = self._get_connection()
         cursor = conn.cursor()
         
         amount = max(0, amount)
-        cursor.execute('SELECT points FROM points WHERE user_id = ?', (user_id,))
+        cursor.execute('SELECT gold FROM gold WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
         
         if result:
             cursor.execute(
-                'UPDATE points SET points = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
+                'UPDATE gold SET gold = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
                 (amount, user_id)
             )
         else:
             cursor.execute(
-                'INSERT INTO points (user_id, points) VALUES (?, ?)',
+                'INSERT INTO gold (user_id, gold) VALUES (?, ?)',
                 (user_id, amount)
             )
         
         conn.commit()
         conn.close()
     
-    def has_points(self, user_id: str, amount: int) -> bool:
+    def has_gold(self, user_id: str, amount: int) -> bool:
         """골드 보유 여부 확인"""
-        return self.get_points(user_id) >= amount
+        return self.get_gold(user_id) >= amount
     
     def register_callback(self, event_type: str, callback: Callable[[str, int, str], None]) -> None:
         """골드 이벤트 콜백 등록"""
-        self.point_callbacks[event_type] = callback
+        self.gold_callbacks[event_type] = callback
     
-    def transfer_points(self, from_user: str, to_user: str, amount: int, reason: str = "") -> Optional[int]:
+    def transfer_gold(self, from_user: str, to_user: str, amount: int, reason: str = "") -> Optional[int]:
         """골드 전송 (from_user → to_user)"""
         # 자기 자신에게 전송 불가
         if from_user == to_user:
             return None
         
         # 골드 확인
-        if not self.has_points(from_user, amount):
+        if not self.has_gold(from_user, amount):
             return None
         
         # 최소 전송 금액 체크
@@ -262,11 +263,11 @@ class PointSystem:
             return None
         
         # 골드 차감 및 추가
-        deducted = self.deduct_points(from_user, amount, f"골드 전송 → {to_user}: {reason}")
+        deducted = self.deduct_gold(from_user, amount, f"골드 전송 → {to_user}: {reason}")
         if deducted is None:
             return None
         
-        result = self.add_points(to_user, amount, f"골드 수신 ← {from_user}: {reason}")
+        result = self.add_gold(to_user, amount, f"골드 수신 ← {from_user}: {reason}")
         return result
     
     def get_leaderboard(self, limit: int = 10) -> list:
@@ -275,22 +276,22 @@ class PointSystem:
         cursor = conn.cursor()
         
         cursor.execute(
-            'SELECT user_id, points FROM points ORDER BY points DESC LIMIT ?',
+            'SELECT user_id, gold FROM gold ORDER BY gold DESC LIMIT ?',
             (limit,)
         )
         results = cursor.fetchall()
         
         conn.close()
-        return [(row['user_id'], row['points']) for row in results]
+        return [(row['user_id'], row['gold']) for row in results]
     
-    def get_point_history(self, user_id: str, limit: int = 10) -> list:
-        """골드 이력 조회 (새로운 기능)"""
+    def get_gold_history(self, user_id: str, limit: int = 10) -> list:
+        """골드 이력 조회"""
         conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute(
             '''SELECT amount, reason, created_at 
-               FROM point_history 
+               FROM gold_history 
                WHERE user_id = ? 
                ORDER BY created_at DESC 
                LIMIT ?''',

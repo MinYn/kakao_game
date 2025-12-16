@@ -23,8 +23,8 @@ class Config:
     DISCORD_COMMAND_PREFIX: str = os.getenv('DISCORD_COMMAND_PREFIX', '!')
     
     # 골드 시스템 설정
-    POINTS_DATA_FILE: str = os.getenv('POINTS_DATA_FILE', 'points_data.db')
-    INITIAL_POINTS: int = int(os.getenv('INITIAL_POINTS', '100'))
+    DATA_FILE: str = os.getenv('DATA_FILE', 'data.db')
+    INITIAL_GOLD: int = int(os.getenv('INITIAL_GOLD', '100'))
     
     # 게임 설정 - 숫자맞추기
     NUMBER_GUESS_ENTRY_COST: int = int(os.getenv('NUMBER_GUESS_ENTRY_COST', '10'))

@@ -92,11 +92,11 @@ class EnhancementGame(Game):
         cost = self._calculate_cost()
         
         # 골드 확인
-        if not self.point_system or not self.point_system.has_points(self.user_id, cost):
+        if not self.point_system or not self.point_system.has_gold(self.user_id, cost):
             return f"❌ 강화에 필요한 골드가 부족합니다.\n필요 골드: {cost}G\n현재 골드: {self.get_user_points()}G"
         
         # 골드 차감
-        self.deduct_points(cost, f"강화 시도 (+{self.current_level} → +{self.current_level + 1})")
+        self.deduct_gold(cost, f"강화 시도 (+{self.current_level} → +{self.current_level + 1})")
         
         # 시도 횟수 증가
         self.game_data['attempts'] = self.game_data.get('attempts', 0) + 1
@@ -204,7 +204,7 @@ class EnhancementGame(Game):
         
         # 골드 지급
         if self.point_system:
-            self.award_points(sell_price, f"강화 아이템 판매 (+{sold_level})")
+            self.award_gold(sell_price, f"강화 아이템 판매 (+{sold_level})")
         
         # 판매 통계 업데이트
         if 'sold_items' not in self.game_data:

@@ -216,10 +216,10 @@ class AdventureGame(Game):
         """강화 시도"""
         cost = self._calculate_cost()
         
-        if not self.point_system or not self.point_system.has_points(self.user_id, cost):
+        if not self.point_system or not self.point_system.has_gold(self.user_id, cost):
             return f"❌ 강화에 필요한 골드가 부족합니다.\n필요 골드: {cost}G\n현재 골드: {self.get_user_points()}G"
         
-        self.deduct_points(cost, f"강화 시도 (+{self.current_level} → +{self.current_level + 1})")
+        self.deduct_gold(cost, f"강화 시도 (+{self.current_level} → +{self.current_level + 1})")
         
         self.game_data['attempts'] = self.game_data.get('attempts', 0) + 1
         # DB에 강화 시도 저장
@@ -292,7 +292,7 @@ class AdventureGame(Game):
         sold_level = self.current_level
         
         if self.point_system:
-            self.award_points(sell_price, f"강화 아이템 판매 (+{sold_level})")
+            self.award_gold(sell_price, f"강화 아이템 판매 (+{sold_level})")
         
         self.current_level = 0
         self.game_data['level'] = 0
@@ -395,7 +395,7 @@ class AdventureGame(Game):
             reward = self._calculate_reward(monster_type)
             
             if self.point_system:
-                self.award_points(reward, f"{monster_type.name} 사냥 성공 ({monster_name})")
+                self.award_gold(reward, f"{monster_type.name} 사냥 성공 ({monster_name})")
             
             self.hunted_count += 1
             self.total_reward += reward
