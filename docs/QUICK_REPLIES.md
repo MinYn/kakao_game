@@ -4,13 +4,55 @@
 
 ---
 
+## 목차
+
+1. [개요](#개요)
+2. [사용자 발화 설정](#사용자-발화-설정)
+3. [구현 방식](#구현-방식)
+4. [게임봇 Quick Replies 설정](#게임봇-quick-replies-설정)
+5. [카카오톡에서 확인 방법](#카카오톡에서-확인-방법)
+6. [커스터마이징](#커스터마이징)
+7. [문제 해결](#문제-해결)
+
+---
+
 ## 개요
 
 **Quick Replies**는 카카오톡 챗봇에서 사용자가 봇을 멘션(`@봇이름`)하거나 특정 상황에서 자동으로 표시되는 **빠른 응답 버튼**입니다.
 
-이미지에서 보이는 것처럼:
-- 하단에 "강화", "배틀", "랭킹", "판매", "묵념", "프로필" 등의 버튼이 표시됨
+**특징**:
+- 하단에 "강화", "배틀", "랭킹", "판매" 등의 버튼이 표시됨
 - 사용자가 버튼을 클릭하면 해당 명령어가 자동으로 전송됨
+- 게임 상태에 따라 다른 버튼 세트 표시 가능
+
+---
+
+## 사용자 발화 설정
+
+### 핵심 요약
+
+**Quick Replies를 사용할 때도 사용자 발화 설정은 동일합니다!**
+
+✅ **권장 설정**: "모든 발화"로 설정
+- 발화 패턴 입력 필드: **비워두기**
+- 발화 패턴 목록: **비우기**
+- "모든 발화" 옵션: **활성화** (있는 경우)
+
+**이유**:
+- Quick Replies는 **응답에 포함되는 버튼**이므로, 사용자 발화 설정과는 별개
+- 모든 메시지를 스킬 서버로 전달해야 Quick Replies 버튼이 표시됨
+- 봇 멘션(`@봇이름`)도 일반 메시지로 처리되므로 "모든 발화"로 설정하면 자동으로 처리됨
+
+### 단계별 설정
+
+1. **게임봇 메인 블록 편집**
+2. **"사용자 발화" 섹션**:
+   - 발화 패턴 입력 필드: 비워두기
+   - 발화 패턴 목록: 비우기
+   - "모든 발화" 옵션: 활성화
+3. **저장 및 배포**
+
+**상세 가이드**: `USER_UTTERANCE.md` 참조
 
 ---
 
@@ -86,93 +128,6 @@
 
 ---
 
-## 코드 구현
-
-### `webhook_server.py` 구현
-
-**기본 Quick Replies 생성**:
-```python
-def _get_default_quick_replies(self) -> list:
-    """기본 Quick Replies 버튼 목록 생성"""
-    return [
-        {
-            'action': 'message',
-            'label': '💰 골드',
-            'messageText': '골드'
-        },
-        {
-            'action': 'message',
-            'label': '🎮 게임시작',
-            'messageText': '게임시작 모험'
-        },
-        # ... 더 많은 버튼
-    ]
-```
-
-**모험 게임 Quick Replies 생성**:
-```python
-def _get_adventure_quick_replies(self) -> list:
-    """모험 게임 중 Quick Replies 버튼 목록 생성"""
-    return [
-        {
-            'action': 'message',
-            'label': '🔨 강화',
-            'messageText': '강화'
-        },
-        {
-            'action': 'message',
-            'label': '🗡️ 사냥',
-            'messageText': '사냥'
-        },
-        # ... 더 많은 버튼
-    ]
-```
-
-**응답 생성 시 Quick Replies 추가**:
-```python
-def _create_response(
-    self,
-    text: str,
-    quick_replies: Optional[list] = None
-) -> Dict[str, Any]:
-    """응답 생성 (Quick Replies 포함)"""
-    if quick_replies is None:
-        quick_replies = self._get_default_quick_replies()
-    
-    return {
-        'version': '2.0',
-        'template': {
-            'outputs': [
-                {
-                    'simpleText': {
-                        'text': text,
-                        'extra': {}
-                    }
-                }
-            ],
-            'quickReplies': quick_replies
-        }
-    }
-```
-
-**게임 상태에 따라 Quick Replies 선택**:
-```python
-# 메시지 처리
-response_text = self.engine.process_message(user_id, message)
-
-# Quick Replies 버튼 결정
-quick_replies = None
-if self.engine.has_active_game(user_id):
-    game = self.engine.active_games.get(user_id)
-    if game and game.__class__.__name__ == 'AdventureGame':
-        quick_replies = self._get_adventure_quick_replies()
-
-# 응답 생성
-response = self._create_response(response_text, quick_replies)
-```
-
----
-
 ## 카카오톡에서 확인 방법
 
 ### 1. 봇 멘션 시 버튼 표시
@@ -198,25 +153,6 @@ response = self._create_response(response_text, quick_replies)
    - `게임시작 모험` 또는 `@게임봇 게임시작 모험`
 2. **게임 중 응답 확인**
    - 🔨 강화, 🗡️ 사냥, 💰 판매 등 게임 관련 버튼이 표시됨
-
----
-
-## Quick Replies 제한 사항
-
-### 버튼 개수 제한
-
-- **최대 10개**: Quick Replies 버튼은 최대 10개까지 표시 가능
-- **권장 5-6개**: 너무 많으면 사용자가 혼란스러울 수 있음
-
-### 버튼 텍스트 제한
-
-- **라벨 길이**: 버튼 라벨은 짧고 명확하게 (예: "💰 골드")
-- **이모지 사용**: 이모지를 사용하면 시각적으로 구분하기 쉬움
-
-### 동작 제한
-
-- **메시지 전송만 가능**: `action: "message"`만 지원
-- **외부 링크 불가**: URL 링크는 지원하지 않음 (카드형 응답 사용 필요)
 
 ---
 
@@ -273,13 +209,24 @@ def _get_number_guess_quick_replies(self) -> list:
     ]
 ```
 
-**게임 상태에 따라 선택**:
-```python
-if game.__class__.__name__ == 'NumberGuessGame':
-    quick_replies = self._get_number_guess_quick_replies()
-elif game.__class__.__name__ == 'AdventureGame':
-    quick_replies = self._get_adventure_quick_replies()
-```
+---
+
+## Quick Replies 제한 사항
+
+### 버튼 개수 제한
+
+- **최대 10개**: Quick Replies 버튼은 최대 10개까지 표시 가능
+- **권장 5-6개**: 너무 많으면 사용자가 혼란스러울 수 있음
+
+### 버튼 텍스트 제한
+
+- **라벨 길이**: 버튼 라벨은 짧고 명확하게 (예: "💰 골드")
+- **이모지 사용**: 이모지를 사용하면 시각적으로 구분하기 쉬움
+
+### 동작 제한
+
+- **메시지 전송만 가능**: `action: "message"`만 지원
+- **외부 링크 불가**: URL 링크는 지원하지 않음 (카드형 응답 사용 필요)
 
 ---
 
@@ -287,17 +234,17 @@ elif game.__class__.__name__ == 'AdventureGame':
 
 ### 버튼이 표시되지 않는 경우
 
-1. **응답 형식 확인**
-   - `quickReplies` 필드가 올바르게 포함되어 있는지 확인
-   - JSON 형식이 올바른지 확인
+1. **사용자 발화 확인**
+   - "모든 발화"로 설정되어 있는지 확인
+   - 발화 패턴이 입력한 메시지와 일치하는지 확인
 
-2. **카카오톡 버전 확인**
+2. **스킬 서버 응답 확인**
+   - 스킬 서버 로그에서 `quickReplies` 필드가 포함되어 있는지 확인
+   - 응답 형식이 올바른지 확인
+
+3. **카카오톡 버전 확인**
    - 최신 버전의 카카오톡 사용
    - Quick Replies는 최신 버전에서만 지원
-
-3. **스킬 서버 로그 확인**
-   - 응답에 `quickReplies`가 포함되어 있는지 확인
-   - 버튼 개수가 10개 이하인지 확인
 
 ### 버튼 클릭 시 작동하지 않는 경우
 
@@ -308,6 +255,16 @@ elif game.__class__.__name__ == 'AdventureGame':
 2. **스킬 서버 로그 확인**
    - 버튼 클릭 시 요청이 올바르게 전달되는지 확인
    - `utterance` 필드에 올바른 메시지가 포함되는지 확인
+
+### 봇 멘션 시 버튼이 표시되지 않는 경우
+
+1. **사용자 발화 확인**
+   - "모든 발화"로 설정되어 있는지 확인
+   - `@게임봇` 발화 패턴이 등록되어 있는지 확인 (발화 패턴을 사용하는 경우)
+
+2. **스킬 서버 로그 확인**
+   - `@게임봇` 요청이 스킬 서버로 전달되는지 확인
+   - 응답에 `quickReplies`가 포함되어 있는지 확인
 
 ---
 
@@ -325,9 +282,9 @@ elif game.__class__.__name__ == 'AdventureGame':
 - 일반 메시지 응답 시에도 버튼 표시
 - 버튼 클릭 시 해당 명령어 자동 전송
 
-✅ **커스터마이징**:
-- `webhook_server.py`에서 버튼 추가/제거 가능
-- 게임별로 다른 버튼 세트 설정 가능
+✅ **설정**:
+- 사용자 발화: "모든 발화"로 설정 (기존과 동일)
+- Quick Replies: 스킬 서버 응답에 자동 포함
 
-이제 카카오톡에서 봇을 멘션하면 이미지처럼 커맨드 버튼이 자동으로 표시됩니다! 🎉
+이제 카카오톡에서 봇을 멘션하면 커맨드 버튼이 자동으로 표시됩니다! 🎉
 

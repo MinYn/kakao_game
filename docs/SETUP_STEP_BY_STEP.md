@@ -4,8 +4,7 @@
 
 **📖 관련 가이드**:
 - 파라미터 설정: `PARAMETER_GUIDE.md`
-- 발화 패턴 설정: `UTTERANCE_SETUP.md` ⭐
-- 커맨드 형태 발화 패턴: `COMMAND_PATTERN_GUIDE.md` ⭐ (슬래시/@ 커맨드 등록)
+- 발화 패턴 설정: `USER_UTTERANCE.md` ⭐
 - 문제 해결: `TROUBLESHOOTING.md` ⚠️ (폴백 블록 문제 해결)
 
 ---

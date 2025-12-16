@@ -23,16 +23,16 @@ kakao_game/
 ├── Dockerfile               # Docker 이미지 정의
 ├── docker-compose.yml      # Docker Compose 설정
 ├── .dockerignore           # Docker 빌드 제외 파일
-├── KAKAO_BUSINESS_SETUP.md  # 카카오 비즈니스 웹훅 설정 가이드
-├── CHATBOT_ADMIN_GUIDE.md   # 카카오 챗봇 관리자센터 연동 가이드 (완전 무료) ⭐
-├── SKILL_SCENARIO_GUIDE.md  # 스킬 및 시나리오 등록 가이드 (발화 패턴 목록) ⭐
-├── SETUP_STEP_BY_STEP.md    # 실제 화면 기준 단계별 설정 가이드 📸
-├── PARAMETER_GUIDE.md       # 파라미터 설정 상세 가이드
-├── UTTERANCE_SETUP.md       # 사용자 발화 설정 가이드 (모든 발화 설정 방법) ⭐
-├── COMMAND_PATTERN_GUIDE.md # 커맨드 형태 발화 패턴 가이드 (슬래시/@ 커맨드) ⭐
-├── QUICK_REPLIES_GUIDE.md   # Quick Replies 버튼 가이드 (봇 멘션 시 버튼 표시) ⭐
-├── TROUBLESHOOTING.md       # 문제 해결 가이드 (폴백 블록 문제 등) ⚠️
-└── FREE_SETUP.md            # 무료 사용 가이드
+├── docs/                    # 문서 폴더
+│   ├── CHATBOT_ADMIN_GUIDE.md   # 카카오 챗봇 관리자센터 연동 가이드 ⭐
+│   ├── SKILL_SCENARIO_GUIDE.md  # 스킬 및 시나리오 등록 가이드 ⭐
+│   ├── SETUP_STEP_BY_STEP.md    # 실제 화면 기준 단계별 설정 가이드 📸
+│   ├── USER_UTTERANCE.md        # 사용자 발화 설정 가이드 (모든 발화, 커맨드 형태) ⭐
+│   ├── QUICK_REPLIES.md         # Quick Replies 버튼 가이드 ⭐
+│   ├── PARAMETER_GUIDE.md       # 파라미터 설정 상세 가이드
+│   ├── TROUBLESHOOTING.md       # 문제 해결 가이드 ⚠️
+│   ├── DOCKER.md                # Docker 사용 가이드
+│   └── FREE_SETUP.md            # 무료 사용 가이드
 ```
 
 ## 사용법
@@ -76,9 +76,9 @@ docker-compose down -v
 **볼륨 관리:**
 - 데이터베이스는 명명된 볼륨(`gamebot_data`)에 저장됩니다
 - 로그는 `gamebot_logs` 볼륨에 저장됩니다
-- 자세한 내용은 `DOCKER.md` 참조
+- 자세한 내용은 `docs/DOCKER.md` 참조
 
-**참고**: 카카오톡은 웹훅 서버 방식으로 동작합니다. 자세한 설정은 `CHATBOT_ADMIN_GUIDE.md` 참조.
+**참고**: 카카오톡은 웹훅 서버 방식으로 동작합니다. 자세한 설정은 `docs/CHATBOT_ADMIN_GUIDE.md` 참조.
 
 ### CLI 모드 사용법
 
@@ -282,7 +282,7 @@ python main.py kakao
 
 **추천 방법:**
 - **카카오 챗봇 관리자센터 사용** (완전 무료, 추천!)
-  - 상세 가이드: `CHATBOT_ADMIN_GUIDE.md` 참조
+  - 상세 가이드: `docs/CHATBOT_ADMIN_GUIDE.md` 참조
   - 챗봇 관리자센터: https://i.kakao.com/
   - 스킬 서버로 연동하여 모든 게임 기능 사용 가능
 
@@ -291,14 +291,14 @@ python main.py kakao
 **필수 설정:**
 - FastAPI 설치: `pip install fastapi uvicorn`
 - 카카오 챗봇 관리자센터에서 스킬 서버 URL 등록
-- 자세한 설정: `CHATBOT_ADMIN_GUIDE.md` 참조
+- 자세한 설정: `docs/CHATBOT_ADMIN_GUIDE.md` 참조
 
 **과금 정보:**
 - **완전 무료**: 카카오 챗봇 관리자센터의 무료 기능 활용
 - API 제한 없음
 - 서버 호스팅만 필요 (ngrok 무료 또는 무료 호스팅 서비스 사용)
 
-자세한 설정 및 무료 사용 방법은 `CHATBOT_ADMIN_GUIDE.md`와 `FREE_SETUP.md` 참조
+자세한 설정 및 무료 사용 방법은 `docs/CHATBOT_ADMIN_GUIDE.md`와 `docs/FREE_SETUP.md` 참조
 
 ### 디스코드
 

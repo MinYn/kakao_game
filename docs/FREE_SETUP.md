@@ -80,7 +80,7 @@ Forwarding: https://abc123.ngrok.io -> http://localhost:5000
 
 #### 3. 카카오톡 비즈니스 채널에 웹훅 등록
 
-**상세한 단계별 가이드는 `KAKAO_BUSINESS_SETUP.md` 파일을 참조하세요.**
+**상세한 단계별 가이드는 `CHATBOT_ADMIN_GUIDE.md` 파일을 참조하세요.**
 
 간단 요약:
 1. **카카오 비즈니스 접속**: https://business.kakao.com/
@@ -89,7 +89,7 @@ Forwarding: https://abc123.ngrok.io -> http://localhost:5000
 4. **API 연동** → 웹훅 URL 입력: `https://abc123.ngrok.io/webhook`
 5. **연결 확인**
 
-자세한 스크린샷과 단계별 설명은 `KAKAO_BUSINESS_SETUP.md` 참조
+자세한 스크린샷과 단계별 설명은 `SETUP_STEP_BY_STEP.md` 참조
 
 #### 4. 실행
 
