@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Tuple, Any
 from games.base_game import Game
 from games.number_guess import NumberGuessGame
 from games.rps import RockPaperScissorsGame
@@ -328,4 +328,227 @@ class GameEngine:
             result.append(f"{medal} {user_id}: {points}G")
         
         return "\n".join(result)
+    
+    def get_ui_buttons(self, user_id: str, response: str = None) -> List[Dict[str, str]]:
+        """UI 버튼 목록 반환 (플랫폼별 UI 생성용)
+        
+        Args:
+            user_id: 사용자 ID
+            response: 응답 메시지 (선택사항, 게임 상태 판단용)
+            
+        Returns:
+            버튼 목록 [{'label': '...', 'messageText': '...'}, ...]
+        """
+        # 모험 게임 중인지 확인
+        is_adventure = self.has_active_game(user_id)
+        
+        if is_adventure:
+            # 응답 텍스트로 모험 게임인지 확인
+            if response and ('강화' in response or '일반몹' in response or 
+                           '특수몹' in response or '보스몹' in response or '모험' in response):
+                return [
+                    {'label': '🔨 강화', 'messageText': '강화'},
+                    {'label': '🗡️ 사냥', 'messageText': '사냥'},
+                    {'label': '💰 판매', 'messageText': '판매'},
+                    {'label': '📊 상태', 'messageText': '상태'},
+                    {'label': '🏠 홈', 'messageText': '게임종료'},
+                ]
+            else:
+                return [
+                    {'label': '💰 골드', 'messageText': '골드'},
+                    {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
+                    {'label': '🏆 랭킹', 'messageText': '리더보드'},
+                    {'label': '📋 게임목록', 'messageText': '게임목록'},
+                    {'label': '❓ 도움말', 'messageText': '도움말'},
+                ]
+        else:
+            # 기본 버튼
+            return [
+                {'label': '💰 골드', 'messageText': '골드'},
+                {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
+                {'label': '🏆 랭킹', 'messageText': '리더보드'},
+                {'label': '📋 게임목록', 'messageText': '게임목록'},
+                {'label': '❓ 도움말', 'messageText': '도움말'},
+            ]
+    
+    def should_generate_image(self, user_id: str, command: str, response: str) -> bool:
+        """이미지 생성이 필요한지 확인
+        
+        Args:
+            user_id: 사용자 ID
+            command: 명령어
+            response: 응답 메시지
+            
+        Returns:
+            이미지 생성 필요 여부
+        """
+        if not response:
+            return False
+        
+        # 강화 결과 확인
+        if '강화 성공' in response or '강화 실패' in response:
+            return user_id in self.active_games
+        
+        # 사냥 결과 확인
+        if '사냥 성공' in response or '사냥 실패' in response:
+            return user_id in self.active_games
+        
+        return False
+    
+    def get_enhancement_image_data(self, user_id: str, response: str) -> Optional[Dict[str, Any]]:
+        """강화 이미지 생성에 필요한 데이터 반환
+        
+        Args:
+            user_id: 사용자 ID
+            response: 응답 메시지
+            
+        Returns:
+            이미지 생성 데이터 딕셔너리 또는 None
+        """
+        if user_id not in self.active_games:
+            return None
+        
+        game = self.active_games[user_id]
+        if not hasattr(game, 'current_level'):
+            return None
+        
+        # 강화 결과 파싱
+        is_success = '강화 성공' in response
+        level = game.current_level
+        previous_level = None
+        
+        # 실패 시 이전 레벨 추출
+        if not is_success and '→' in response:
+            import re
+            match = re.search(r'\+(\d+)\s*→\s*\+(\d+)', response)
+            if match:
+                previous_level = int(match.group(1))
+                level = int(match.group(2))
+        
+        gold = game.get_user_points() if hasattr(game, 'get_user_points') else 0
+        
+        # 추가 정보 수집
+        next_cost = 0
+        next_success_rate = 0
+        attempts = 0
+        successes = 0
+        failures = 0
+        
+        if hasattr(game, '_calculate_cost'):
+            next_cost = game._calculate_cost()
+        if hasattr(game, '_calculate_success_rate'):
+            next_success_rate = game._calculate_success_rate()
+        if hasattr(game, 'game_data'):
+            attempts = game.game_data.get('attempts', 0)
+            successes = game.game_data.get('successes', 0)
+            failures = game.game_data.get('failures', 0)
+        
+        return {
+            'level': level,
+            'max_level': None,  # 최대 레벨 제한 없음
+            'is_success': is_success,
+            'previous_level': previous_level,
+            'gold': gold,
+            'next_cost': next_cost,
+            'next_success_rate': next_success_rate,
+            'attempts': attempts,
+            'successes': successes,
+            'failures': failures
+        }
+    
+    def get_hunt_image_data(self, user_id: str, command: str, response: str) -> Optional[Dict[str, Any]]:
+        """사냥 이미지 생성에 필요한 데이터 반환
+        
+        Args:
+            user_id: 사용자 ID
+            command: 명령어
+            response: 응답 메시지
+            
+        Returns:
+            이미지 생성 데이터 딕셔너리 또는 None
+        """
+        if user_id not in self.active_games:
+            return None
+        
+        game = self.active_games[user_id]
+        if not hasattr(game, 'current_level'):
+            return None
+        
+        # 사냥 결과 파싱
+        is_success = '사냥 성공' in response
+        level = game.current_level
+        gold = game.get_user_points() if hasattr(game, 'get_user_points') else 0
+        
+        # 몬스터 정보 추출
+        monster_name = "몬스터"
+        monster_type = "일반몹"
+        reward = 0
+        
+        # 골드 추출
+        import re
+        gold_match = re.search(r'\+(\d+)G', response)
+        if gold_match:
+            reward = int(gold_match.group(1))
+        
+        # 몬스터 타입 확인 (우선순위: command > monster_names > response 메시지)
+        # command가 명확한 경우 우선 사용
+        if command:
+            # 정확한 타입명 매칭
+            if command == '일반몹':
+                monster_type = '일반몹'
+            elif command == '특수몹':
+                monster_type = '특수몹'
+            elif command == '보스몹':
+                monster_type = '보스몹'
+            # 단축키 매칭
+            elif command in ['normal', 'n', '1']:
+                monster_type = '일반몹'
+            elif command in ['special', 's', '2']:
+                monster_type = '특수몹'
+            elif command in ['boss', 'b', '3']:
+                monster_type = '보스몹'
+        
+        # command가 없거나 매칭되지 않으면 monster_names에서 확인 (가장 정확)
+        if monster_type == "일반몹" and hasattr(game, 'monster_names') and game.monster_names:
+            # monster_names의 키를 확인하여 타입 결정
+            available_types = list(game.monster_names.keys())
+            if available_types:
+                # command와 일치하는 타입이 있으면 사용
+                if command and command in available_types:
+                    monster_type = command
+                # 아니면 가장 최근에 추가된 타입 사용 (마지막 키)
+                else:
+                    monster_type = available_types[-1]
+        
+        # 그래도 못 찾으면 response에서 확인 (마지막 수단)
+        if monster_type == "일반몹":
+            # response에서 명시적으로 언급된 타입 확인
+            # 단, 통계 메시지("일반몹: X마리")는 무시
+            if '특수몹' in response:
+                # "특수몹"이 "일반몹"보다 먼저 나오는지 확인
+                special_idx = response.find('특수몹')
+                normal_idx = response.find('일반몹')
+                if special_idx != -1 and (normal_idx == -1 or special_idx < normal_idx):
+                    monster_type = '특수몹'
+            elif '보스몹' in response:
+                boss_idx = response.find('보스몹')
+                normal_idx = response.find('일반몹')
+                if boss_idx != -1 and (normal_idx == -1 or boss_idx < normal_idx):
+                    monster_type = '보스몹'
+        
+        # 몬스터 이름 추출
+        if hasattr(game, 'monster_names') and monster_type in game.monster_names:
+            monster_name = game.monster_names[monster_type]
+        elif hasattr(game, 'monster_names') and game.monster_names:
+            # monster_names에 있지만 타입이 다른 경우, 첫 번째 사용
+            monster_name = list(game.monster_names.values())[0]
+        
+        return {
+            'monster_name': monster_name,
+            'monster_type': monster_type,
+            'reward': reward,
+            'is_success': is_success,
+            'level': level,
+            'gold': gold
+        }
 

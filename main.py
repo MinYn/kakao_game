@@ -27,7 +27,7 @@ class GameBot:
         if platform_type == 'kakao':
             return KakaoAdapter()
         elif platform_type == 'discord':
-            return DiscordAdapter()
+            return DiscordAdapter(engine=self.engine)
         else:
             raise ValueError(f"지원하지 않는 플랫폼: {platform_type}")
     
@@ -76,7 +76,33 @@ class GameBot:
     def stop(self):
         """봇 종료"""
         print("게임 봇을 종료합니다...")
-        self.platform.stop()
+        try:
+            # 플랫폼 종료
+            if self.platform:
+                self.platform.stop()
+            
+            # 게임 엔진 데이터 저장
+            if self.engine:
+                try:
+                    # 모든 활성 게임 종료 및 데이터 저장
+                    if hasattr(self.engine, 'active_games'):
+                        for user_id in list(self.engine.active_games.keys()):
+                            try:
+                                game = self.engine.active_games.get(user_id)
+                                if game and hasattr(game, 'end'):
+                                    game.end()
+                            except Exception as e:
+                                print(f"게임 종료 오류 (user_id: {user_id}): {e}")
+                    
+                    # 데이터베이스 연결 정리
+                    if hasattr(self.engine, 'point_system') and self.engine.point_system:
+                        # SQLite는 자동으로 커밋되므로 명시적 저장 불필요
+                        # 하지만 연결을 명시적으로 닫을 수 있음
+                        pass
+                except Exception as e:
+                    print(f"데이터 저장 오류: {e}")
+        except Exception as e:
+            print(f"종료 중 오류: {e}")
 
 
 def main():
@@ -113,6 +139,7 @@ def main():
             while True:
                 time.sleep(1)
         elif platform == 'discord':
+            bot.start(use_webhook=False)
             print("\n✅ 디스코드 모드로 실행 중...")
             print("디스코드 봇이 실행되었습니다.")
             print("\n종료하려면 Ctrl+C를 누르세요.")
@@ -124,9 +151,17 @@ def main():
             print("💡 또는: python cli.py")
         
     except KeyboardInterrupt:
-        print("\n종료 중...")
+        print("\n종료 신호를 받았습니다...")
+    except Exception as e:
+        print(f"\n오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
-        bot.stop()
+        try:
+            bot.stop()
+        except Exception as e:
+            print(f"종료 중 오류: {e}")
+        print("✅ 봇이 안전하게 종료되었습니다.")
 
 
 if __name__ == '__main__':

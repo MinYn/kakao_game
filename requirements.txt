@@ -5,6 +5,9 @@ python-dotenv>=1.0.0
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 
-# 디스코드 봇 (예시 - 실제 사용 시 해당 라이브러리 설치)
-# discord.py>=2.3.0
+# 디스코드 봇
+discord.py>=2.3.0
+
+# 이미지 생성 (디스코드용)
+Pillow>=10.0.0
 

@@ -22,7 +22,7 @@ class AdventureGame(Game):
     
     def __init__(self, user_id: str, point_system=None):
         super().__init__(user_id, point_system)
-        self.max_level = Config.ENHANCEMENT_MAX_LEVEL
+        self.max_level = None  # 최대 레벨 제한 없음
         self.current_level = 0
         self.enhancement_cost_base = Config.ENHANCEMENT_BASE_COST
         self.enhancement_cost_multiplier = Config.ENHANCEMENT_COST_MULTIPLIER
@@ -87,21 +87,42 @@ class AdventureGame(Game):
     def start(self) -> str:
         """게임 시작"""
         self.is_active = True
-        self.current_level = 0
-        self.hunted_count = 0
-        self.total_reward = 0
-        self.hunt_stats = {'일반몹': 0, '특수몹': 0, '보스몹': 0}
+        # DB에서 강화 레벨 및 통계 로드
+        if self.point_system:
+            self.current_level = self.point_system.get_enhancement_level(self.user_id)
+            # 통계 로드
+            stats = self.point_system.get_game_stats(self.user_id)
+            self.game_data = {
+                'level': self.current_level,
+                'attempts': stats['enhancement_attempts'],
+                'successes': stats['enhancement_successes'],
+                'failures': stats['enhancement_failures'],
+                'hunted_count': stats['total_hunts'],
+                'total_reward': stats['total_hunt_reward'],
+                'hunt_stats': {
+                    '일반몹': stats['hunt_normal'],
+                    '특수몹': stats['hunt_special'],
+                    '보스몹': stats['hunt_boss']
+                }
+            }
+            self.hunted_count = stats['total_hunts']
+            self.total_reward = stats['total_hunt_reward']
+            self.hunt_stats = self.game_data['hunt_stats'].copy()
+        else:
+            self.current_level = 0
+            self.hunted_count = 0
+            self.total_reward = 0
+            self.hunt_stats = {'일반몹': 0, '특수몹': 0, '보스몹': 0}
+            self.game_data = {
+                'level': self.current_level,
+                'attempts': 0,
+                'successes': 0,
+                'failures': 0,
+                'hunted_count': 0,
+                'total_reward': 0,
+                'hunt_stats': self.hunt_stats
+            }
         self.monster_names = {}
-        self.game_data = {
-            'level': 0,
-            'max_level': self.max_level,
-            'attempts': 0,
-            'successes': 0,
-            'failures': 0,
-            'hunted_count': 0,
-            'total_reward': 0,
-            'hunt_stats': self.hunt_stats
-        }
         
         boss_tickets = self._get_boss_tickets()
         
@@ -193,9 +214,6 @@ class AdventureGame(Game):
     
     def _enhance(self) -> str:
         """강화 시도"""
-        if self.current_level >= self.max_level:
-            return f"🎉 이미 최대 레벨(+{self.max_level})입니다!"
-        
         cost = self._calculate_cost()
         
         if not self.point_system or not self.point_system.has_points(self.user_id, cost):
@@ -204,6 +222,12 @@ class AdventureGame(Game):
         self.deduct_points(cost, f"강화 시도 (+{self.current_level} → +{self.current_level + 1})")
         
         self.game_data['attempts'] = self.game_data.get('attempts', 0) + 1
+        # DB에 강화 시도 저장
+        if self.point_system:
+            self.point_system.update_game_stats(
+                user_id=self.user_id,
+                enhancement_attempts=1
+            )
         
         success_rate = self._calculate_success_rate()
         is_success = random.random() * 100 < success_rate
@@ -212,17 +236,16 @@ class AdventureGame(Game):
             self.current_level += 1
             self.game_data['level'] = self.current_level
             self.game_data['successes'] = self.game_data.get('successes', 0) + 1
+            # DB에 강화 레벨 및 성공 저장
+            if self.point_system:
+                self.point_system.set_enhancement_level(self.user_id, self.current_level)
+                self.point_system.update_game_stats(
+                    user_id=self.user_id,
+                    enhancement_successes=1
+                )
             
-            if self.current_level >= self.max_level:
-                result = f"""🎉🎉🎉 강화 성공! 🎉🎉🎉
-
-+{self.current_level} 강화 완료! (최대 레벨 달성!)
-💰 골드: {self.get_user_points()}G
-
-축하합니다! 최대 레벨을 달성했습니다!"""
-            else:
-                next_cost = self._calculate_cost()
-                result = f"""✅ 강화 성공!
+            next_cost = self._calculate_cost()
+            result = f"""✅ 강화 성공!
 
 +{self.current_level} 강화 완료!
 다음 강화 비용: {next_cost}G
@@ -231,10 +254,19 @@ class AdventureGame(Game):
 💡 강화 레벨이 높을수록 몬스터 사냥 보상이 증가합니다!"""
         else:
             self.game_data['failures'] = self.game_data.get('failures', 0) + 1
+            # DB에 강화 실패 저장
+            if self.point_system:
+                self.point_system.update_game_stats(
+                    user_id=self.user_id,
+                    enhancement_failures=1
+                )
             
             if self.current_level > 0:
                 self.current_level -= 1
                 self.game_data['level'] = self.current_level
+                # DB에 강화 레벨 저장
+                if self.point_system:
+                    self.point_system.set_enhancement_level(self.user_id, self.current_level)
                 result = f"""❌ 강화 실패...
 
 +{self.current_level + 1} → +{self.current_level} (레벨 하락)
@@ -264,6 +296,9 @@ class AdventureGame(Game):
         
         self.current_level = 0
         self.game_data['level'] = 0
+        # DB에 강화 레벨 저장 (0으로 리셋)
+        if self.point_system:
+            self.point_system.set_enhancement_level(self.user_id, 0)
         
         return f"""💰 아이템 판매 완료!
 
@@ -369,6 +404,21 @@ class AdventureGame(Game):
             self.game_data['total_reward'] = self.total_reward
             self.game_data['hunt_stats'] = self.hunt_stats
             
+            # DB에 사냥 통계 저장
+            if self.point_system:
+                hunt_type_map = {
+                    '일반몹': 'hunt_normal',
+                    '특수몹': 'hunt_special',
+                    '보스몹': 'hunt_boss'
+                }
+                update_params = {
+                    'user_id': self.user_id,
+                    'total_hunts': 1,
+                    'total_hunt_reward': reward
+                }
+                update_params[hunt_type_map[monster_type.name]] = 1
+                self.point_system.update_game_stats(**update_params)
+            
             multiplier = monster_type.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER
             multiplier_percent = multiplier * 100
             kill_message = self._get_kill_message(monster_type, monster_name)
@@ -438,7 +488,7 @@ class AdventureGame(Game):
         status = f"""📊 현재 상태
 
 🔨 강화 정보:
-- 강화 레벨: +{self.current_level} / +{self.max_level}
+- 강화 레벨: +{self.current_level}
 - 다음 강화 비용: {cost}G
 - 성공 확률: {success_rate:.1f}%
 - 판매 가격: {sell_price}G
@@ -469,6 +519,20 @@ class AdventureGame(Game):
         hunted = self.hunted_count
         reward = self.total_reward
         stats = self.hunt_stats.copy()
+        
+        # 게임 종료 시 최종 통계를 DB에 동기화
+        if self.point_system:
+            self.point_system.set_game_stats(
+                user_id=self.user_id,
+                enhancement_attempts=attempts,
+                enhancement_successes=successes,
+                enhancement_failures=failures,
+                hunt_normal=stats.get('일반몹', 0),
+                hunt_special=stats.get('특수몹', 0),
+                hunt_boss=stats.get('보스몹', 0),
+                total_hunts=hunted,
+                total_hunt_reward=reward
+            )
         
         self.is_active = False
         self.game_data.clear()

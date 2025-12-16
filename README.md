@@ -303,9 +303,72 @@ python main.py kakao
 ### 디스코드
 
 디스코드 봇을 사용하려면:
-1. Discord Developer Portal에서 봇 생성
-2. `discord.py` 설치: `pip install discord.py`
-3. `discord_adapter.py`의 주석 처리된 코드 활성화 및 수정
+
+#### 1. Discord Developer Portal에서 봇 생성
+
+1. **Discord Developer Portal 접속**
+   - https://discord.com/developers/applications 접속
+   - Discord 계정으로 로그인
+
+2. **새 애플리케이션 생성**
+   - "New Application" 클릭
+   - 애플리케이션 이름 입력 (예: "GameBot")
+   - "Create" 클릭
+
+3. **봇 생성**
+   - 왼쪽 메뉴에서 "Bot" 클릭
+   - "Add Bot" 클릭
+   - "Yes, do it!" 클릭
+
+4. **봇 토큰 복사**
+   - "Token" 섹션에서 "Reset Token" 또는 "Copy" 클릭
+   - 토큰을 안전하게 보관 (다시 볼 수 없으므로 복사 필수!)
+
+5. **봇 권한 설정**
+   - "Bot Permissions" 섹션에서 필요한 권한 선택:
+     - Send Messages
+     - Read Message History
+     - Use Slash Commands (선택사항)
+   - "OAuth2" → "URL Generator"에서 권한 선택 후 생성된 URL로 봇을 서버에 초대
+
+#### 2. 환경 변수 설정
+
+`.env` 파일에 다음 값 설정:
+
+```env
+PLATFORM=discord
+DISCORD_TOKEN=your_bot_token_here
+DISCORD_COMMAND_PREFIX=!
+INITIAL_POINTS=100
+```
+
+**중요**: `DISCORD_TOKEN`에 위에서 복사한 봇 토큰을 입력하세요.
+
+#### 3. 패키지 설치 및 실행
+
+```bash
+# 패키지 설치
+pip install -r requirements.txt
+
+# 디스코드 봇 실행
+python main.py discord
+```
+
+#### 4. 사용 방법
+
+- **DM (개인 메시지)**: 봇에게 직접 메시지를 보내면 자동으로 응답합니다.
+- **서버 채널**: 명령어 접두사(`!`)를 사용하여 명령을 실행합니다.
+  - 예: `!게임목록`, `!게임시작 숫자맞추기`, `!골드` 등
+
+**주요 명령어:**
+- `!게임목록`: 사용 가능한 게임 보기
+- `!게임시작 숫자맞추기`: 숫자 맞추기 게임 시작
+- `!게임시작 가위바위보`: 가위바위보 게임 시작
+- `!게임시작 모험`: 모험 게임 시작 (강화 + 몬스터 사냥)
+- `!골드`: 내 골드 조회
+- `!골드주기 [사용자] [금액]`: 다른 사용자에게 골드 전송
+- `!리더보드`: 골드 랭킹 보기
+- `!도움말`: 도움말 보기
 
 ## 예시
 

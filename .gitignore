@@ -48,5 +48,6 @@ wheels/
 *.json.backup
 
 # 불필요한 파일
-points_data.json
+*.sqlite
 
+/text_game

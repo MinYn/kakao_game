@@ -49,6 +49,33 @@ class PointSystem:
             )
         ''')
         
+        # 강화 레벨 테이블 생성
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS enhancement_levels (
+                user_id TEXT PRIMARY KEY,
+                level INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # 게임 통계 테이블 생성
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS game_stats (
+                user_id TEXT PRIMARY KEY,
+                enhancement_attempts INTEGER NOT NULL DEFAULT 0,
+                enhancement_successes INTEGER NOT NULL DEFAULT 0,
+                enhancement_failures INTEGER NOT NULL DEFAULT 0,
+                hunt_normal INTEGER NOT NULL DEFAULT 0,
+                hunt_special INTEGER NOT NULL DEFAULT 0,
+                hunt_boss INTEGER NOT NULL DEFAULT 0,
+                total_hunts INTEGER NOT NULL DEFAULT 0,
+                total_hunt_reward INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         conn.commit()
         conn.close()
     
@@ -336,3 +363,197 @@ class PointSystem:
         conn.commit()
         conn.close()
         return True
+    
+    def get_enhancement_level(self, user_id: str) -> int:
+        """강화 레벨 조회"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT level FROM enhancement_levels WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        
+        conn.close()
+        return result['level'] if result else 0
+    
+    def set_enhancement_level(self, user_id: str, level: int) -> None:
+        """강화 레벨 설정"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        level = max(0, level)  # 최소 0
+        cursor.execute('SELECT level FROM enhancement_levels WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        
+        if result:
+            cursor.execute(
+                'UPDATE enhancement_levels SET level = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
+                (level, user_id)
+            )
+        else:
+            cursor.execute(
+                'INSERT INTO enhancement_levels (user_id, level) VALUES (?, ?)',
+                (user_id, level)
+            )
+        
+        conn.commit()
+        conn.close()
+    
+    def get_game_stats(self, user_id: str) -> dict:
+        """게임 통계 조회"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT enhancement_attempts, enhancement_successes, enhancement_failures,
+                   hunt_normal, hunt_special, hunt_boss, total_hunts, total_hunt_reward
+            FROM game_stats WHERE user_id = ?
+        ''', (user_id,))
+        result = cursor.fetchone()
+        
+        conn.close()
+        
+        if result:
+            return {
+                'enhancement_attempts': result['enhancement_attempts'],
+                'enhancement_successes': result['enhancement_successes'],
+                'enhancement_failures': result['enhancement_failures'],
+                'hunt_normal': result['hunt_normal'],
+                'hunt_special': result['hunt_special'],
+                'hunt_boss': result['hunt_boss'],
+                'total_hunts': result['total_hunts'],
+                'total_hunt_reward': result['total_hunt_reward']
+            }
+        else:
+            return {
+                'enhancement_attempts': 0,
+                'enhancement_successes': 0,
+                'enhancement_failures': 0,
+                'hunt_normal': 0,
+                'hunt_special': 0,
+                'hunt_boss': 0,
+                'total_hunts': 0,
+                'total_hunt_reward': 0
+            }
+    
+    def update_game_stats(
+        self,
+        user_id: str,
+        enhancement_attempts: int = 0,
+        enhancement_successes: int = 0,
+        enhancement_failures: int = 0,
+        hunt_normal: int = 0,
+        hunt_special: int = 0,
+        hunt_boss: int = 0,
+        total_hunts: int = 0,
+        total_hunt_reward: int = 0
+    ) -> None:
+        """게임 통계 업데이트 (증가값으로 업데이트)"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        # 기존 통계 조회
+        cursor.execute('SELECT * FROM game_stats WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        
+        if result:
+            # 기존 값에 증가값 추가
+            new_attempts = result['enhancement_attempts'] + enhancement_attempts
+            new_successes = result['enhancement_successes'] + enhancement_successes
+            new_failures = result['enhancement_failures'] + enhancement_failures
+            new_normal = result['hunt_normal'] + hunt_normal
+            new_special = result['hunt_special'] + hunt_special
+            new_boss = result['hunt_boss'] + hunt_boss
+            new_total_hunts = result['total_hunts'] + total_hunts
+            new_total_reward = result['total_hunt_reward'] + total_hunt_reward
+            
+            cursor.execute('''
+                UPDATE game_stats SET
+                    enhancement_attempts = ?,
+                    enhancement_successes = ?,
+                    enhancement_failures = ?,
+                    hunt_normal = ?,
+                    hunt_special = ?,
+                    hunt_boss = ?,
+                    total_hunts = ?,
+                    total_hunt_reward = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+            ''', (new_attempts, new_successes, new_failures, new_normal, new_special,
+                  new_boss, new_total_hunts, new_total_reward, user_id))
+        else:
+            # 새로 생성
+            cursor.execute('''
+                INSERT INTO game_stats (
+                    user_id, enhancement_attempts, enhancement_successes, enhancement_failures,
+                    hunt_normal, hunt_special, hunt_boss, total_hunts, total_hunt_reward
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, enhancement_attempts, enhancement_successes, enhancement_failures,
+                  hunt_normal, hunt_special, hunt_boss, total_hunts, total_hunt_reward))
+        
+        conn.commit()
+        conn.close()
+    
+    def set_game_stats(
+        self,
+        user_id: str,
+        enhancement_attempts: int = None,
+        enhancement_successes: int = None,
+        enhancement_failures: int = None,
+        hunt_normal: int = None,
+        hunt_special: int = None,
+        hunt_boss: int = None,
+        total_hunts: int = None,
+        total_hunt_reward: int = None
+    ) -> None:
+        """게임 통계 설정 (절대값으로 설정)"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        # 기존 통계 조회
+        cursor.execute('SELECT * FROM game_stats WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        
+        if result:
+            # 기존 값 유지하거나 새 값으로 업데이트
+            attempts = enhancement_attempts if enhancement_attempts is not None else result['enhancement_attempts']
+            successes = enhancement_successes if enhancement_successes is not None else result['enhancement_successes']
+            failures = enhancement_failures if enhancement_failures is not None else result['enhancement_failures']
+            normal = hunt_normal if hunt_normal is not None else result['hunt_normal']
+            special = hunt_special if hunt_special is not None else result['hunt_special']
+            boss = hunt_boss if hunt_boss is not None else result['hunt_boss']
+            total_hunts_val = total_hunts if total_hunts is not None else result['total_hunts']
+            total_reward = total_hunt_reward if total_hunt_reward is not None else result['total_hunt_reward']
+            
+            cursor.execute('''
+                UPDATE game_stats SET
+                    enhancement_attempts = ?,
+                    enhancement_successes = ?,
+                    enhancement_failures = ?,
+                    hunt_normal = ?,
+                    hunt_special = ?,
+                    hunt_boss = ?,
+                    total_hunts = ?,
+                    total_hunt_reward = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+            ''', (attempts, successes, failures, normal, special, boss, total_hunts_val, total_reward, user_id))
+        else:
+            # 새로 생성 (None인 경우 0으로 설정)
+            attempts = enhancement_attempts or 0
+            successes = enhancement_successes or 0
+            failures = enhancement_failures or 0
+            normal = hunt_normal or 0
+            special = hunt_special or 0
+            boss = hunt_boss or 0
+            total_hunts_val = total_hunts or 0
+            total_reward = total_hunt_reward or 0
+            
+            cursor.execute('''
+                INSERT INTO game_stats (
+                    user_id, enhancement_attempts, enhancement_successes, enhancement_failures,
+                    hunt_normal, hunt_special, hunt_boss, total_hunts, total_hunt_reward
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, attempts, successes, failures, normal, special, boss, total_hunts_val, total_reward))
+        
+        conn.commit()
+        conn.close()
