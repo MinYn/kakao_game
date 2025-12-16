@@ -26,6 +26,12 @@ kakao_game/
 ├── KAKAO_BUSINESS_SETUP.md  # 카카오 비즈니스 웹훅 설정 가이드
 ├── CHATBOT_ADMIN_GUIDE.md   # 카카오 챗봇 관리자센터 연동 가이드 (완전 무료) ⭐
 ├── SKILL_SCENARIO_GUIDE.md  # 스킬 및 시나리오 등록 가이드 (발화 패턴 목록) ⭐
+├── SETUP_STEP_BY_STEP.md    # 실제 화면 기준 단계별 설정 가이드 📸
+├── PARAMETER_GUIDE.md       # 파라미터 설정 상세 가이드
+├── UTTERANCE_SETUP.md       # 사용자 발화 설정 가이드 (모든 발화 설정 방법) ⭐
+├── COMMAND_PATTERN_GUIDE.md # 커맨드 형태 발화 패턴 가이드 (슬래시/@ 커맨드) ⭐
+├── QUICK_REPLIES_GUIDE.md   # Quick Replies 버튼 가이드 (봇 멘션 시 버튼 표시) ⭐
+├── TROUBLESHOOTING.md       # 문제 해결 가이드 (폴백 블록 문제 등) ⚠️
 └── FREE_SETUP.md            # 무료 사용 가이드
 ```
 

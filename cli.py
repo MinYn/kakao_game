@@ -52,7 +52,11 @@ class CLIMode:
         print("💡 '종료' 또는 'q'를 입력하면 프로그램을 종료합니다.")
         print(
             "💡 모든 명령어에 단축키가 있습니다! "
-            "(예: g=골드, gl=게임목록, s=게임시작)\n"
+            "(예: g=골드, gl=게임목록, s=게임시작)"
+        )
+        print(
+            "💡 슬래시 커맨드도 사용 가능합니다! "
+            "(예: /골드, /게임시작 모험)\n"
         )
         print("=" * 50)
 
@@ -66,14 +70,16 @@ class CLIMode:
   - 게임시작 [게임] (s, gs)   : 게임 시작
     예: s n, s 1, s number → 숫자맞추기
         s r, s 2, s rps → 가위바위보
-        s e, s 3, s enhancement → 강화
+        s a, s 3, s adventure → 모험
+    슬래시 커맨드: /게임시작 모험, /s a
   - 게임종료 (e, end, ge)     : 현재 게임 종료
 
 💰 골드 관련:
   - 골드 (g, gold, p, pt)            : 내 골드 조회
+  - /골드, @게임봇 골드              : 슬래시/@ 커맨드로도 사용 가능
   - 골드주기 [사용자] [금액] (pay, send):
     다른 사용자에게 골드 전송
-    예: pay alice 50, send bob 100
+    예: pay alice 50, send bob 100, /골드주기 alice 50
   - 리더보드 (l, lb, rank)    : 골드 랭킹 보기
 
 👤 사용자 관련:

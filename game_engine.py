@@ -29,18 +29,43 @@ class GameEngine:
         is_new_user = self.point_system.ensure_initial_points(user_id)
         
         message = message.strip()
+
+        # 커맨드 형태 처리 (/명령어 또는 @봇이름 명령어)
+        # "/골드" 또는 "@게임봇 골드" 형태 지원
+        if message.startswith('/'):
+            # 슬래시 커맨드: "/골드" -> "골드"
+            message = message[1:].strip()
+        elif message.startswith('@'):
+            # @봇이름 커맨드: "@게임봇 골드" -> "골드"
+            # @ 뒤의 공백까지 제거
+            parts = message[1:].split(None, 1)  # 최대 1번만 분할
+            if len(parts) > 1:
+                # 봇 이름 뒤의 명령어만 추출
+                message = parts[1].strip()
+            else:
+                message = ''  # "@봇이름"만 입력한 경우
         
         # 골드 조회 (단축키: g, gold, p, pt)
-        if message.lower() in ['골드', 'gold', 'g', '포인트', 'point', 'points', '잔액', '내골드', 'p', 'pt']:
+        gold_commands = [
+            '골드', 'gold', 'g', '포인트', 'point', 'points',
+            '잔액', '내골드', 'p', 'pt'
+        ]
+        if message.lower() in gold_commands:
             response = self._get_points(user_id)
             if is_new_user:
-                response = f"🎉 환영합니다! 신규 사용자에게 {Config.INITIAL_POINTS}G를 지급했습니다!\n\n{response}"
+                response = (
+                    f"🎉 환영합니다! 신규 사용자에게 "
+                    f"{Config.INITIAL_POINTS}G를 지급했습니다!\n\n"
+                    f"{response}"
+                )
             return response
         
         # 골드 전송 (단축키: pay, send)
         msg_lower = message.lower()
-        if (msg_lower.startswith('골드주기') or msg_lower.startswith('골드전송') or
-            msg_lower.startswith('pay ') or msg_lower.startswith('send ')):
+        if (msg_lower.startswith('골드주기') or
+                msg_lower.startswith('골드전송') or
+                msg_lower.startswith('pay ') or
+                msg_lower.startswith('send ')):
             # 단축키 변환
             if msg_lower.startswith('pay '):
                 message = '골드주기 ' + message[4:]
@@ -49,11 +74,18 @@ class GameEngine:
             return self._transfer_points(user_id, message)
         
         # 리더보드 (단축키: l, lb, rank)
-        if message.lower() in ['리더보드', '랭킹', 'leaderboard', 'ranking', 'l', 'lb', 'rank', 'r']:
+        leaderboard_commands = [
+            '리더보드', '랭킹', 'leaderboard', 'ranking',
+            'l', 'lb', 'rank', 'r'
+        ]
+        if message.lower() in leaderboard_commands:
             return self._get_leaderboard()
         
         # 게임 목록 (단축키: g, gl, list)
-        if message.lower() in ['게임목록', '게임', 'games', 'list', 'g', 'gl']:
+        game_list_commands = [
+            '게임목록', '게임', 'games', 'list', 'g', 'gl'
+        ]
+        if message.lower() in game_list_commands:
             return self._list_games()
         
         # 도움말 (단축키: h, ?)
@@ -62,9 +94,11 @@ class GameEngine:
         
         # 게임 시작 (단축키: s, start, gs)
         msg_lower = message.lower()
-        if (msg_lower.startswith('게임시작') or msg_lower.startswith('시작') or 
-            msg_lower.startswith('s ') or msg_lower.startswith('start ') or 
-            msg_lower.startswith('gs ')):
+        if (msg_lower.startswith('게임시작') or
+                msg_lower.startswith('시작') or
+                msg_lower.startswith('s ') or
+                msg_lower.startswith('start ') or
+                msg_lower.startswith('gs ')):
             # 단축키 변환
             if msg_lower.startswith('s '):
                 game_name = message[2:].strip()
@@ -73,11 +107,16 @@ class GameEngine:
             elif msg_lower.startswith('gs '):
                 game_name = message[3:].strip()
             else:
-                game_name = message.replace('게임시작', '').replace('시작', '').strip()
+                game_name = (
+                    message.replace('게임시작', '')
+                    .replace('시작', '')
+                    .strip()
+                )
             return self._start_game(user_id, game_name)
-        
+
         # 게임 종료 (단축키: e, end, ge)
-        if message.lower() in ['게임종료', '종료', 'end', 'e', 'ge']:
+        end_commands = ['게임종료', '종료', 'end', 'e', 'ge']
+        if message.lower() in end_commands:
             return self._end_game(user_id)
         
         # 활성 게임이 있으면 게임 명령 처리
@@ -87,7 +126,11 @@ class GameEngine:
                 return game.process_command(message)
         
         # 기본 응답
-        return "게임을 시작하려면 '게임시작 [게임이름]' 또는 's [게임]'을 입력하세요.\n'게임목록' 또는 'g'로 사용 가능한 게임을 확인할 수 있습니다."
+        return (
+            "게임을 시작하려면 '게임시작 [게임이름]' 또는 "
+            "'s [게임]'을 입력하세요.\n"
+            "'게임목록' 또는 'g'로 사용 가능한 게임을 확인할 수 있습니다."
+        )
     
     def _list_games(self) -> str:
         """게임 목록 반환"""
@@ -97,7 +140,9 @@ class GameEngine:
             "2. 가위바위보 (rps, r, 2) - 컴퓨터와 가위바위보를 해보세요",
             "3. 모험 (adventure, a, adv, 3) - 강화와 몬스터 사냥을 한 게임에서!",
             "",
-            "사용법: '게임시작 [게임이름]' 또는 's [게임]'"
+            "사용법: '게임시작 [게임이름]' 또는 's [게임]'",
+            "",
+            "커맨드 형태도 지원: '/게임시작 모험', '@게임봇 게임시작 모험'"
         ]
         return "\n".join(games_list)
     
@@ -105,6 +150,12 @@ class GameEngine:
         """도움말 반환"""
         help_text = [
             "🎮 게임 봇 도움말",
+            "",
+            "명령어 사용법:",
+            "- 일반 명령어: '골드', '게임시작 모험' 등",
+            "- 슬래시 커맨드: '/골드', '/게임시작 모험' 등",
+            "- @봇이름 커맨드: '@게임봇 골드', "
+            "'@게임봇 게임시작 모험' 등",
             "",
             "명령어 (단축키):",
             "- 골드 (g, gold, p, pt): 내 골드 조회",
@@ -115,6 +166,11 @@ class GameEngine:
             "  게임 단축키: 숫자맞추기(n, 1), 가위바위보(r, 2), 모험(a, adv, 3)",
             "- 게임종료 (e, end, ge): 현재 게임 종료",
             "- 도움말 (h, ?): 이 도움말 보기",
+            "",
+            "예시:",
+            "- /골드",
+            "- /게임시작 모험",
+            "- @게임봇 리더보드",
             "",
             "게임 중에는 게임 명령을 입력하세요."
         ]
@@ -163,14 +219,19 @@ class GameEngine:
                 break
         
         if game_class is None:
-            return f"'{game_name}' 게임을 찾을 수 없습니다.\n'게임목록' 또는 'g'로 사용 가능한 게임을 확인하세요."
+            return (
+                f"'{game_name}' 게임을 찾을 수 없습니다.\n"
+                "'게임목록' 또는 'g'로 사용 가능한 게임을 확인하세요."
+            )
         
         # 게임 생성 및 시작
         try:
-            game = game_class(user_id, point_system=self.point_system)
+            game = game_class(
+                user_id, point_system=self.point_system
+            )
             self.active_games[user_id] = game
             return game.start()
-        except Exception as e:
+        except (ValueError, AttributeError, KeyError) as e:
             return f"게임 시작 중 오류가 발생했습니다: {str(e)}"
     
     def _end_game(self, user_id: str) -> str:
@@ -198,7 +259,10 @@ class GameEngine:
         parts = message.replace('골드주기', '').replace('골드전송', '').strip().split()
         
         if len(parts) < 2:
-            return "❌ 사용법: '골드주기 [사용자] [금액]'\n예: 골드주기 alice 50"
+            return (
+                "❌ 사용법: '골드주기 [사용자] [금액]'\n"
+                "예: 골드주기 alice 50"
+            )
         
         # 금액과 사용자 추출
         to_user = None
@@ -225,7 +289,11 @@ class GameEngine:
         # 골드 확인
         current_points = self.point_system.get_points(from_user)
         if current_points < amount:
-            return f"❌ 골드가 부족합니다.\n현재 골드: {current_points}G\n전송하려는 골드: {amount}G"
+            return (
+                f"❌ 골드가 부족합니다.\n"
+                f"현재 골드: {current_points}G\n"
+                f"전송하려는 골드: {amount}G"
+            )
         
         # 골드 전송
         result = self.point_system.transfer_points(

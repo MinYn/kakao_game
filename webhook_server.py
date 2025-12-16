@@ -42,7 +42,82 @@ class WebhookServer:
         
         return str(user_id), utterance
     
-    def _create_response(self, text: str) -> Dict[str, Any]:
+    def _get_default_quick_replies(self) -> list:
+        """
+        기본 Quick Replies 버튼 목록 생성
+        
+        카카오톡에서 봇 멘션(@봇이름) 시 표시될 커맨드 버튼들
+        """
+        return [
+            {
+                'action': 'message',
+                'label': '💰 골드',
+                'messageText': '골드'
+            },
+            {
+                'action': 'message',
+                'label': '🎮 게임시작',
+                'messageText': '게임시작 모험'
+            },
+            {
+                'action': 'message',
+                'label': '🏆 랭킹',
+                'messageText': '리더보드'
+            },
+            {
+                'action': 'message',
+                'label': '📋 게임목록',
+                'messageText': '게임목록'
+            },
+            {
+                'action': 'message',
+                'label': '❓ 도움말',
+                'messageText': '도움말'
+            }
+        ]
+    
+    def _get_adventure_quick_replies(self) -> list:
+        """
+        모험 게임 중 Quick Replies 버튼 목록 생성
+        """
+        return [
+            {
+                'action': 'message',
+                'label': '🔨 강화',
+                'messageText': '강화'
+            },
+            {
+                'action': 'message',
+                'label': '🗡️ 사냥',
+                'messageText': '사냥'
+            },
+            {
+                'action': 'message',
+                'label': '💰 판매',
+                'messageText': '판매'
+            },
+            {
+                'action': 'message',
+                'label': '📊 상태',
+                'messageText': '상태'
+            },
+            {
+                'action': 'message',
+                'label': '🏆 랭킹',
+                'messageText': '리더보드'
+            },
+            {
+                'action': 'message',
+                'label': '❌ 종료',
+                'messageText': '게임종료'
+            }
+        ]
+    
+    def _create_response(
+        self,
+        text: str,
+        quick_replies: Optional[list] = None
+    ) -> Dict[str, Any]:
         """
         카카오 챗봇 관리자센터 스킬 서버 응답 생성
         
@@ -58,10 +133,23 @@ class WebhookServer:
                         }
                     }
                 ],
-                "quickReplies": []
+                "quickReplies": [
+                    {
+                        "action": "message",
+                        "label": "버튼 텍스트",
+                        "messageText": "전송될 메시지"
+                    }
+                ]
             }
         }
+        
+        Args:
+            text: 응답 메시지 텍스트
+            quick_replies: Quick Replies 버튼 목록 (None이면 기본 버튼 사용)
         """
+        if quick_replies is None:
+            quick_replies = self._get_default_quick_replies()
+        
         return {
             'version': '2.0',
             'template': {
@@ -73,7 +161,7 @@ class WebhookServer:
                         }
                     }
                 ],
-                'quickReplies': []
+                'quickReplies': quick_replies
             }
         }
     
@@ -112,7 +200,7 @@ class WebhookServer:
                                         }
                                     }
                                 ],
-                                'quickReplies': []
+                                'quickReplies': self._get_default_quick_replies()
                             }
                         }
                     )
@@ -120,8 +208,19 @@ class WebhookServer:
                 # 메시지 처리
                 response_text = self.engine.process_message(user_id, message)
                 
+                # Quick Replies 버튼 결정
+                # 모험 게임 중이면 모험 게임 버튼, 아니면 기본 버튼
+                quick_replies = None
+                if self.engine.has_active_game(user_id):
+                    # 게임 타입 확인을 위해 게임 이름으로 판단
+                    # 응답 텍스트에 "모험" 또는 "강화" 키워드가 있으면 모험 게임
+                    if ('강화' in response_text or
+                            '사냥' in response_text or
+                            '모험' in response_text):
+                        quick_replies = self._get_adventure_quick_replies()
+                
                 # 카카오 챗봇 관리자센터 스킬 서버 응답 형식으로 반환
-                response = self._create_response(response_text)
+                response = self._create_response(response_text, quick_replies)
                 
                 print(f"[웹훅 응답] 사용자: {user_id}, 메시지: {message}, 응답: {response_text[:50]}...")
                 
