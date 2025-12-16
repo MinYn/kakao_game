@@ -53,10 +53,12 @@ class WebhookServer:
                 "outputs": [
                     {
                         "simpleText": {
-                            "text": "응답 메시지"
+                            "text": "응답 메시지",
+                            "extra": {}
                         }
                     }
-                ]
+                ],
+                "quickReplies": []
             }
         }
         """
@@ -66,10 +68,12 @@ class WebhookServer:
                 'outputs': [
                     {
                         'simpleText': {
-                            'text': text
+                            'text': text,
+                            'extra': {}
                         }
                     }
-                ]
+                ],
+                'quickReplies': []
             }
         }
     
@@ -103,10 +107,12 @@ class WebhookServer:
                                 'outputs': [
                                     {
                                         'simpleText': {
-                                            'text': '❌ 잘못된 요청 형식입니다.'
+                                            'text': '❌ 잘못된 요청 형식입니다.',
+                                            'extra': {}
                                         }
                                     }
-                                ]
+                                ],
+                                'quickReplies': []
                             }
                         }
                     )
@@ -135,10 +141,12 @@ class WebhookServer:
                             'outputs': [
                                 {
                                     'simpleText': {
-                                        'text': f'❌ 오류가 발생했습니다: {str(e)}'
+                                        'text': f'❌ 오류가 발생했습니다: {str(e)}',
+                                        'extra': {}
                                     }
                                 }
-                            ]
+                            ],
+                            'quickReplies': []
                         }
                     }
                 )

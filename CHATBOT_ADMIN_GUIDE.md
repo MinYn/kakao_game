@@ -189,10 +189,12 @@ Forwarding: https://abc123.ngrok.io -> http://localhost:5000
     "outputs": [
       {
         "simpleText": {
-          "text": "응답 메시지"
+          "text": "응답 메시지",
+          "extra": {}
         }
       }
-    ]
+    ],
+    "quickReplies": []
   }
 }
 ```
@@ -202,8 +204,17 @@ Forwarding: https://abc123.ngrok.io -> http://localhost:5000
 1. **간단한 텍스트**:
 ```json
 {
-  "simpleText": {
-    "text": "안녕하세요!"
+  "version": "2.0",
+  "template": {
+    "outputs": [
+      {
+        "simpleText": {
+          "text": "안녕하세요!",
+          "extra": {}
+        }
+      }
+    ],
+    "quickReplies": []
   }
 }
 ```
@@ -211,9 +222,17 @@ Forwarding: https://abc123.ngrok.io -> http://localhost:5000
 2. **이미지 포함**:
 ```json
 {
-  "simpleImage": {
-    "imageUrl": "https://example.com/image.jpg",
-    "altText": "이미지 설명"
+  "version": "2.0",
+  "template": {
+    "outputs": [
+      {
+        "simpleImage": {
+          "imageUrl": "https://example.com/image.jpg",
+          "altText": "이미지 설명"
+        }
+      }
+    ],
+    "quickReplies": []
   }
 }
 ```
@@ -221,10 +240,14 @@ Forwarding: https://abc123.ngrok.io -> http://localhost:5000
 3. **카드형 응답**:
 ```json
 {
-  "basicCard": {
-    "title": "제목",
-    "description": "설명",
-    "thumbnail": {
+  "version": "2.0",
+  "template": {
+    "outputs": [
+      {
+        "basicCard": {
+          "title": "제목",
+          "description": "설명",
+          "thumbnail": {
       "imageUrl": "https://example.com/image.jpg"
     },
     "buttons": [
@@ -331,11 +354,32 @@ railway up
 
 ## 참고 자료
 
+- **스킬 및 시나리오 등록 가이드**: `SKILL_SCENARIO_GUIDE.md` ⭐ (상세한 발화 패턴 목록 포함)
 - **챗봇 관리자센터 가이드**: https://kakaobusiness.gitbook.io/main/tool/chatbot
 - **스킬 개발 가이드**: https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide
 - **응답 타입별 JSON 포맷**: https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide/answer_json_format
 - **카카오 비즈니스**: https://business.kakao.com/
 - **챗봇 관리자센터**: https://i.kakao.com/
+
+---
+
+## 부록: 스킬 및 시나리오 등록 요약
+
+### 스킬 등록 (1개만 필요)
+
+**스킬 이름**: `게임봇 스킬`
+**스킬 서버 URL**: `https://yourdomain.com/webhook`
+
+### 시나리오 등록 (최소 설정)
+
+**블록 1개 생성**:
+- **블록 이름**: `게임봇 메인 블록`
+- **발화 패턴**: 모든 발화 (기본 블록)
+- **스킬 연결**: `게임봇 스킬`
+
+**완료!** 이제 모든 명령어가 스킬 서버로 전달됩니다.
+
+**상세한 발화 패턴 목록과 블록 구성 방법은 `SKILL_SCENARIO_GUIDE.md`를 참조하세요.**
 
 ---
 

@@ -25,6 +25,7 @@ kakao_game/
 ├── .dockerignore           # Docker 빌드 제외 파일
 ├── KAKAO_BUSINESS_SETUP.md  # 카카오 비즈니스 웹훅 설정 가이드
 ├── CHATBOT_ADMIN_GUIDE.md   # 카카오 챗봇 관리자센터 연동 가이드 (완전 무료) ⭐
+├── SKILL_SCENARIO_GUIDE.md  # 스킬 및 시나리오 등록 가이드 (발화 패턴 목록) ⭐
 └── FREE_SETUP.md            # 무료 사용 가이드
 ```
 
