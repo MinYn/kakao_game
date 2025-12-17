@@ -1,5 +1,4 @@
 import sqlite3
-import os
 from typing import Dict, Optional, Callable
 from config import Config
 
@@ -11,8 +10,6 @@ class GoldSystem:
         self.db_file = db_file or Config.DATA_FILE
         self.gold_callbacks: Dict[str, Callable[[str, int, str], None]] = {}
         self._init_database()
-        self._migrate_from_json()
-        self._migrate_points_to_gold()
     
     def _init_database(self) -> None:
         """데이터베이스 초기화"""
@@ -79,40 +76,6 @@ class GoldSystem:
         
         conn.commit()
         conn.close()
-    
-    def _migrate_from_json(self) -> None:
-        """기존 JSON 파일에서 데이터 마이그레이션"""
-        json_file = self.db_file.replace('.db', '.json')
-        if os.path.exists(json_file):
-            try:
-                import json
-                with open(json_file, 'r', encoding='utf-8') as f:
-                    json_data = json.load(f)
-                
-                if json_data:
-                    conn = sqlite3.connect(self.db_file)
-                    cursor = conn.cursor()
-                    
-                    for user_id, gold in json_data.items():
-                        # 기존 데이터가 없을 때만 마이그레이션
-                        cursor.execute('SELECT gold FROM gold WHERE user_id = ?', (user_id,))
-                        if cursor.fetchone() is None:
-                            cursor.execute(
-                                'INSERT INTO gold (user_id, gold) VALUES (?, ?)',
-                                (user_id, gold)
-                            )
-                    
-                    conn.commit()
-                    conn.close()
-                    
-                    # 마이그레이션 완료 후 JSON 파일 백업
-                    backup_file = json_file + '.backup'
-                    if not os.path.exists(backup_file):
-                        import shutil
-                        shutil.copy2(json_file, backup_file)
-                        print(f"✅ JSON 데이터를 SQLite로 마이그레이션했습니다. 원본 파일은 {backup_file}로 백업되었습니다.")
-            except Exception as e:
-                print(f"⚠️ JSON 마이그레이션 중 오류: {e}")
     
     def _get_connection(self) -> sqlite3.Connection:
         """데이터베이스 연결 반환"""
