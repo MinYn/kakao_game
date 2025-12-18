@@ -188,12 +188,6 @@ class AdventureGame(Game):
                 "handler": lambda: self._perform_activity("구조"),
                 "button": {"label": "🚨 구조", "messageText": "구조"},
             },
-            {
-                "key": "end",
-                "triggers": ["종료", "quit", "exit", "게임종료", "홈"],
-                "handler": self.end,
-                "button": {"label": "🏠 홈", "messageText": "게임종료"},
-            },
         ]
 
     def get_command_buttons(self, last_command: Optional[str] = None) -> list[dict]:
@@ -206,7 +200,6 @@ class AdventureGame(Game):
             "sell",
             "status",
             "passes",
-            "end",
         ]
 
         definition_by_key = {d.get("key"): d for d in self.get_command_definitions()}
@@ -303,17 +296,21 @@ class AdventureGame(Game):
 
     def process_command(self, command: str) -> str:
         """명령 처리"""
+        start_message = None
         if not self.is_active:
-            return "게임이 시작되지 않았습니다. '게임시작 모험'을 입력하세요."
+            start_message = self.start()
 
         response, _ = self.run_structured_command(command)
         if response:
-            return response
+            return f"{start_message}\n\n{response}" if start_message else response
 
-        return (
+        fallback = (
             "알 수 없는 명령입니다.\n"
-            "사용 가능한 명령: 성장, 정산, 정찰, 탐사, 구조, 패스, 상태, 종료"
+            "사용 가능한 명령: 성장, 정산, 정찰, 탐사, 구조, 패스, 상태"
         )
+        if start_message:
+            return f"{start_message}\n\n{fallback}"
+        return fallback
 
     # ========== 성장 관련 메서드 ==========
 

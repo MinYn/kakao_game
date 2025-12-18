@@ -98,9 +98,7 @@ class HuntMenuView(View):
             # 기본 버튼 (engine이 없는 경우)
             buttons = [
                 {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
                 {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '📋 게임목록', 'messageText': '게임목록'},
                 {'label': '❓ 도움말', 'messageText': '도움말'},
             ]
 
@@ -251,9 +249,7 @@ class CommandButtonView(View):
             # 기본 버튼 (engine이 없는 경우)
             buttons = [
                 {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
                 {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '📋 게임목록', 'messageText': '게임목록'},
                 {'label': '❓ 도움말', 'messageText': '도움말'},
             ]
 
@@ -428,9 +424,7 @@ class DiscordAdapter(ChatPlatform):
             return self.engine.get_ui_buttons(user_id, command, response)
         return [
             {'label': '💰 골드', 'messageText': '골드'},
-            {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
             {'label': '🏆 랭킹', 'messageText': '리더보드'},
-            {'label': '📋 게임목록', 'messageText': '게임목록'},
             {'label': '❓ 도움말', 'messageText': '도움말'},
         ]
     

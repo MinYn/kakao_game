@@ -15,13 +15,7 @@ class GameEngine:
         self._platform_adapter: Optional[ChatPlatform] = None
         self.command_definitions = self._build_command_definitions()
         self._command_index: Dict[str, Dict[str, Any]] = {}
-        self.available_games = {
-            '모험': AdventureGame,
-            'adventure': AdventureGame,
-            'adv': AdventureGame,
-            '펫': AdventureGame,
-            'pet': AdventureGame,
-        }
+        self.default_game_class = AdventureGame
     
     def process_message(self, user_id: str, message: str, user_name: Optional[str] = None, platform_adapter=None) -> str:
         """사용자 메시지 처리
@@ -53,18 +47,19 @@ class GameEngine:
         if handled:
             return handled
         
+        start_response = self._ensure_active_game(user_id)
+
         # 활성 게임이 있으면 게임 명령 처리
         if user_id in self.active_games:
             game = self.active_games[user_id]
             if game.is_game_active():
-                return game.process_command(message)
-        
+                game_response = game.process_command(message)
+                if start_response and game_response:
+                    return f"{start_response}\n\n{game_response}"
+                return game_response or start_response or ""
+
         # 기본 응답
-        return (
-            "게임을 시작하려면 '게임시작 [게임이름]' 또는 "
-            "'s [게임]'을 입력하세요.\n"
-            "'게임목록' 또는 'g'로 사용 가능한 게임을 확인할 수 있습니다."
-        )
+        return self._get_help()
 
     def _normalize_command(self, message: str) -> str:
         message = message.strip()
@@ -76,6 +71,19 @@ class GameEngine:
                 return parts[1].strip()
             return ''
         return message
+
+    def _ensure_active_game(self, user_id: str) -> Optional[str]:
+        """사용자에게 기본 게임 인스턴스를 보장"""
+        existing = self.active_games.get(user_id)
+        if existing and existing.is_game_active():
+            return None
+
+        try:
+            game = self.default_game_class(user_id, point_system=self.gold_system)
+            self.active_games[user_id] = game
+            return game.start()
+        except Exception as e:
+            return f"게임을 준비하는 중 오류가 발생했습니다: {str(e)}"
 
     def _build_command_definitions(self) -> List[Dict[str, Any]]:
         return [
@@ -99,36 +107,12 @@ class GameEngine:
                 "button": {"label": "🏆 랭킹", "messageText": "리더보드"},
             },
             {
-                "key": "game_list",
-                "label": "📋 게임목록",
-                "triggers": ['게임목록', '게임', 'games', 'list', 'g', 'gl'],
-                "handler": self._list_games,
-                "match": "exact",
-                "button": {"label": "📋 게임목록", "messageText": "게임목록"},
-            },
-            {
                 "key": "help",
                 "label": "❓ 도움말",
                 "triggers": ['도움말', 'help', '?', 'h'],
                 "handler": self._get_help,
                 "match": "exact",
                 "button": {"label": "❓ 도움말", "messageText": "도움말"},
-            },
-            {
-                "key": "start",
-                "label": "🎮 게임시작",
-                "triggers": ['게임시작', '시작', 's', 's ', 'start', 'start ', 'gs', 'gs '],
-                "handler": self._handle_start_command,
-                "match": "prefix",
-                "button": {"label": "🎮 게임시작", "messageText": "게임시작 모험"},
-            },
-            {
-                "key": "end",
-                "label": "⏹️ 게임종료",
-                "triggers": ['게임종료', '종료', 'end', 'e', 'ge'],
-                "handler": self._end_game,
-                "match": "exact",
-                "button": {"label": "⏹️ 종료", "messageText": "게임종료"},
             },
             {
                 "key": "transfer",
@@ -174,10 +158,8 @@ class GameEngine:
         if not handler:
             return None, None
 
-        if handler in (self._get_leaderboard, self._list_games, self._get_help, self._end_game):
-            result = handler(user_id) if handler is self._end_game else handler()
-        elif handler is self._handle_start_command:
-            result = handler(user_id, command)
+        if handler in (self._get_leaderboard, self._get_help):
+            result = handler()
         elif handler is self._handle_transfer_command:
             result = handler(user_id, command)
         else:
@@ -198,30 +180,6 @@ class GameEngine:
             response = f"{mention} {response}"
         return response
 
-    def _handle_start_command(
-        self,
-        user_id: str,
-        message: Optional[str] = None,
-        user_name: Optional[str] = None,
-        is_new_user: bool = False,
-        **_: Any,
-    ) -> str:
-        message = message or ""
-        msg_lower = message.lower()
-        if msg_lower.startswith('s '):
-            game_name = message[2:].strip()
-        elif msg_lower.startswith('start '):
-            game_name = message[6:].strip()
-        elif msg_lower.startswith('gs '):
-            game_name = message[3:].strip()
-        else:
-            game_name = (
-                message.replace('게임시작', '')
-                .replace('시작', '')
-                .strip()
-            )
-        return self._start_game(user_id, game_name)
-
     def _handle_transfer_command(self, user_id: str, message: str) -> str:
         msg_lower = message.lower()
         if msg_lower.startswith('pay '):
@@ -230,102 +188,36 @@ class GameEngine:
             message = '골드주기 ' + message[5:]
         return self._transfer_gold(user_id, message)
     
-    def _list_games(self) -> str:
-        """게임 목록 반환"""
-        games_list = [
-            "🎮 사용 가능한 게임:",
-            "1. 펫 모험 (adventure, adv, pet, 1) - 나만의 캐릭터를 돌보고 성장시키세요",
-            "",
-            "사용법: '게임시작 [게임이름]' 또는 's [게임]'",
-            "",
-            "커맨드 형태도 지원: '/게임시작 모험', '@게임봇 게임시작 모험'"
-        ]
-        return "\n".join(games_list)
-    
     def _get_help(self) -> str:
         """도움말 반환"""
         help_text = [
             "🎮 게임 봇 도움말",
             "",
-            "명령어 사용법:",
-            "- 일반 명령어: '골드', '게임시작 모험' 등",
-            "- 슬래시 커맨드: '/골드', '/게임시작 모험' 등",
-            "- @봇이름 커맨드: '@게임봇 골드', "
-            "'@게임봇 게임시작 모험' 등",
-            "",
-            "명령어 (단축키):",
+            "기본 명령어:",
             "- 골드 (g, gold, p, pt): 내 골드 조회",
             "- 골드주기 [사용자] [금액] (pay, send): 다른 사용자에게 골드 전송",
             "- 리더보드 (l, lb, rank): 골드 랭킹 보기",
-            "- 게임목록 (g, gl): 사용 가능한 게임 목록 보기",
-            "- 게임시작 [게임이름] (s, start, gs): 게임 시작",
-            "  게임 단축키: 모험(adventure, adv, pet, 1)",
-            "- 게임종료 (e, end, ge): 현재 게임 종료",
             "- 도움말 (h, ?): 이 도움말 보기",
             "",
-            "예시:",
-            "- /골드",
-            "- /게임시작 모험",
-            "- @게임봇 리더보드",
+            "모험 명령어:",
+            "- 성장/강화: '성장', '강화', '업그레이드'",
+            "- 정산/판매: '정산', '판매'",
+            "- 활동: '정찰', '탐사', '구조'",
+            "- 상태/패스 확인: '상태', '패스'",
             "",
-            "게임 중에는 게임 명령을 입력하세요."
+            "첫 메시지를 보내면 바로 우주 탐험이 시작되며 버튼으로 바로 진행할 수 있습니다."
         ]
         return "\n".join(help_text)
-    
+
     def _get_enhancement_level(self, user_id: str) -> int:
         """사용자의 현재 강화 레벨 조회 (AdventureGame에서)"""
         if user_id in self.active_games:
             game = self.active_games[user_id]
             if isinstance(game, AdventureGame) and game.is_game_active():
                 return game.current_level
-        
+
         # 활성 모험 게임이 없으면 0 반환
         return 0
-    
-    def _start_game(self, user_id: str, game_name: str) -> str:
-        """게임 시작"""
-        # 기존 게임 종료
-        if user_id in self.active_games:
-            self.active_games[user_id].end()
-        
-        # 게임 이름 정규화
-        game_name = game_name.lower() if game_name else ''
-        
-        # 게임 단축키 매핑
-        game_shortcuts = {
-            'a': 'adventure',
-            'adv': 'adventure',
-            'pet': 'adventure',
-            '펫': 'adventure',
-            '1': 'adventure',
-        }
-        
-        # 단축키 변환
-        if game_name in game_shortcuts:
-            game_name = game_shortcuts[game_name]
-        
-        # 게임 찾기
-        game_class = None
-        for key, cls in self.available_games.items():
-            if key.lower() == game_name or game_name in key.lower():
-                game_class = cls
-                break
-        
-        if game_class is None:
-            return (
-                f"'{game_name}' 게임을 찾을 수 없습니다.\n"
-                "'게임목록' 또는 'g'로 사용 가능한 게임을 확인하세요."
-            )
-        
-        # 게임 생성 및 시작
-        try:
-            game = game_class(
-                user_id, point_system=self.gold_system
-            )
-            self.active_games[user_id] = game
-            return game.start()
-        except (ValueError, AttributeError, KeyError) as e:
-            return f"게임 시작 중 오류가 발생했습니다: {str(e)}"
     
     def _end_game(self, user_id: Optional[str] = None, *_: Any, **__: Any) -> str:
         """게임 종료"""
@@ -448,25 +340,17 @@ class GameEngine:
             if hasattr(active_game, "get_command_buttons"):
                 game_buttons = active_game.get_command_buttons(command) or []
 
-        base_buttons = self._build_base_buttons(include_start=not (active_game and active_game.is_game_active()))
-
-        if active_game and active_game.is_game_active():
-            end_button = next((b for b in base_buttons if b.get("messageText") == "게임종료"), None)
-            if end_button:
-                # 게임 전용 버튼보다 우선 노출
-                base_buttons = [end_button] + [b for b in base_buttons if b is not end_button]
+        base_buttons = self._build_base_buttons()
 
         combined = game_buttons + base_buttons
         # 최대 5개로 제한
         return combined[:5]
 
-    def _build_base_buttons(self, include_start: bool = True) -> List[Dict[str, str]]:
+    def _build_base_buttons(self) -> List[Dict[str, str]]:
         buttons: List[Dict[str, str]] = []
         for definition in self.command_definitions:
             button_meta = definition.get("button")
             if not button_meta:
-                continue
-            if not include_start and definition.get("key") == "start":
                 continue
             buttons.append({
                 "label": button_meta.get("label", definition.get("label", "")),
