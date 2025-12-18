@@ -355,25 +355,12 @@ class GameEngine:
         Returns:
             버튼 목록 [{'label': '...', 'messageText': '...'}, ...]
         """
-        # 모험 게임 중인지 확인
-        is_adventure = self.has_active_game(user_id)
-        normalized_command = (command or "").strip()
-        normalized_response = response or ""
-
-        adventure_triggers = {"강화", "사냥", "판매", "상태", "모험", "게임종료"}
-        is_adventure_view = (
-            normalized_command in adventure_triggers
-            or any(token in normalized_response for token in adventure_triggers)
-        )
-
-        if is_adventure and is_adventure_view:
-            return [
-                {'label': '🔨 강화', 'messageText': '강화'},
-                {'label': '🗡️ 사냥', 'messageText': '사냥'},
-                {'label': '💰 판매', 'messageText': '판매'},
-                {'label': '📊 상태', 'messageText': '상태'},
-                {'label': '🏠 홈', 'messageText': '게임종료'},
-            ]
+        active_game = self.active_games.get(user_id)
+        if active_game and active_game.is_game_active():
+            if hasattr(active_game, "get_command_buttons"):
+                buttons = active_game.get_command_buttons(command)
+                if buttons:
+                    return buttons
 
         # 기본 버튼
         return [

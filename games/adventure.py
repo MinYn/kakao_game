@@ -81,6 +81,8 @@ class AdventureGame(Game):
         self.activity_count = 0
         self.total_reward = 0
         self.explorer_profile: Optional[ExplorerProfile] = None
+        self.command_definitions = self._init_command_definitions()
+        self._build_command_index()
 
     def _init_activities(self) -> list:
         """활동 타입 초기화"""
@@ -140,6 +142,92 @@ class AdventureGame(Game):
                 ),
             ),
         ]
+
+    def _init_command_definitions(self) -> list:
+        """구조화된 커맨드/버튼 정의"""
+        return [
+            {
+                "key": "enhance",
+                "triggers": ["성장", "train", "강화", "업그레이드", "개조"],
+                "handler": self._enhance,
+                "button": {"label": "🔨 강화", "messageText": "강화"},
+            },
+            {
+                "key": "sell",
+                "triggers": ["정산", "sell", "추억", "돌아보기", "판매"],
+                "handler": self._sell,
+                "button": {"label": "💰 판매", "messageText": "판매"},
+            },
+            {
+                "key": "status",
+                "triggers": ["상태", "status", "info"],
+                "handler": self._get_status,
+                "button": {"label": "📊 상태", "messageText": "상태"},
+            },
+            {
+                "key": "passes",
+                "triggers": ["패스", "ticket", "tickets", "t"],
+                "handler": self._show_passes,
+                "button": {"label": "🎫 패스", "messageText": "패스"},
+            },
+            {
+                "key": "scout",
+                "triggers": ["정찰", "walk", "scout", "n", "1"],
+                "handler": lambda: self._perform_activity("정찰"),
+                "button": {"label": "🛰️ 정찰", "messageText": "정찰"},
+            },
+            {
+                "key": "survey",
+                "triggers": ["탐사", "play", "survey", "s", "2", "특별놀이"],
+                "handler": lambda: self._perform_activity("탐사"),
+                "button": {"label": "🧭 탐사", "messageText": "탐사"},
+            },
+            {
+                "key": "rescue",
+                "triggers": ["구조", "challenge", "rescue", "boss", "b", "3"],
+                "handler": lambda: self._perform_activity("구조"),
+                "button": {"label": "🚨 구조", "messageText": "구조"},
+            },
+            {
+                "key": "end",
+                "triggers": ["종료", "quit", "exit", "게임종료", "홈"],
+                "handler": self.end,
+                "button": {"label": "🏠 홈", "messageText": "게임종료"},
+            },
+        ]
+
+    def get_command_buttons(self, last_command: Optional[str] = None) -> list[dict]:
+        """모험 게임용 버튼 우선순위 제공"""
+        key_order = [
+            "enhance",
+            "scout",
+            "survey",
+            "rescue",
+            "sell",
+            "status",
+            "passes",
+            "end",
+        ]
+
+        definition_by_key = {d.get("key"): d for d in self.get_command_definitions()}
+        buttons: list[dict] = []
+
+        for key in key_order:
+            definition = definition_by_key.get(key)
+            if not definition or not definition.get("button"):
+                continue
+
+            button_meta = definition["button"]
+            label = button_meta.get("label") or definition.get("label")
+            message_text = button_meta.get("messageText") or next(
+                iter(definition.get("triggers", [])),
+                "",
+            )
+
+            if label and message_text:
+                buttons.append({"label": label, "messageText": message_text})
+
+        return buttons[:5]
 
     def _load_stats(self) -> Dict[str, int]:
         if self.point_system:
@@ -218,31 +306,9 @@ class AdventureGame(Game):
         if not self.is_active:
             return "게임이 시작되지 않았습니다. '게임시작 모험'을 입력하세요."
 
-        command = command.strip().lower()
-
-        if command in ["종료", "quit", "exit"]:
-            return self.end()
-
-        if command in ["상태", "status", "info"]:
-            return self._get_status()
-
-        if command in ["성장", "train", "강화", "업그레이드", "개조"]:
-            return self._enhance()
-
-        if command in ["정산", "sell", "추억", "돌아보기"]:
-            return self._sell()
-
-        if command in ["패스", "ticket", "tickets", "t"]:
-            return self._show_passes()
-
-        if command in ["정찰", "walk", "scout", "n", "1"]:
-            return self._perform_activity("정찰")
-
-        if command in ["탐사", "play", "survey", "s", "2", "특별놀이"]:
-            return self._perform_activity("탐사")
-
-        if command in ["구조", "challenge", "rescue", "boss", "b", "3"]:
-            return self._perform_activity("구조")
+        response, _ = self.run_structured_command(command)
+        if response:
+            return response
 
         return (
             "알 수 없는 명령입니다.\n"
