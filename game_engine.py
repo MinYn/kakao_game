@@ -1,8 +1,6 @@
 from typing import Dict, Optional, List, Tuple, Any
 from platforms.base_platform import ChatPlatform
 from games.base_game import Game
-from games.number_guess import NumberGuessGame
-from games.rps import RockPaperScissorsGame
 from games.adventure import AdventureGame
 from gold_system_postgres import GoldSystemPostgres
 from config import Config
@@ -16,13 +14,11 @@ class GameEngine:
         self.gold_system = gold_system or GoldSystemPostgres()
         self._platform_adapter: Optional[ChatPlatform] = None
         self.available_games = {
-            '숫자맞추기': NumberGuessGame,
-            'number': NumberGuessGame,
-            '가위바위보': RockPaperScissorsGame,
-            'rps': RockPaperScissorsGame,
             '모험': AdventureGame,
             'adventure': AdventureGame,
             'adv': AdventureGame,
+            '펫': AdventureGame,
+            'pet': AdventureGame,
         }
     
     def process_message(self, user_id: str, message: str, user_name: Optional[str] = None, platform_adapter=None) -> str:
@@ -155,9 +151,7 @@ class GameEngine:
         """게임 목록 반환"""
         games_list = [
             "🎮 사용 가능한 게임:",
-            "1. 숫자맞추기 (number, n, 1) - 1~100 사이의 숫자를 맞춰보세요",
-            "2. 가위바위보 (rps, r, 2) - 컴퓨터와 가위바위보를 해보세요",
-            "3. 모험 (adventure, a, adv, 3) - 강화와 몬스터 사냥을 한 게임에서!",
+            "1. 펫 모험 (adventure, adv, pet, 1) - 나만의 캐릭터를 돌보고 성장시키세요",
             "",
             "사용법: '게임시작 [게임이름]' 또는 's [게임]'",
             "",
@@ -182,7 +176,7 @@ class GameEngine:
             "- 리더보드 (l, lb, rank): 골드 랭킹 보기",
             "- 게임목록 (g, gl): 사용 가능한 게임 목록 보기",
             "- 게임시작 [게임이름] (s, start, gs): 게임 시작",
-            "  게임 단축키: 숫자맞추기(n, 1), 가위바위보(r, 2), 모험(a, adv, 3)",
+            "  게임 단축키: 모험(adventure, adv, pet, 1)",
             "- 게임종료 (e, end, ge): 현재 게임 종료",
             "- 도움말 (h, ?): 이 도움말 보기",
             "",
@@ -216,14 +210,11 @@ class GameEngine:
         
         # 게임 단축키 매핑
         game_shortcuts = {
-            'n': 'number',
-            'num': 'number',
-            '1': 'number',
-            'r': 'rps',
-            '2': 'rps',
             'a': 'adventure',
             'adv': 'adventure',
-            '3': 'adventure',
+            'pet': 'adventure',
+            '펫': 'adventure',
+            '1': 'adventure',
         }
         
         # 단축키 변환
@@ -409,12 +400,12 @@ class GameEngine:
         if not response:
             return False
         
-        # 강화 결과 확인
-        if '강화 성공' in response or '강화 실패' in response:
+        # 성장 결과 확인
+        if '성장 성공' in response or '성장 실패' in response:
             return user_id in self.active_games
-        
-        # 사냥 결과 확인
-        if '사냥 성공' in response or '사냥 실패' in response:
+
+        # 활동 결과 확인
+        if '활동 성공' in response or '활동이 잘 풀리지' in response:
             return user_id in self.active_games
         
         return False

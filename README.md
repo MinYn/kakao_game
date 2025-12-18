@@ -1,6 +1,6 @@
 # GameBot - 채팅 게임 봇
 
-채팅 플랫폼에 연동 가능한 게임 봇입니다. 카카오톡, 디스코드 등 다양한 플랫폼을 지원하며 골드 시스템을 통해 게임을 즐길 수 있습니다.
+채팅 플랫폼에 연동 가능한 게임 봇입니다. 현재는 디스코드(및 로컬 CLI 테스트)에 집중해 우주 탐험 로그 경험을 제공합니다.
 
 ## 구조
 
@@ -8,25 +8,18 @@
 kakao_game/
 ├── games/              # 게임 로직
 │   ├── base_game.py    # 게임 기본 클래스
-│   ├── number_guess.py # 숫자 맞추기 게임
-│   ├── rps.py          # 가위바위보 게임
-│   └── adventure.py    # 모험 게임 (강화 + 몬스터 사냥 통합)
+│   └── adventure.py    # 우주 탐험 로그 게임 (우주선 강화 + 임무)
 ├── platforms/          # 채팅 플랫폼 어댑터
 │   ├── base_platform.py    # 플랫폼 기본 인터페이스
-│   ├── kakao_adapter.py    # 카카오톡 어댑터
 │   └── discord_adapter.py  # 디스코드 어댑터
 ├── game_engine.py      # 게임 엔진
 ├── point_system.py     # 골드 관리 시스템
 ├── main.py             # 메인 실행 파일
 ├── requirements.txt    # 의존성
-├── webhook_server.py        # 스킬 서버 (카카오 챗봇 관리자센터용)
 ├── Dockerfile               # Docker 이미지 정의
 ├── docker-compose.yml      # Docker Compose 설정
 ├── .dockerignore           # Docker 빌드 제외 파일
 ├── docs/                    # 문서 폴더
-│   ├── CHATBOT_ADMIN_GUIDE.md   # 카카오 챗봇 관리자센터 연동 가이드 ⭐
-│   ├── SKILL_SCENARIO_GUIDE.md  # 스킬 및 시나리오 등록 가이드 ⭐
-│   ├── SETUP_STEP_BY_STEP.md    # 실제 화면 기준 단계별 설정 가이드 📸
 │   ├── USER_UTTERANCE.md        # 사용자 발화 설정 가이드 (모든 발화, 커맨드 형태) ⭐
 │   ├── QUICK_REPLIES.md         # Quick Replies 버튼 가이드 ⭐
 │   ├── PARAMETER_GUIDE.md       # 파라미터 설정 상세 가이드
@@ -46,9 +39,6 @@ kakao_game/
 python main.py cli
 # 또는
 python cli.py
-
-# 카카오톡 웹훅 서버 모드 (완전 무료)
-python main.py kakao
 
 # 디스코드 모드
 python main.py discord
@@ -78,8 +68,6 @@ docker-compose down -v
 - 로그는 `gamebot_logs` 볼륨에 저장됩니다
 - 자세한 내용은 `docs/DOCKER.md` 참조
 
-**참고**: 카카오톡은 웹훅 서버 방식으로 동작합니다. 자세한 설정은 `docs/CHATBOT_ADMIN_GUIDE.md` 참조.
-
 ### CLI 모드 사용법
 
 CLI 모드에서는 로컬에서 게임을 테스트할 수 있습니다:
@@ -90,8 +78,7 @@ python cli.py
 
 **주요 명령어:**
 - `게임목록`: 사용 가능한 게임 보기
-- `게임시작 숫자맞추기`: 숫자 맞추기 게임 시작
-- `게임시작 가위바위보`: 가위바위보 게임 시작
+- `게임시작 모험`: 우주 탐험 게임 시작 (우주선 강화 + 임무)
 - `골드`: 내 골드 조회
 - `골드주기 [사용자] [금액]`: 다른 사용자에게 골드 전송
 - `리더보드`: 골드 랭킹 보기
@@ -105,9 +92,7 @@ python cli.py
 - `골드주기 [사용자] [금액]`: 다른 사용자에게 골드 전송
 - `리더보드`: 골드 랭킹 보기
 - `게임목록`: 사용 가능한 게임 목록 보기
-- `게임시작 숫자맞추기`: 숫자 맞추기 게임 시작
-- `게임시작 가위바위보`: 가위바위보 게임 시작
-- `게임시작 모험`: 모험 게임 시작 (강화 + 몬스터 사냥)
+- `게임시작 모험`: 우주 탐험 게임 시작 (우주선 강화 + 임무)
 - `게임종료`: 현재 게임 종료
 - `도움말`: 도움말 보기
 
@@ -115,32 +100,11 @@ python cli.py
 
 모든 게임에서 골드를 획득하거나 사용할 수 있습니다.
 
-**숫자맞추기 게임:**
-- 입장료: 10G
-- 클리어 보상: 50G + (남은 시도 × 5G)
-- 실패 보상: 5G (참여 보상)
-
-**가위바위보 게임:**
-- 입장료: 없음
-- 승리: +10G
-- 패배: -5G
-- 무승부: 골드 변화 없음
-
-**강화 게임:**
-- 입장료: 없음
-- 강화 비용: 레벨에 따라 증가 (기본 40G, 레벨당 1.4배)
-- 성공 확률: 레벨이 높을수록 감소 (+0: 100%, +15: 10%)
-- 실패 시: 강화 레벨 1 하락 (레벨 0 제외)
-- 최대 레벨: +15
-- 판매 기능: 강화된 아이템을 골드로 판매 가능 (레벨에 따라 가격 결정)
-
-**몬스터 사냥 게임:**
-- 입장료: 없음
-- 강화 게임과 연동: 강화 레벨에 따라 사냥 가능한 몬스터 결정
-- 몬스터 종류: 슬라임(+0) ~ 고대신(+15)까지 8종
-- 보상: 몬스터마다 다른 골드 보상 (20G ~ 600G)
-- 성공 확률: 강화 레벨이 높을수록 증가 (기본 70%, 레벨당 +2%)
-- 추가 보상: 강화 레벨이 몬스터 필요 레벨보다 3 이상 높으면 20% 추가 보상
+**우주 탐험 로그 게임 (우주선 강화 + 임무):**
+- 사용자별 고유 탐사대 프로필과 기체 배지가 로컬 결정적으로 생성됩니다 (추가 요금 없음).
+- 우주선 강화를 통해 임무 보상 배율이 상승하며, 정산 시 투자 골드를 회수할 수 있습니다.
+- 임무: 정찰(기본), 탐사(패스 드랍), 구조(패스 소모)로 골드를 획득합니다.
+- 패스: 탐사 임무에서 일정 확률로 구조 패스를 얻어 고보상 구조 임무를 시도합니다.
 
 골드는 PostgreSQL 데이터베이스에 저장되며, 모든 트랜잭션이 Kafka를 통해 이벤트로 발행됩니다.
 
@@ -208,42 +172,11 @@ class MyPlatformAdapter(ChatPlatform):
 
 ## 실제 연동 방법
 
-### 카카오톡 챗봇 설정
+현재는 **디스코드 봇** 연동만 지원합니다. 디스코드 개발자 포털에서 봇 토큰을 발급한 후 `.env`에 `DISCORD_TOKEN`을 넣고 다음 명령어로 실행하세요:
 
-#### 1. 카카오 개발자 계정 및 애플리케이션 등록
-
-1. **카카오 챗봇 관리자센터 접속**
-   - https://i.kakao.com/ 접속
-   - 카카오 계정으로 로그인
-
-2. **챗봇 생성**
-   - 챗봇 관리자센터에서 새 챗봇 만들기
-   - 카카오톡 채널 선택
-
-3. **스킬 서버 URL 설정**
-   - 스킬 만들기 → 스킬 서버 URL 입력
-   - 예: `https://abc123.ngrok.io/webhook` 또는 `https://yourdomain.com/webhook`
-
-#### 2. 웹훅 서버 실행
-
-**로컬 개발 환경:**
-1. 웹훅 서버 실행:
-   ```bash
-   python main.py kakao
-   ```
-
-2. ngrok 설치 및 실행 (다른 터미널):
-   ```bash
-   # ngrok 설치 (macOS)
-   brew install ngrok
-   
-   # 또는 다운로드: https://ngrok.com/download
-   
-   # 터널 생성 (포트 5000)
-   ngrok http 5000
-   ```
-3. ngrok이 제공하는 HTTPS URL 복사 (예: `https://abc123.ngrok.io`)
-4. 이 URL을 스킬 서버 URL로 사용: `https://abc123.ngrok.io/webhook`
+```bash
+python main.py discord
+```
 
 **서버 배포 환경:**
 - 공개 서버의 도메인 사용 (예: `https://yourdomain.com/webhook`)
@@ -253,7 +186,7 @@ class MyPlatformAdapter(ChatPlatform):
 
 `.env` 파일에 다음 값 설정 (선택사항):
 ```env
-PLATFORM=kakao
+PLATFORM=discord
 INITIAL_POINTS=100
 SERVER_HOST=0.0.0.0
 SERVER_PORT=5000
@@ -270,7 +203,7 @@ SERVER_PORT=5000
 pip install -r requirements.txt
 
 # 웹훅 서버 모드로 실행 (완전 무료)
-python main.py kakao
+python main.py discord
 ```
 
 **웹훅 서버 모드 (완전 무료):**
@@ -282,7 +215,6 @@ python main.py kakao
 **추천 방법:**
 - **카카오 챗봇 관리자센터 사용** (완전 무료, 추천!)
   - 상세 가이드: `docs/CHATBOT_ADMIN_GUIDE.md` 참조
-  - 챗봇 관리자센터: https://i.kakao.com/
   - 스킬 서버로 연동하여 모든 게임 기능 사용 가능
 
 카카오톡 채널에서 메시지를 보내면 봇이 응답합니다.
@@ -357,13 +289,11 @@ python main.py discord
 
 - **DM (개인 메시지)**: 봇에게 직접 메시지를 보내면 자동으로 응답합니다.
 - **서버 채널**: 명령어 접두사(`!`)를 사용하여 명령을 실행합니다.
-  - 예: `!게임목록`, `!게임시작 숫자맞추기`, `!골드` 등
+  - 예: `!게임목록`, `!게임시작 모험`, `!골드` 등
 
 **주요 명령어:**
 - `!게임목록`: 사용 가능한 게임 보기
-- `!게임시작 숫자맞추기`: 숫자 맞추기 게임 시작
-- `!게임시작 가위바위보`: 가위바위보 게임 시작
-- `!게임시작 모험`: 모험 게임 시작 (강화 + 몬스터 사냥)
+- `!게임시작 모험`: 우주 탐험 게임 시작 (우주선 강화 + 임무)
 - `!골드`: 내 골드 조회
 - `!골드주기 [사용자] [금액]`: 다른 사용자에게 골드 전송
 - `!리더보드`: 골드 랭킹 보기
@@ -373,7 +303,7 @@ python main.py discord
 
 ```python
 from game_engine import GameEngine
-from platforms.kakao_adapter import KakaoAdapter
+from platforms.discord_adapter import DiscordAdapter
 from point_system import PointSystem
 
 # 골드 시스템 생성 (선택사항 - GameEngine이 자동 생성)

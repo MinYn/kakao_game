@@ -68,9 +68,7 @@ class CLIMode:
 🎮 게임 관련:
   - 게임목록 (g, gl)          : 사용 가능한 게임 목록 보기
   - 게임시작 [게임] (s, gs)   : 게임 시작
-    예: s n, s 1, s number → 숫자맞추기
-        s r, s 2, s rps → 가위바위보
-        s a, s 3, s adventure → 모험
+    예: s 1, s pet, s adventure → 펫 모험
     슬래시 커맨드: /게임시작 모험, /s a
   - 게임종료 (e, end, ge)     : 현재 게임 종료
 

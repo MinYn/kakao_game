@@ -1,12 +1,13 @@
-from typing import Optional
+from typing import Callable, Optional
 import asyncio
+import os
 import discord
 from discord.ext import commands
 from discord.ui import View, Button, Select
 from platforms.base_platform import ChatPlatform
 from config import Config
 from image_generator import ImageGenerator
-import os
+from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
 
 class HuntMenuView(View):
@@ -45,8 +46,11 @@ class HuntMenuView(View):
         try:
             # 즉시 응답 (타임아웃 방지)
             await interaction.response.defer(ephemeral=False)
-            
+
             selected = interaction.data['values'][0]  # 선택된 값
+            if self.adapter and self.adapter._enqueue_incoming(self.user_id, selected):
+                await self.adapter._acknowledge_interaction(interaction)
+                return
             if self.message_handler:
                 response = self.message_handler(self.user_id, selected)
                 if response:
@@ -56,20 +60,13 @@ class HuntMenuView(View):
                     image_path = None
                     if hasattr(self, 'adapter') and self.adapter:
                         image_path = self.adapter._generate_image_if_needed(self.user_id, selected, response)
-                    files = []
-                    if image_path and os.path.exists(image_path):
-                        files.append(discord.File(image_path))
-                    # files가 비어있으면 파라미터를 전달하지 않음
-                    if files:
-                        await interaction.followup.send(response, view=view, files=files, ephemeral=False)
-                    else:
-                        await interaction.followup.send(response, view=view, ephemeral=False)
-                    # 이미지 파일 정리
-                    if image_path and os.path.exists(image_path):
-                        try:
-                            os.remove(image_path)
-                        except:
-                            pass
+
+                    await self.adapter._send_interaction_message(
+                        interaction=interaction,
+                        response=response,
+                        view=view,
+                        image_path=image_path,
+                    )
                 else:
                     await interaction.followup.send("처리되었습니다.", ephemeral=True)
             else:
@@ -183,30 +180,26 @@ class CommandButtonView(View):
             try:
                 # 즉시 응답 (타임아웃 방지)
                 await interaction.response.defer(ephemeral=False)
-                
+
+                if hasattr(self, 'adapter') and self.adapter and self.adapter._enqueue_incoming(self.user_id, command):
+                    await self.adapter._acknowledge_interaction(interaction)
+                    return
+
                 if self.message_handler:
                     response = self.message_handler(self.user_id, command)
                     if response:
                         # 응답에 따라 새로운 버튼 생성
                         view = self._create_view_for_response(response)
-                        # 이미지 생성 (강화/사냥 결과인 경우)
                         image_path = None
                         if self.adapter:
                             image_path = self.adapter._generate_image_if_needed(self.user_id, command, response)
-                        files = []
-                        if image_path and os.path.exists(image_path):
-                            files.append(discord.File(image_path))
-                        # files가 비어있으면 파라미터를 전달하지 않음
-                        if files:
-                            await interaction.followup.send(response, view=view, files=files, ephemeral=False)
-                        else:
-                            await interaction.followup.send(response, view=view, ephemeral=False)
-                        # 이미지 파일 정리
-                        if image_path and os.path.exists(image_path):
-                            try:
-                                os.remove(image_path)
-                            except:
-                                pass
+
+                        await self.adapter._send_interaction_message(
+                            interaction=interaction,
+                            response=response,
+                            view=view,
+                            image_path=image_path,
+                        )
                     else:
                         await interaction.followup.send("처리되었습니다.", ephemeral=True)
                 else:
@@ -246,7 +239,7 @@ class CommandButtonView(View):
 class DiscordAdapter(ChatPlatform):
     """디스코드 봇 어댑터"""
     
-    def __init__(self, token: Optional[str] = None, engine=None):
+    def __init__(self, token: Optional[str] = None, engine=None, message_queue: Optional[PlatformMessageQueue] = None):
         super().__init__()
         self.token = token or Config.DISCORD_TOKEN
         self.command_prefix = Config.DISCORD_COMMAND_PREFIX
@@ -256,9 +249,51 @@ class DiscordAdapter(ChatPlatform):
         self.bot_thread = None
         self.engine = engine  # GameEngine 참조
         self.image_generator = ImageGenerator()  # 이미지 생성기
-        
+        self.message_queue = message_queue
+        self._queue_listener_started = False
+
+        self.message_handler: Optional[Callable[[str, str], str]] = None
+
         # 메시지 전송을 위한 채널/유저 매핑
         self.user_channels = {}  # user_id -> (channel, last_channel) 매핑
+
+    def set_message_queue(self, queue: PlatformMessageQueue) -> None:
+        self.message_queue = queue
+
+    def _enqueue_incoming(self, user_id: str, content: str) -> bool:
+        """Kafka/큐에 수신 메시지를 적재"""
+        if self.message_queue:
+            self.message_queue.publish_incoming(
+                PlatformMessage(platform="discord", user_id=user_id, content=content)
+            )
+            return True
+        return False
+
+    def _handle_outgoing_message(self, message: PlatformMessage) -> None:
+        if message.platform and message.platform != "discord":
+            return
+        self.send_message(message.user_id, message.content)
+
+    async def _acknowledge_interaction(self, interaction: discord.Interaction) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.followup.send(
+                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
+                    ephemeral=True,
+                )
+        except Exception:
+            pass
+
+    async def _acknowledge_channel(self, channel: discord.abc.Messageable) -> None:
+        try:
+            await channel.send("요청을 접수했어요. 처리 후 답변을 보내드릴게요.")
+        except Exception:
+            pass
     
     def send_message(self, user_id: str, message: str) -> bool:
         """디스코드 메시지 전송"""
@@ -290,54 +325,32 @@ class DiscordAdapter(ChatPlatform):
         user_id: str,
         message: str,
         view: Optional[View] = None,
-        image_path: Optional[str] = None
-    ):
+        image_path: Optional[str] = None,
+    ) -> None:
         """비동기 메시지 전송"""
         try:
-            # 이미지 파일이 있으면 첨부
-            files = []
-            if image_path and os.path.exists(image_path):
-                files.append(discord.File(image_path, filename=os.path.basename(image_path)))
+            files = self._build_files(image_path)
             
             # 마지막으로 메시지를 보낸 채널이 있으면 그 채널에 전송
             if user_id in self.user_channels:
                 channel, _ = self.user_channels[user_id]
                 if channel:
-                    if files:
-                        await channel.send(message, view=view, files=files)
-                    else:
-                        await channel.send(message, view=view)
-                    # 이미지 전송 후 임시 파일 삭제
-                    if image_path and os.path.exists(image_path):
-                        try:
-                            os.remove(image_path)
-                        except:
-                            pass
+                    await channel.send(message, view=view, files=files or None)
+                    self._cleanup_temp_image(image_path)
                     return
             
             # 채널이 없으면 DM으로 전송 시도
             user = self.client.get_user(int(user_id))
             if user:
-                if files:
-                    await user.send(message, view=view, files=files)
-                else:
-                    await user.send(message, view=view)
-                # 이미지 전송 후 임시 파일 삭제
-                if image_path and os.path.exists(image_path):
-                    try:
-                        os.remove(image_path)
-                    except:
-                        pass
+                await user.send(message, view=view, files=files or None)
+                self._cleanup_temp_image(image_path)
         except discord.Forbidden:
             print(f"[디스코드] 메시지 전송 권한 없음: {user_id}")
         except Exception as e:
             print(f"[디스코드] 메시지 전송 오류: {e}")
-            # 오류 발생 시에도 임시 파일 삭제 시도
-            if image_path and os.path.exists(image_path):
-                try:
-                    os.remove(image_path)
-                except:
-                    pass
+            self._cleanup_temp_image(image_path)
+        finally:
+            self._cleanup_temp_image(image_path)
     
     def _create_button_view(self, user_id: str, response: str) -> Optional[View]:
         """응답에 따라 버튼 뷰 생성"""
@@ -418,8 +431,32 @@ class DiscordAdapter(ChatPlatform):
             print(f"[디스코드] 이미지 생성 오류: {e}")
             import traceback
             traceback.print_exc()
-        
+
         return None
+
+    async def _send_interaction_message(
+        self,
+        interaction: discord.Interaction,
+        response: str,
+        view: Optional[View] = None,
+        image_path: Optional[str] = None,
+    ) -> None:
+        files = self._build_files(image_path)
+        await interaction.followup.send(response, view=view, files=files or None, ephemeral=False)
+        self._cleanup_temp_image(image_path)
+
+    def _build_files(self, image_path: Optional[str]):
+        files = []
+        if image_path and os.path.exists(image_path):
+            files.append(discord.File(image_path, filename=os.path.basename(image_path)))
+        return files
+
+    def _cleanup_temp_image(self, image_path: Optional[str]) -> None:
+        if image_path and os.path.exists(image_path):
+            try:
+                os.remove(image_path)
+            except Exception:
+                pass
     
     def start(self, start_webhook: bool = False) -> None:
         """디스코드 봇 시작"""
@@ -461,6 +498,12 @@ class DiscordAdapter(ChatPlatform):
             print(f"[디스코드] 봇이 로그인했습니다: {self.client.user}")
             print(f"[디스코드] 서버 수: {len(self.client.guilds)}")
             print(f"[디스코드] 명령어 접두사: {self.command_prefix}")
+            if self.message_queue and not self._queue_listener_started:
+                self.message_queue.start_outgoing_consumer(
+                    self._handle_outgoing_message,
+                    group_id=f"{Config.KAFKA_PLATFORM_GROUP}-discord",
+                )
+                self._queue_listener_started = True
         
         @self.client.event
         async def on_message(message):
@@ -475,6 +518,10 @@ class DiscordAdapter(ChatPlatform):
                     # 플랫폼 어댑터 설정 (멘션 기능용)
                     if self.engine:
                         self.engine.set_platform_adapter(self)
+                    if self._enqueue_incoming(user_id, message.content):
+                        self.user_channels[user_id] = (message.channel, message.channel)
+                        await self._acknowledge_channel(message.channel)
+                        return
                     response = self.message_handler(user_id, message.content)
                     if response:
                         # DM 채널 저장
@@ -501,6 +548,10 @@ class DiscordAdapter(ChatPlatform):
                         # 플랫폼 어댑터 설정 (멘션 기능용)
                         if self.engine:
                             self.engine.set_platform_adapter(self)
+                        if self._enqueue_incoming(user_id, content):
+                            self.user_channels[user_id] = (message.channel, message.channel)
+                            await self._acknowledge_channel(message.channel)
+                            return
                         response = self.message_handler(user_id, content)
                         if response:
                             # 채널 저장

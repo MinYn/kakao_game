@@ -5,9 +5,9 @@
 import sys
 from typing import Optional
 from game_engine import GameEngine
-from platforms.kakao_adapter import KakaoAdapter
 from platforms.discord_adapter import DiscordAdapter
 from config import Config
+from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
 
 class GameBot:
@@ -15,21 +15,39 @@ class GameBot:
     
     def __init__(self, platform_type: Optional[str] = None):
         self.engine = GameEngine()
+        self.message_queue = PlatformMessageQueue()
         platform = platform_type or Config.PLATFORM
         self.platform = self._create_platform(platform)
         self.platform.set_message_handler(self._handle_message)
-        self.webhook_server = None
+        if hasattr(self.platform, "set_message_queue"):
+            self.platform.set_message_queue(self.message_queue)
     
     def _create_platform(self, platform_type: str):
         """플랫폼 생성"""
         platform_type = platform_type.lower()
-        
-        if platform_type == 'kakao':
-            return KakaoAdapter()
-        elif platform_type == 'discord':
-            return DiscordAdapter(engine=self.engine)
-        else:
-            raise ValueError(f"지원하지 않는 플랫폼: {platform_type}")
+
+        if platform_type == 'discord':
+            return DiscordAdapter(engine=self.engine, message_queue=self.message_queue)
+        elif platform_type == 'cli':
+            from cli import CLIMode
+
+            class CLIPlatformWrapper:
+                """단순 CLI 테스트용 어댑터"""
+
+                def __init__(self, cli_engine):
+                    self.cli_engine = cli_engine
+
+                def set_message_handler(self, handler):
+                    self.handler = handler
+
+                def start(self, *_, **__):
+                    return CLIMode().run()
+
+                def stop(self):
+                    return None
+
+            return CLIPlatformWrapper(self.engine)
+        raise ValueError(f"지원하지 않는 플랫폼: {platform_type}")
     
     def _handle_message(self, user_id: str, message: str) -> str:
         """메시지 핸들러"""
@@ -39,42 +57,30 @@ class GameBot:
             return self.engine.process_message(user_id, message, platform_adapter=self.platform)
         except Exception as e:
             return f"오류가 발생했습니다: {str(e)}"
-    
-    def start(self, start_webhook: bool = True, use_webhook: bool = True):
-        """봇 시작
-        
-        Args:
-            start_webhook: 웹훅 서버 시작 여부 (deprecated)
-            use_webhook: 웹훅 서버 사용 여부 (기본값: True, 웹훅 서버만 사용)
-        """
-        print("게임 봇을 시작합니다...")
-        
-        # 카카오톡은 항상 웹훅 서버 모드 사용
-        if isinstance(self.platform, KakaoAdapter):
-            try:
-                from webhook_server import create_webhook_server
-                self.webhook_server = create_webhook_server(self.platform, self.engine)
-                
-                # 웹훅 서버는 별도 스레드에서 실행
-                import threading
-                server_thread = threading.Thread(
-                    target=self.webhook_server.run,
-                    daemon=True
+
+    def _start_message_pipeline(self) -> None:
+        """Kafka/인메모리 큐를 통한 메시지 라우팅 시작"""
+
+        def process_incoming(message: PlatformMessage) -> None:
+            response = self._handle_message(message.user_id, message.content)
+            if response:
+                self.message_queue.publish_outgoing(
+                    PlatformMessage(
+                        platform=message.platform,
+                        user_id=message.user_id,
+                        content=response,
+                        correlation_id=message.correlation_id,
+                    )
                 )
-                server_thread.start()
-                print(f"✅ 웹훅 서버 모드로 시작되었습니다 (완전 무료)")
-                print(f"웹훅 URL: http://{Config.SERVER_HOST}:{Config.SERVER_PORT}/webhook")
-                print("💡 카카오 챗봇 관리자센터에서 위 URL을 스킬 서버로 등록하세요")
-                print("💡 자세한 설정: CHATBOT_ADMIN_GUIDE.md 참조")
-                return
-            except ImportError:
-                print("⚠️ FastAPI가 설치되지 않았습니다. 웹훅 서버를 사용할 수 없습니다.")
-                print("💡 설치: pip install fastapi uvicorn")
-                return
-        
-        # 다른 플랫폼 (Discord 등)
-        self.platform.start(start_webhook=False)
-    
+
+        self.message_queue.start_incoming_consumer(process_incoming, group_id=f"{Config.KAFKA_PLATFORM_GROUP}-engine")
+
+    def start(self) -> None:
+        """봇 시작"""
+        print("게임 봇을 시작합니다...")
+        self._start_message_pipeline()
+        self.platform.start()
+
     def stop(self):
         """봇 종료"""
         print("게임 봇을 종료합니다...")
@@ -82,28 +88,30 @@ class GameBot:
             # 플랫폼 종료
             if self.platform:
                 self.platform.stop()
-            
+
             # 게임 엔진 데이터 저장
             if self.engine:
-                try:
-                    # 모든 활성 게임 종료 및 데이터 저장
-                    if hasattr(self.engine, 'active_games'):
-                        for user_id in list(self.engine.active_games.keys()):
-                            try:
-                                game = self.engine.active_games.get(user_id)
-                                if game and hasattr(game, 'end'):
-                                    game.end()
-                            except Exception as e:
-                                print(f"게임 종료 오류 (user_id: {user_id}): {e}")
-                    
-                    # 데이터베이스 연결 정리
-                    if hasattr(self.engine, 'point_system') and self.engine.gold_system:
-                        # PostgreSQL 연결 풀은 자동으로 관리됨
-                        pass
-                except Exception as e:
-                    print(f"데이터 저장 오류: {e}")
+                # 모든 활성 게임 종료 및 데이터 저장
+                if hasattr(self.engine, 'active_games'):
+                    for user_id in list(self.engine.active_games.keys()):
+                        try:
+                            game = self.engine.active_games.get(user_id)
+                            if game and hasattr(game, 'end'):
+                                game.end()
+                        except Exception as e:
+                            print(f"게임 종료 오류 (user_id: {user_id}): {e}")
+
+                # 데이터베이스 연결 정리
+                if hasattr(self.engine, 'point_system') and self.engine.gold_system:
+                    # PostgreSQL 연결 풀은 자동으로 관리됨
+                    pass
         except Exception as e:
             print(f"종료 중 오류: {e}")
+        try:
+            if self.message_queue:
+                self.message_queue.stop()
+        except Exception as e:
+            print(f"메시지 큐 종료 오류: {e}")
 
 
 def main():
@@ -126,31 +134,13 @@ def main():
     bot = GameBot(platform_type=platform)
     
     try:
-        # 플랫폼별 처리
-        if platform == 'kakao':
-            bot.start(use_webhook=True)
-            print("\n✅ 카카오톡 웹훅 서버 모드로 실행 중... (완전 무료)")
-            print("웹훅 서버가 실행되었습니다.")
-            print("카카오 챗봇 관리자센터에서 스킬 서버 URL을 등록하세요.")
-            print("💡 자세한 설정: CHATBOT_ADMIN_GUIDE.md 참조")
-            print("\n종료하려면 Ctrl+C를 누르세요.")
-            
-            # 서버가 계속 실행되도록 대기
-            import time
-            while True:
-                time.sleep(1)
-        elif platform == 'discord':
-            bot.start(use_webhook=False)
+        bot.start()
+        if platform == 'discord':
             print("\n✅ 디스코드 모드로 실행 중...")
-            print("디스코드 봇이 실행되었습니다.")
-            print("\n종료하려면 Ctrl+C를 누르세요.")
-            import time
-            while True:
-                time.sleep(1)
         else:
             print("\n💡 CLI 모드로 테스트하려면: python main.py cli")
             print("💡 또는: python cli.py")
-        
+
     except KeyboardInterrupt:
         print("\n종료 신호를 받았습니다...")
     except Exception as e:
