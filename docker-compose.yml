@@ -71,11 +71,12 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    command: python main.py
     # 내부 포트만 노출 (Nginx를 통해 접근)
     expose:
       - "5000"
     environment:
-      - PLATFORM=discord
+      - PLATFORM=${PLATFORM:-kakao}
       - INITIAL_POINTS=${INITIAL_POINTS:-100}
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=5000
