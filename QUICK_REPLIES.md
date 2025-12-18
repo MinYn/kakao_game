@@ -181,15 +181,15 @@ def _get_default_quick_replies(self) -> list:
 
 ### 게임별 Quick Replies 추가
 
-**펫 모험 Quick Replies 생성**:
+**우주 탐험 Quick Replies 생성**:
 ```python
-def _get_pet_quick_replies(self) -> list:
-    """펫 모험 활동 Quick Replies"""
+def _get_space_quick_replies(self) -> list:
+    """우주 탐험 임무 Quick Replies"""
     return [
-        {'action': 'message', 'label': '✨ 성장', 'messageText': '성장'},
-        {'action': 'message', 'label': '🚶 산책', 'messageText': '산책'},
-        {'action': 'message', 'label': '🎈 놀이', 'messageText': '놀이'},
-        {'action': 'message', 'label': '🎯 챌린지', 'messageText': '챌린지'},
+        {'action': 'message', 'label': '✨ 강화', 'messageText': '성장'},
+        {'action': 'message', 'label': '🛰️ 정찰', 'messageText': '정찰'},
+        {'action': 'message', 'label': '🔬 탐사', 'messageText': '탐사'},
+        {'action': 'message', 'label': '🚑 구조', 'messageText': '구조'},
         {'action': 'message', 'label': '🎫 패스', 'messageText': '패스'},
         {'action': 'message', 'label': '📊 상태', 'messageText': '상태'},
         {'action': 'message', 'label': '❌ 종료', 'messageText': '게임종료'},

@@ -1,14 +1,14 @@
 import random
 import unittest
 
-from games.adventure import AdventureGame, PetProfile
+from games.adventure import AdventureGame, ExplorerProfile
 
 
 class AdventureGameTestCase(unittest.TestCase):
-    def test_pet_profile_is_deterministic(self):
-        first = PetProfile.from_user_id("user-123")
-        second = PetProfile.from_user_id("user-123")
-        other = PetProfile.from_user_id("another-user")
+    def test_explorer_profile_is_deterministic(self):
+        first = ExplorerProfile.from_user_id("user-123")
+        second = ExplorerProfile.from_user_id("user-123")
+        other = ExplorerProfile.from_user_id("another-user")
 
         self.assertEqual(first, second)
         self.assertNotEqual(first, other)
@@ -16,10 +16,10 @@ class AdventureGameTestCase(unittest.TestCase):
     def test_activity_flow_returns_success_message(self):
         game = AdventureGame(user_id="tester")
         start_message = game.start()
-        self.assertIn("펫 모험", start_message)
+        self.assertIn("우주 탐험", start_message)
 
         random.seed(0)
-        response = game.process_command("산책")
+        response = game.process_command("정찰")
         self.assertIn("활동", response)
         self.assertIn("현재 골드", response)
 

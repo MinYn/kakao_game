@@ -9,7 +9,7 @@ from config import Config
 
 @dataclass
 class ActivityType:
-    """펫 활동 타입 정보"""
+    """우주 임무 타입 정보"""
 
     name: str
     base_reward: int
@@ -22,57 +22,50 @@ class ActivityType:
 
 
 @dataclass
-class PetProfile:
-    """사용자별 고유 펫 프로필 (외부 과금 없는 로컬 생성)"""
+class ExplorerProfile:
+    """사용자별 고유 탐사대 프로필 (로컬 결정적 생성)"""
 
-    name: str
-    species: str
-    color: str
-    accessory: str
-    personality: str
-    avatar: str
+    call_sign: str
+    role: str
+    ship_class: str
+    module: str
+    temperament: str
+    badge: str
 
     @classmethod
-    def from_user_id(cls, user_id: str) -> "PetProfile":
+    def from_user_id(cls, user_id: str) -> "ExplorerProfile":
         seed = int(hashlib.sha256(user_id.encode("utf-8")).hexdigest(), 16)
         rng = random.Random(seed)
 
-        species_choices = ["버블펫", "도트냥", "픽셀토끼", "비트폭스", "루프펭귄"]
-        colors = ["코랄", "블루", "그린", "퍼플", "옐로"]
-        accessories = ["별안경", "리본", "마법모자", "후드", "헤드폰"]
-        personalities = [
-            "호기심 많은",
-            "차분한",
-            "장난꾸러기",
-            "다정한",
-            "모험심 가득한",
-        ]
+        roles = ["궤도 조종사", "심우주 정찰관", "행성 지질학자", "통신 기사", "구조 대원"]
+        ships = ["탐사 셔틀", "정찰 프리깃", "과학 코르벳", "수송 드론", "지원 크루저"]
+        modules = ["과학 모듈", "레이더 팩", "엔진 튠", "차폐 장치", "응급 키트"]
+        temperaments = ["냉정한", "호기심 많은", "신속한", "분석적인", "대담한"]
 
-        species = rng.choice(species_choices)
-        color = rng.choice(colors)
-        accessory = rng.choice(accessories)
-        personality = rng.choice(personalities)
-        name = f"{color} {species}"
+        role = rng.choice(roles)
+        ship_class = rng.choice(ships)
+        module = rng.choice(modules)
+        temperament = rng.choice(temperaments)
+        call_sign = f"STS-{rng.randint(100, 999)}"
 
-        avatar_rng = random.Random(seed ^ 0xABCDEF)
-        eyes = avatar_rng.choice(["•‿•", "ᵔᴥᵔ", "✿ᴗ✿", "´｡• ᵕ •｡`", "^ᴗ^"])
-        cheeks = avatar_rng.choice(["❀", "✦", "", "✧", "★"])
-        ear = avatar_rng.choice(["/\\", "vv", "ʕʔ", "ɿɾ", "⟡⟡"])
-        body = avatar_rng.choice(["( " + eyes + " )", "<" + eyes + ">", "{" + eyes + "}"])
-        avatar = f"{ear}\n{cheeks}{body}{cheeks}"
+        badge_rng = random.Random(seed ^ 0xABCDEF)
+        nose = badge_rng.choice(["/\\", "^", "Λ", "A", "Δ"])
+        body = badge_rng.choice(["===>", "--->", "-==>", "~=>"])
+        trail = badge_rng.choice(["⋆", "✦", "✧", ""],)
+        badge = f"  {nose}\n{body}🚀{trail}\n  ||"
 
         return cls(
-            name=name,
-            species=species,
-            color=color,
-            accessory=accessory,
-            personality=personality,
-            avatar=avatar,
+            call_sign=call_sign,
+            role=role,
+            ship_class=ship_class,
+            module=module,
+            temperament=temperament,
+            badge=badge,
         )
 
 
 class AdventureGame(Game):
-    """펫 돌봄 모험 게임"""
+    """우주 탐험 로그 게임"""
 
     def __init__(self, user_id: str, point_system=None):
         super().__init__(user_id, point_system)
@@ -87,63 +80,63 @@ class AdventureGame(Game):
         self.activity_stats: Dict[str, int] = {a.name: 0 for a in self.activities}
         self.activity_count = 0
         self.total_reward = 0
-        self.pet_profile: Optional[PetProfile] = None
+        self.explorer_profile: Optional[ExplorerProfile] = None
 
     def _init_activities(self) -> list:
         """활동 타입 초기화"""
         return [
             ActivityType(
-                name="산책",
-                base_reward=25,
-                reward_range=(15, 40),
+                name="정찰",
+                base_reward=30,
+                reward_range=(20, 45),
                 multiplier=0.08,
-                prompts=("산책", "walk", "n", "1"),
-                success_rate=85.0,
+                prompts=("정찰", "scout", "walk", "n", "1"),
+                success_rate=86.0,
                 success_messages=(
-                    "{pet}이(가) 상쾌한 공기를 마시며 기분이 좋아졌어요!",
-                    "{pet}이(가) 주변을 구경하며 꼬리를 흔듭니다.",
-                    "{pet}이(가) 새 친구를 만나 인사했어요!",
+                    "{pilot}이(가) 저궤도 정찰을 마치고 안전하게 복귀했습니다.",
+                    "{pilot} 콜사인이 남긴 센서 로그가 깔끔합니다!",
+                    "{pilot}이(가) 잔해 지대를 스캔해 유용한 데이터를 확보했어요.",
                 ),
                 fail_messages=(
-                    "비가 와서 금방 돌아왔어요.",
-                    "조금 겁을 먹고 집으로 돌아왔어요.",
-                    "잠시 쉬고 싶어 하는 것 같아요.",
+                    "태양 플레어가 강해 임무를 축소했습니다.",
+                    "센서 노이즈가 커서 재시도가 필요합니다.",
+                    "연료 절약을 위해 빠르게 회항했습니다.",
                 ),
             ),
             ActivityType(
-                name="놀이",
-                base_reward=70,
-                reward_range=(60, 110),
+                name="탐사",
+                base_reward=85,
+                reward_range=(65, 125),
                 multiplier=0.12,
-                prompts=("놀이", "play", "s", "2", "특별놀이"),
+                prompts=("탐사", "survey", "play", "s", "2"),
                 success_rate=78.0,
                 success_messages=(
-                    "{pet}이(가) 장난감을 끌어안고 즐거워합니다!",
-                    "{pet}이(가) 신나는 비눗방울 놀이에 푹 빠졌어요!",
-                    "{pet}이(가) 음악에 맞춰 깜찍하게 춤을 춰요!",
+                    "{pilot}이(가) 샘플 채취에 성공했습니다! 분석 크레딧 확보.",
+                    "{pilot}이(가) 지질 코어를 회수하고 보고서를 남겼습니다.",
+                    "{pilot}이(가) 외계 구조물을 기록해 연구 포인트를 얻었습니다.",
                 ),
                 fail_messages=(
-                    "잠깐 집중이 흐트러졌어요.",
-                    "장난감이 금방 질린 것 같아요.",
-                    "다시 시도하면 더 즐거워질 거예요!",
+                    "표본이 손상되어 다시 채취가 필요합니다.",
+                    "드론이 전송을 끊어 임무를 중단했습니다.",
+                    "기상 악화로 탐사를 연기했습니다.",
                 ),
             ),
             ActivityType(
-                name="챌린지",
-                base_reward=180,
-                reward_range=(150, 260),
-                multiplier=0.15,
-                prompts=("챌린지", "challenge", "boss", "b", "3"),
-                success_rate=65.0,
+                name="구조",
+                base_reward=210,
+                reward_range=(170, 280),
+                multiplier=0.17,
+                prompts=("구조", "rescue", "challenge", "boss", "b", "3"),
+                success_rate=64.0,
                 success_messages=(
-                    "{pet}이(가) 집중해서 대형 퍼즐을 완성했어요!",
-                    "{pet}이(가) 새로운 재주를 성공적으로 선보였습니다!",
-                    "{pet}이(가) 깜짝 미션을 멋지게 수행했어요!",
+                    "{pilot}이(가) 조난 신호를 따라가 승선자를 무사히 구출했습니다!",
+                    "{pilot} 팀이 위험 구역을 돌파해 화물을 회수했습니다!",
+                    "{pilot}이(가) 침몰 직전의 캡슐을 견인했습니다. 대원들이 환호합니다!",
                 ),
                 fail_messages=(
-                    "아직 조금 어려웠나 봐요.",
-                    "휴식 후 다시 도전해봐요!",
-                    "응원이 필요합니다. 한 번 더!",
+                    "신호가 약해 경로를 잃었습니다. 다시 좌표를 보정합니다.",
+                    "차폐가 부족해 접근이 좌절됐습니다. 업그레이드가 필요합니다.",
+                    "연료가 부족해 안전히 철수했습니다.",
                 ),
             ),
         ]
@@ -156,9 +149,9 @@ class AdventureGame(Game):
                 "activity_count": stats.get("total_hunts", 0),
                 "total_reward": stats.get("total_hunt_reward", 0),
                 "activity_stats": {
-                    "산책": stats.get("hunt_normal", 0),
-                    "놀이": stats.get("hunt_special", 0),
-                    "챌린지": stats.get("hunt_boss", 0),
+                    "정찰": stats.get("hunt_normal", 0),
+                    "탐사": stats.get("hunt_special", 0),
+                    "구조": stats.get("hunt_boss", 0),
                 },
                 "attempts": stats.get("enhancement_attempts", 0),
                 "successes": stats.get("enhancement_successes", 0),
@@ -169,7 +162,7 @@ class AdventureGame(Game):
             "level": 0,
             "activity_count": 0,
             "total_reward": 0,
-            "activity_stats": {"산책": 0, "놀이": 0, "챌린지": 0},
+            "activity_stats": {"정찰": 0, "탐사": 0, "구조": 0},
             "attempts": 0,
             "successes": 0,
             "failures": 0,
@@ -178,7 +171,7 @@ class AdventureGame(Game):
     def start(self) -> str:
         """게임 시작"""
         self.is_active = True
-        self.pet_profile = PetProfile.from_user_id(self.user_id)
+        self.explorer_profile = ExplorerProfile.from_user_id(self.user_id)
         stats = self._load_stats()
 
         self.current_level = stats["level"]
@@ -196,27 +189,28 @@ class AdventureGame(Game):
         }
 
         challenge_passes = self._get_challenge_passes()
-        pet_card = (
-            f"{self.pet_profile.avatar}\n"
-            f"이름: {self.pet_profile.name}\n"
-            f"성격: {self.pet_profile.personality}\n"
-            f"포인트: {self.pet_profile.color}, {self.pet_profile.accessory}"
+        pilot_card = (
+            f"{self.explorer_profile.badge}\n"
+            f"콜사인: {self.explorer_profile.call_sign}\n"
+            f"역할: {self.explorer_profile.role}\n"
+            f"기체: {self.explorer_profile.ship_class} ({self.explorer_profile.module})\n"
+            f"기질: {self.explorer_profile.temperament}"
         )
 
         return (
-            "🐾 펫 모험을 시작합니다!\n\n"
-            f"{pet_card}\n\n"
-            f"현재 성장 레벨: +{self.current_level}\n"
-            f"챌린지 패스: {challenge_passes}장\n\n"
+            "🛰️ 우주 탐험 로그를 시작합니다!\n\n"
+            f"{pilot_card}\n\n"
+            f"현재 우주선 강화 레벨: +{self.current_level}\n"
+            f"구조 임무 패스: {challenge_passes}장\n\n"
             "명령어:\n"
-            "✨ 성장: '성장'/'train' (골드 사용)\n"
-            "💾 추억정산: '정산'/'sell' (현재 성장 단계 초기화 후 보상)\n"
+            "✨ 강화: '성장'/'train'/'강화'/'업그레이드' (골드 사용)\n"
+            "💾 정산: '정산'/'sell' (강화 단계 초기화 후 보상)\n"
             "📊 상태보기: '상태'/'status'\n\n"
             "🎯 활동:\n"
-            "- '산책'/'walk': 기본 케어\n"
-            "- '놀이'/'play': 특별 케어 (챌린지 패스 드랍 가능)\n"
-            "- '챌린지'/'challenge': 패스를 사용해 대형 미션\n"
-            "- '패스'/'ticket': 보유 챌린지 패스 확인"
+            "- '정찰'/'scout': 기본 센서 임무\n"
+            "- '탐사'/'survey': 샘플 채취 (패스 드랍 가능)\n"
+            "- '구조'/'rescue': 패스를 사용한 고난도 구조 임무\n"
+            "- '패스'/'ticket': 보유 구조 패스 확인"
         )
 
     def process_command(self, command: str) -> str:
@@ -232,7 +226,7 @@ class AdventureGame(Game):
         if command in ["상태", "status", "info"]:
             return self._get_status()
 
-        if command in ["성장", "train", "강화"]:
+        if command in ["성장", "train", "강화", "업그레이드", "개조"]:
             return self._enhance()
 
         if command in ["정산", "sell", "추억", "돌아보기"]:
@@ -241,24 +235,24 @@ class AdventureGame(Game):
         if command in ["패스", "ticket", "tickets", "t"]:
             return self._show_passes()
 
-        if command in ["산책", "walk", "n", "1"]:
-            return self._perform_activity("산책")
+        if command in ["정찰", "walk", "scout", "n", "1"]:
+            return self._perform_activity("정찰")
 
-        if command in ["놀이", "play", "s", "2", "특별놀이"]:
-            return self._perform_activity("놀이")
+        if command in ["탐사", "play", "survey", "s", "2", "특별놀이"]:
+            return self._perform_activity("탐사")
 
-        if command in ["챌린지", "challenge", "boss", "b", "3"]:
-            return self._perform_activity("챌린지")
+        if command in ["구조", "challenge", "rescue", "boss", "b", "3"]:
+            return self._perform_activity("구조")
 
         return (
             "알 수 없는 명령입니다.\n"
-            "사용 가능한 명령: 성장, 정산, 산책, 놀이, 챌린지, 패스, 상태, 종료"
+            "사용 가능한 명령: 성장, 정산, 정찰, 탐사, 구조, 패스, 상태, 종료"
         )
 
     # ========== 성장 관련 메서드 ==========
 
     def _calculate_cost(self) -> int:
-        """성장 비용 계산"""
+        """우주선 강화 비용 계산"""
         cost = int(
             self.enhancement_cost_base
             * (self.enhancement_cost_multiplier ** self.current_level)
@@ -272,7 +266,7 @@ class AdventureGame(Game):
         return max(boosted, 25.0)
 
     def _calculate_sell_price(self) -> int:
-        """추억 정산 금액 계산"""
+        """정산 금액 계산"""
         if self.current_level == 0:
             return 0
 
@@ -295,16 +289,16 @@ class AdventureGame(Game):
         return max(sell_price, 10)
 
     def _enhance(self) -> str:
-        """펫 성장"""
+        """우주선 강화"""
         cost = self._calculate_cost()
 
         if not self.point_system or not self.point_system.has_gold(self.user_id, cost):
             return (
-                "❌ 성장을 위해 필요한 골드가 부족합니다.\n"
+                "❌ 우주선 강화를 위한 골드가 부족합니다.\n"
                 f"필요 골드: {cost}G\n현재 골드: {self.get_user_points()}G"
             )
 
-        self.deduct_gold(cost, f"펫 성장 시도 (+{self.current_level} → +{self.current_level + 1})")
+        self.deduct_gold(cost, f"우주선 강화 시도 (+{self.current_level} → +{self.current_level + 1})")
 
         self.game_data["attempts"] = self.game_data.get("attempts", 0) + 1
         if self.point_system:
@@ -323,11 +317,11 @@ class AdventureGame(Game):
 
             next_cost = self._calculate_cost()
             return (
-                "✅ 성장 성공!\n\n"
-                f"현재 성장 레벨: +{self.current_level}\n"
-                f"다음 성장 필요 골드: {next_cost}G\n"
+                "✅ 강화 성공!\n\n"
+                f"현재 우주선 강화 레벨: +{self.current_level}\n"
+                f"다음 강화 필요 골드: {next_cost}G\n"
                 f"현재 골드: {self.get_user_points()}G\n\n"
-                "💡 성장 레벨이 오르면 활동 보상이 커집니다."
+                "💡 강화 레벨이 오르면 임무 보상이 커집니다."
             )
 
         self.game_data["failures"] = self.game_data.get("failures", 0) + 1
@@ -340,29 +334,29 @@ class AdventureGame(Game):
             if self.point_system:
                 self.point_system.set_enhancement_level(self.user_id, self.current_level)
             return (
-                "❌ 성장 단계가 한 단계 내려갔어요.\n\n"
-                f"현재 성장 레벨: +{self.current_level}\n"
+                "❌ 강화 단계가 한 단계 내려갔어요.\n\n"
+                f"현재 우주선 강화 레벨: +{self.current_level}\n"
                 f"현재 골드: {self.get_user_points()}G\n\n"
                 "다시 시도해볼까요?"
             )
 
         return (
-            "❌ 성장 실패...\n\n"
-            f"현재 성장 레벨: +{self.current_level}\n"
+            "❌ 강화 실패...\n\n"
+            f"현재 우주선 강화 레벨: +{self.current_level}\n"
             f"현재 골드: {self.get_user_points()}G\n\n"
             "다시 한 번 시도해보세요!"
         )
 
     def _sell(self) -> str:
-        """성장 단계 정산"""
+        """강화 단계 정산"""
         if self.current_level == 0:
-            return "❌ 정산할 성장이 없습니다. 성장 후 정산해 주세요."
+            return "❌ 정산할 강화 단계가 없습니다. 강화 후 정산해 주세요."
 
         sell_price = self._calculate_sell_price()
         sold_level = self.current_level
 
         if self.point_system:
-            self.award_gold(sell_price, f"펫 성장 정산 (+{sold_level})")
+            self.award_gold(sell_price, f"우주선 강화 정산 (+{sold_level})")
 
         self.current_level = 0
         self.game_data["level"] = 0
@@ -370,11 +364,11 @@ class AdventureGame(Game):
             self.point_system.set_enhancement_level(self.user_id, 0)
 
         return (
-            "💾 추억을 정산했습니다!\n\n"
-            f"정산한 성장 단계: +{sold_level}\n"
+            "💾 강화 단계를 정산했습니다!\n\n"
+            f"정산한 강화 단계: +{sold_level}\n"
             f"정산 보상: {sell_price}G\n"
             f"현재 골드: {self.get_user_points()}G\n\n"
-            "새로운 목표로 다시 키워봐요!"
+            "새로운 모듈로 다시 업그레이드해봐요!"
         )
 
     # ========== 활동 관련 메서드 ==========
@@ -396,24 +390,24 @@ class AdventureGame(Game):
     def _perform_activity(self, activity_name: str) -> str:
         activity = self._get_activity_type(activity_name)
         if activity is None:
-            return "❌ 해당 활동을 찾을 수 없습니다. 산책, 놀이, 챌린지를 입력해 주세요."
+            return "❌ 해당 활동을 찾을 수 없습니다. 정찰, 탐사, 구조를 입력해 주세요."
 
-        if activity.name == "챌린지":
+        if activity.name == "구조":
             if not self._use_challenge_pass():
                 passes = self._get_challenge_passes()
                 return (
-                    "❌ 챌린지 패스가 부족합니다.\n"
+                    "❌ 구조 임무 패스가 부족합니다.\n"
                     f"보유 패스: {passes}장\n"
-                    "'놀이'를 하면 패스를 얻을 수 있어요."
+                    "'탐사'를 하면 패스를 얻을 수 있어요."
                 )
 
         success_rate = self._calculate_success_rate(activity)
-        pet_name = self.pet_profile.name if self.pet_profile else "펫"
+        pilot_name = self.explorer_profile.call_sign if self.explorer_profile else "탐사대"
 
         if random.random() * 100 < success_rate:
             reward = self._calculate_activity_reward(activity)
             if self.point_system:
-                self.award_gold(reward, f"{activity.name} 성공 ({pet_name})")
+                self.award_gold(reward, f"{activity.name} 성공 ({pilot_name})")
 
             self.activity_count += 1
             self.total_reward += reward
@@ -423,7 +417,7 @@ class AdventureGame(Game):
             self.game_data["activity_stats"] = self.activity_stats
 
             if self.point_system:
-                activity_map = {"산책": "hunt_normal", "놀이": "hunt_special", "챌린지": "hunt_boss"}
+                activity_map = {"정찰": "hunt_normal", "탐사": "hunt_special", "구조": "hunt_boss"}
                 update_params = {
                     "user_id": self.user_id,
                     "total_hunts": 1,
@@ -435,7 +429,7 @@ class AdventureGame(Game):
             reward_multiplier = (
                 activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER
             ) * 100
-            description = random.choice(activity.success_messages).format(pet=pet_name)
+            description = random.choice(activity.success_messages).format(pilot=pilot_name)
 
             result_lines = [
                 "✅ 활동 성공!",
@@ -445,18 +439,18 @@ class AdventureGame(Game):
                 "",
             ]
 
-            if activity.name == "놀이":
+            if activity.name == "탐사":
                 if random.random() < Config.BOSS_TICKET_DROP_RATE:
                     new_passes = self._add_challenge_pass()
-                    result_lines.append(f"🎫 챌린지 패스 획득! (현재: {new_passes}장)")
+                    result_lines.append(f"🎫 구조 임무 패스 획득! (현재: {new_passes}장)")
                     result_lines.append("")
 
             result_lines.extend(
                 [
                     "활동 통계:",
-                    f"- 산책: {self.activity_stats.get('산책', 0)}회",
-                    f"- 놀이: {self.activity_stats.get('놀이', 0)}회",
-                    f"- 챌린지: {self.activity_stats.get('챌린지', 0)}회",
+                    f"- 정찰: {self.activity_stats.get('정찰', 0)}회",
+                    f"- 탐사: {self.activity_stats.get('탐사', 0)}회",
+                    f"- 구조: {self.activity_stats.get('구조', 0)}회",
                     f"총 활동: {self.activity_count}회",
                     f"총 획득 골드: {self.total_reward}G",
                     f"현재 골드: {self.get_user_points()}G",
@@ -478,9 +472,9 @@ class AdventureGame(Game):
         drop_rate_percent = Config.BOSS_TICKET_DROP_RATE * 100
 
         return (
-            "🎫 챌린지 패스 현황\n\n"
+            "🎫 구조 임무 패스 현황\n\n"
             f"보유 패스: {passes}장\n\n"
-            f"💡 '놀이'를 하면 {drop_rate_percent:.0f}% 확률로 패스를 얻을 수 있어요!"
+            f"💡 '탐사'를 하면 {drop_rate_percent:.0f}% 확률로 패스를 얻을 수 있어요!"
         )
 
     def _get_status(self) -> str:
@@ -492,36 +486,37 @@ class AdventureGame(Game):
         status_lines = [
             "📊 현재 상태",
             "",
-            "✨ 성장 정보:",
-            f"- 성장 레벨: +{self.current_level}",
-            f"- 다음 성장 비용: {cost}G",
-            f"- 성장 성공률: {success_rate:.1f}%",
+            "✨ 우주선 강화:",
+            f"- 강화 레벨: +{self.current_level}",
+            f"- 다음 강화 비용: {cost}G",
+            f"- 강화 성공률: {success_rate:.1f}%",
             f"- 정산 예상 보상: {sell_price}G",
             "",
-            "🎯 활동 정보:",
+            "🎯 임무 정보:",
             f"- 보상 배율: {1.0 + (self.current_level * Config.MONSTER_HUNT_REWARD_MULTIPLIER):.2f}배",
-            f"- 챌린지 패스: {passes}장",
+            f"- 구조 패스: {passes}장",
             "",
             "📈 통계:",
-            f"- 성장 시도: {self.game_data.get('attempts', 0)}회",
-            f"- 성장 성공: {self.game_data.get('successes', 0)}회",
-            f"- 성장 실패: {self.game_data.get('failures', 0)}회",
-            f"- 산책: {self.activity_stats.get('산책', 0)}회",
-            f"- 놀이: {self.activity_stats.get('놀이', 0)}회",
-            f"- 챌린지: {self.activity_stats.get('챌린지', 0)}회",
+            f"- 강화 시도: {self.game_data.get('attempts', 0)}회",
+            f"- 강화 성공: {self.game_data.get('successes', 0)}회",
+            f"- 강화 실패: {self.game_data.get('failures', 0)}회",
+            f"- 정찰: {self.activity_stats.get('정찰', 0)}회",
+            f"- 탐사: {self.activity_stats.get('탐사', 0)}회",
+            f"- 구조: {self.activity_stats.get('구조', 0)}회",
             f"- 총 활동: {self.activity_count}회",
             f"- 총 획득 골드: {self.total_reward}G",
             f"- 현재 골드: {self.get_user_points()}G",
         ]
 
-        if self.pet_profile:
+        if self.explorer_profile:
             status_lines.extend(
                 [
                     "",
-                    "🐾 펫 프로필:",
-                    f"- 이름: {self.pet_profile.name}",
-                    f"- 성격: {self.pet_profile.personality}",
-                    f"- 포인트: {self.pet_profile.color}, {self.pet_profile.accessory}",
+                    "🛰️ 탐사대 프로필:",
+                    f"- 콜사인: {self.explorer_profile.call_sign}",
+                    f"- 역할: {self.explorer_profile.role}",
+                    f"- 기체: {self.explorer_profile.ship_class} ({self.explorer_profile.module})",
+                    f"- 기질: {self.explorer_profile.temperament}",
                 ]
             )
 
@@ -542,9 +537,9 @@ class AdventureGame(Game):
                 enhancement_attempts=attempts,
                 enhancement_successes=successes,
                 enhancement_failures=failures,
-                hunt_normal=stats.get("산책", 0),
-                hunt_special=stats.get("놀이", 0),
-                hunt_boss=stats.get("챌린지", 0),
+                hunt_normal=stats.get("정찰", 0),
+                hunt_special=stats.get("탐사", 0),
+                hunt_boss=stats.get("구조", 0),
                 total_hunts=activity_count,
                 total_hunt_reward=reward,
             )
@@ -554,13 +549,13 @@ class AdventureGame(Game):
 
         return (
             "게임이 종료되었습니다.\n\n"
-            "✨ 성장:",
-            f"- 최종 성장 레벨: +{level}\n"
+            "✨ 우주선 강화 요약:",
+            f"- 최종 강화 레벨: +{level}\n"
             f"- 총 시도: {attempts}회 (성공 {successes}회 / 실패 {failures}회)\n\n"
-            "🎯 활동:",
-            f"- 산책: {stats.get('산책', 0)}회\n"
-            f"- 놀이: {stats.get('놀이', 0)}회\n"
-            f"- 챌린지: {stats.get('챌린지', 0)}회\n"
+            "🎯 임무 기록:",
+            f"- 정찰: {stats.get('정찰', 0)}회\n"
+            f"- 탐사: {stats.get('탐사', 0)}회\n"
+            f"- 구조: {stats.get('구조', 0)}회\n"
             f"- 총 활동: {activity_count}회\n"
             f"- 총 획득 골드: {reward}G"
         )
@@ -568,17 +563,17 @@ class AdventureGame(Game):
     def get_help(self) -> str:
         drop_rate = Config.BOSS_TICKET_DROP_RATE * 100
         return (
-            "펫 모험 도움말:\n\n"
-            "✨ 성장:",
-            "- 성장: '성장' 또는 'train'\n"
-            "- 정산: '정산' 또는 'sell' (성장 리셋 후 보상)\n"
+            "우주 탐험 로그 도움말:\n\n"
+            "✨ 우주선 강화:",
+            "- 강화: '성장', 'train', '업그레이드'\n"
+            "- 정산: '정산' 또는 'sell' (강화 리셋 후 보상)\n"
             "- 상태: '상태' 또는 'status'\n\n"
-            "🎯 활동:",
-            "- 산책: '산책', 'walk', '1'\n"
-            "- 놀이: '놀이', 'play', '2' (패스 드랍 확률 {drop_rate:.0f}%)\n"
-            "- 챌린지: '챌린지', 'challenge', '3' (패스 1장 소모)\n"
+            "🎯 임무:",
+            "- 정찰: '정찰', 'walk', 'scout', '1'\n"
+            "- 탐사: '탐사', 'survey', 'play', '2' (패스 드랍 확률 {drop_rate:.0f}%)\n"
+            "- 구조: '구조', 'rescue', 'challenge', '3' (패스 1장 소모)\n"
             "- 패스 확인: '패스', 'ticket'\n\n"
-            "💡 성장 레벨이 높을수록 활동 보상이 커집니다."
+            "💡 강화 레벨이 높을수록 임무 보상이 커집니다."
         )
 
     # ========== 패스 관련 유틸리티 ==========
@@ -591,9 +586,9 @@ class AdventureGame(Game):
     def _add_challenge_pass(self, amount: int = 1) -> int:
         if not self.point_system:
             return amount
-        return self.point_system.add_boss_ticket(self.user_id, amount, "챌린지 패스 획득")
+        return self.point_system.add_boss_ticket(self.user_id, amount, "구조 패스 획득")
 
     def _use_challenge_pass(self, amount: int = 1) -> bool:
         if not self.point_system:
             return True
-        return self.point_system.use_boss_ticket(self.user_id, amount, "챌린지 진행")
+        return self.point_system.use_boss_ticket(self.user_id, amount, "구조 임무 진행")
