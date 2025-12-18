@@ -301,20 +301,17 @@ class DiscordAdapter(ChatPlatform):
             print(f"[디스코드] 메시지 전송 실패: 플랫폼이 실행 중이 아닙니다.")
             return False
         
-        # 버튼 뷰 생성
-        view = self._create_button_view(user_id, message)
-        
         # 비동기 함수를 동기적으로 실행
         try:
             if self.loop and self.loop.is_running():
                 # 이미 실행 중인 루프가 있으면 태스크로 추가
                 asyncio.run_coroutine_threadsafe(
-                    self._send_message_async(user_id, message, view),
+                    self._send_message_async(user_id, message),
                     self.loop
                 )
             else:
                 # 루프가 없으면 새로 생성해서 실행
-                asyncio.run(self._send_message_async(user_id, message, view))
+                asyncio.run(self._send_message_async(user_id, message))
             return True
         except Exception as e:
             print(f"[디스코드] 메시지 전송 오류: {e}")
@@ -324,11 +321,12 @@ class DiscordAdapter(ChatPlatform):
         self,
         user_id: str,
         message: str,
-        view: Optional[View] = None,
         image_path: Optional[str] = None,
     ) -> None:
         """비동기 메시지 전송"""
         try:
+            # 버튼 뷰는 실행 중인 이벤트 루프 내에서 생성해야 함
+            view = self._create_button_view(user_id, message)
             files = self._build_files(image_path)
             
             # 마지막으로 메시지를 보낸 채널이 있으면 그 채널에 전송
