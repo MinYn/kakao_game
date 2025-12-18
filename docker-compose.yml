@@ -61,59 +61,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # 게임봇 메인 서버
-  gamebot:
-    build: .
-    container_name: kakao_game_bot
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    command: python main.py
-    # 내부 포트만 노출 (Nginx를 통해 접근)
-    expose:
-      - "5000"
-    environment:
-      - PLATFORM=${PLATFORM:-kakao}
-      - INITIAL_POINTS=${INITIAL_POINTS:-100}
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=5000
-      # Discord 설정
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - DISCORD_COMMAND_PREFIX=${DISCORD_COMMAND_PREFIX:-!}
-      # PostgreSQL 설정
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-kakao_game}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      # Kafka 설정
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - USE_KAFKA=${USE_KAFKA:-true}
-      # 게임 설정
-      - NUMBER_GUESS_ENTRY_COST=${NUMBER_GUESS_ENTRY_COST:-10}
-      - NUMBER_GUESS_BASE_REWARD=${NUMBER_GUESS_BASE_REWARD:-50}
-      - RPS_WIN_REWARD=${RPS_WIN_REWARD:-10}
-      - RPS_LOSE_COST=${RPS_LOSE_COST:-5}
-      - ENHANCEMENT_BASE_COST=${ENHANCEMENT_BASE_COST:-40}
-      # 로깅
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    volumes:
-      # .env 파일 마운트 (선택사항, 로컬 개발용)
-      - ./.env:/app/.env:ro
-      # 로그 파일 저장 (명명된 볼륨)
-      - gamebot_logs:/app/logs
-    networks:
-      - gamebot-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
   # Nginx 리버스 프록시
   nginx:
     image: nginx:alpine
@@ -155,22 +102,22 @@ services:
       - gamebot-network
 
   # Discord 봇 서비스
-  discord:
+  gamebot:
     build: .
-    container_name: kakao_game_discord
+    container_name: kakao_game_gamebot
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
-    command: python main.py discord
+    command: python main.py
     environment:
-      - PLATFORM=discord
+      - PLATFORM=${PLATFORM:-discord}
       - INITIAL_POINTS=${INITIAL_POINTS:-100}
       # Discord 설정
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - DISCORD_COMMAND_PREFIX=${DISCORD_COMMAND_PREFIX:-!}
+      - DISCORD_COMMAND_PREFIX=${DISCORD_COMMAND_PREFIX:-/}
       # PostgreSQL 설정
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
