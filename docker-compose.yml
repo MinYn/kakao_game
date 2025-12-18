@@ -30,6 +30,7 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
       # Reduce noisy INFO logs when clients close the connection immediately (e.g., healthchecks)
       KAFKA_OPTS: "-Dzookeeper.root.logger=WARN,CONSOLE"
+      ZOOKEEPER_LOG4J_PROP: "WARN,CONSOLE"
     networks:
       - gamebot-network
     healthcheck:
@@ -74,7 +75,7 @@ services:
     ports:
       - "${EXTERNAL_PORT:-3000}:80"  # 외부 포트 (기본값: 3000, Jenkins가 8080 사용 중)
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - nginx_logs:/var/log/nginx
     environment:
       # 공식 entrypoint 스크립트가 기본 conf를 수정하려고 시도할 때 읽기 전용 볼륨으로 인한 에러를 방지

@@ -344,47 +344,45 @@ class GameEngine:
         
         return "\n".join(result)
     
-    def get_ui_buttons(self, user_id: str, response: str = None) -> List[Dict[str, str]]:
+    def get_ui_buttons(self, user_id: str, command: str | None = None, response: str | None = None) -> List[Dict[str, str]]:
         """UI 버튼 목록 반환 (플랫폼별 UI 생성용)
-        
+
         Args:
             user_id: 사용자 ID
-            response: 응답 메시지 (선택사항, 게임 상태 판단용)
-            
+            command: 직전에 실행한 명령어 (UI 맥락 판단용)
+            response: 응답 메시지 (선택사항, 후행 UI 판단용)
+
         Returns:
             버튼 목록 [{'label': '...', 'messageText': '...'}, ...]
         """
         # 모험 게임 중인지 확인
         is_adventure = self.has_active_game(user_id)
-        
-        if is_adventure:
-            # 응답 텍스트로 모험 게임인지 확인
-            if response and ('강화' in response or '일반몹' in response or 
-                           '특수몹' in response or '보스몹' in response or '모험' in response):
-                return [
-                    {'label': '🔨 강화', 'messageText': '강화'},
-                    {'label': '🗡️ 사냥', 'messageText': '사냥'},
-                    {'label': '💰 판매', 'messageText': '판매'},
-                    {'label': '📊 상태', 'messageText': '상태'},
-                    {'label': '🏠 홈', 'messageText': '게임종료'},
-                ]
-            else:
-                return [
-                    {'label': '💰 골드', 'messageText': '골드'},
-                    {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
-                    {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                    {'label': '📋 게임목록', 'messageText': '게임목록'},
-                    {'label': '❓ 도움말', 'messageText': '도움말'},
-                ]
-        else:
-            # 기본 버튼
+        normalized_command = (command or "").strip()
+        normalized_response = response or ""
+
+        adventure_triggers = {"강화", "사냥", "판매", "상태", "모험", "게임종료"}
+        is_adventure_view = (
+            normalized_command in adventure_triggers
+            or any(token in normalized_response for token in adventure_triggers)
+        )
+
+        if is_adventure and is_adventure_view:
             return [
-                {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
-                {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '📋 게임목록', 'messageText': '게임목록'},
-                {'label': '❓ 도움말', 'messageText': '도움말'},
+                {'label': '🔨 강화', 'messageText': '강화'},
+                {'label': '🗡️ 사냥', 'messageText': '사냥'},
+                {'label': '💰 판매', 'messageText': '판매'},
+                {'label': '📊 상태', 'messageText': '상태'},
+                {'label': '🏠 홈', 'messageText': '게임종료'},
             ]
+
+        # 기본 버튼
+        return [
+            {'label': '💰 골드', 'messageText': '골드'},
+            {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
+            {'label': '🏆 랭킹', 'messageText': '리더보드'},
+            {'label': '📋 게임목록', 'messageText': '게임목록'},
+            {'label': '❓ 도움말', 'messageText': '도움말'},
+        ]
     
     def should_generate_image(self, user_id: str, command: str, response: str) -> bool:
         """이미지 생성이 필요한지 확인

@@ -54,8 +54,6 @@ class HuntMenuView(View):
             if self.message_handler:
                 response = self.message_handler(self.user_id, selected)
                 if response:
-                    # 응답에 따라 새로운 버튼 생성
-                    view = self._create_view_for_response(response)
                     # 이미지 생성 (사냥 결과인 경우)
                     image_path = None
                     if hasattr(self, 'adapter') and self.adapter:
@@ -64,7 +62,7 @@ class HuntMenuView(View):
                     await self.adapter._send_interaction_message(
                         interaction=interaction,
                         response=response,
-                        view=view,
+                        view=self._create_view_for_response(selected, response),
                         image_path=image_path,
                     )
                 else:
@@ -83,14 +81,15 @@ class HuntMenuView(View):
             except:
                 pass
     
-    def _create_view_for_response(self, response: str):
+    def _create_view_for_response(self, command: Optional[str], response: str):
         """응답에 따라 적절한 버튼 뷰 생성"""
         if not self.message_handler:
             return None
-        
-        # GameEngine에서 버튼 목록 가져오기
-        if self.engine:
-            buttons = self.engine.get_ui_buttons(self.user_id, response)
+
+        if self.adapter:
+            buttons = self.adapter._get_button_definitions(self.user_id, command, response)
+        elif self.engine:
+            buttons = self.engine.get_ui_buttons(self.user_id, command, response)
         else:
             # 기본 버튼 (engine이 없는 경우)
             buttons = [
@@ -100,19 +99,36 @@ class HuntMenuView(View):
                 {'label': '📋 게임목록', 'messageText': '게임목록'},
                 {'label': '❓ 도움말', 'messageText': '도움말'},
             ]
-        
-        return CommandButtonView(buttons, self.message_handler, self.user_id, self.engine, self.adapter)
+
+        return CommandButtonView(
+            buttons,
+            self.message_handler,
+            self.user_id,
+            self.engine,
+            self.adapter,
+            last_command=command,
+        )
 
 
 class CommandButtonView(View):
     """명령어 버튼 뷰"""
-    
-    def __init__(self, buttons: list, message_handler, user_id: str, engine=None, adapter=None, timeout: float = 300.0):
+
+    def __init__(
+        self,
+        buttons: list,
+        message_handler,
+        user_id: str,
+        engine=None,
+        adapter=None,
+        last_command: Optional[str] = None,
+        timeout: float = 300.0,
+    ):
         super().__init__(timeout=timeout)
         self.message_handler = message_handler
         self.user_id = user_id
         self.engine = engine
         self.adapter = adapter
+        self.last_command = last_command
         
         # 버튼 생성 (최대 5개)
         for btn_data in buttons[:5]:
@@ -189,7 +205,7 @@ class CommandButtonView(View):
                     response = self.message_handler(self.user_id, command)
                     if response:
                         # 응답에 따라 새로운 버튼 생성
-                        view = self._create_view_for_response(response)
+                        view = self._create_view_for_response(command, response)
                         image_path = None
                         if self.adapter:
                             image_path = self.adapter._generate_image_if_needed(self.user_id, command, response)
@@ -218,11 +234,12 @@ class CommandButtonView(View):
         
         return callback
     
-    def _create_view_for_response(self, response: str):
+    def _create_view_for_response(self, command: Optional[str], response: str):
         """응답에 따라 적절한 버튼 뷰 생성"""
-        # GameEngine에서 버튼 목록 가져오기
-        if self.engine:
-            buttons = self.engine.get_ui_buttons(self.user_id, response)
+        if self.adapter:
+            buttons = self.adapter._get_button_definitions(self.user_id, command, response)
+        elif self.engine:
+            buttons = self.engine.get_ui_buttons(self.user_id, command, response)
         else:
             # 기본 버튼 (engine이 없는 경우)
             buttons = [
@@ -232,8 +249,15 @@ class CommandButtonView(View):
                 {'label': '📋 게임목록', 'messageText': '게임목록'},
                 {'label': '❓ 도움말', 'messageText': '도움말'},
             ]
-        
-        return CommandButtonView(buttons, self.message_handler, self.user_id, self.engine, self.adapter)
+
+        return CommandButtonView(
+            buttons,
+            self.message_handler,
+            self.user_id,
+            self.engine,
+            self.adapter,
+            last_command=command,
+        )
 
 
 class DiscordAdapter(ChatPlatform):
@@ -322,11 +346,12 @@ class DiscordAdapter(ChatPlatform):
         user_id: str,
         message: str,
         image_path: Optional[str] = None,
+        last_command: Optional[str] = None,
     ) -> None:
         """비동기 메시지 전송"""
         try:
             # 버튼 뷰는 실행 중인 이벤트 루프 내에서 생성해야 함
-            view = self._create_button_view(user_id, message)
+            view = self._create_button_view(user_id, message, last_command)
             files = self._build_files(image_path)
             
             # 마지막으로 메시지를 보낸 채널이 있으면 그 채널에 전송
@@ -350,41 +375,35 @@ class DiscordAdapter(ChatPlatform):
         finally:
             self._cleanup_temp_image(image_path)
     
-    def _create_button_view(self, user_id: str, response: str) -> Optional[View]:
+    def _create_button_view(
+        self, user_id: str, response: str, last_command: Optional[str] = None
+    ) -> Optional[View]:
         """응답에 따라 버튼 뷰 생성"""
         if not self.message_handler:
             return None
-        
-        # 모험 게임 중인지 확인
-        if self.engine and self.engine.has_active_game(user_id):
-            # 응답 텍스트로 모험 게임인지 확인
-            if '강화' in response or '일반몹' in response or '특수몹' in response or '보스몹' in response or '모험' in response:
-                buttons = [
-                    {'label': '🔨 강화', 'messageText': '강화'},
-                    {'label': '🗡️ 사냥', 'messageText': '사냥'},
-                    {'label': '💰 판매', 'messageText': '판매'},
-                    {'label': '📊 상태', 'messageText': '상태'},
-                    {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                ]
-            else:
-                buttons = [
-                    {'label': '💰 골드', 'messageText': '골드'},
-                    {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
-                    {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                    {'label': '📋 게임목록', 'messageText': '게임목록'},
-                    {'label': '❓ 도움말', 'messageText': '도움말'},
-                ]
-        else:
-            # 기본 버튼
-            buttons = [
-                {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
-                {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '📋 게임목록', 'messageText': '게임목록'},
-                {'label': '❓ 도움말', 'messageText': '도움말'},
-            ]
-        
-        return CommandButtonView(buttons, self.message_handler, user_id, self.engine, self)
+
+        buttons = self._get_button_definitions(user_id, last_command, response)
+        return CommandButtonView(
+            buttons,
+            self.message_handler,
+            user_id,
+            self.engine,
+            self,
+            last_command=last_command,
+        )
+
+    def _get_button_definitions(
+        self, user_id: str, command: Optional[str], response: Optional[str]
+    ) -> list:
+        if self.engine:
+            return self.engine.get_ui_buttons(user_id, command, response)
+        return [
+            {'label': '💰 골드', 'messageText': '골드'},
+            {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
+            {'label': '🏆 랭킹', 'messageText': '리더보드'},
+            {'label': '📋 게임목록', 'messageText': '게임목록'},
+            {'label': '❓ 도움말', 'messageText': '도움말'},
+        ]
     
     def _generate_image_if_needed(self, user_id: str, command: str, response: str) -> Optional[str]:
         """강화/사냥 결과인 경우 이미지 생성"""
@@ -525,7 +544,7 @@ class DiscordAdapter(ChatPlatform):
                         # DM 채널 저장
                         self.user_channels[user_id] = (message.channel, message.channel)
                         # 버튼 뷰 생성
-                        view = self._create_button_view(user_id, response)
+                        view = self._create_button_view(user_id, response, message.content)
                         # 이미지 생성 (강화/사냥 결과인 경우)
                         image_path = self._generate_image_if_needed(user_id, message.content, response)
                         await message.channel.send(response, view=view, files=[discord.File(image_path)] if image_path and os.path.exists(image_path) else None)
@@ -555,7 +574,7 @@ class DiscordAdapter(ChatPlatform):
                             # 채널 저장
                             self.user_channels[user_id] = (message.channel, message.channel)
                             # 버튼 뷰 생성
-                            view = self._create_button_view(user_id, response)
+                            view = self._create_button_view(user_id, response, content)
                             # 이미지 생성 (강화/사냥 결과인 경우)
                             image_path = self._generate_image_if_needed(user_id, content, response)
                             await message.channel.send(response, view=view, files=[discord.File(image_path)] if image_path and os.path.exists(image_path) else None)
