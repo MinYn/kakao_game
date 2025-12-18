@@ -33,6 +33,9 @@ class Config:
     # Kafka 설정
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
     USE_KAFKA: bool = os.getenv('USE_KAFKA', 'true').lower() == 'true'
+    KAFKA_INCOMING_TOPIC: str = os.getenv('KAFKA_INCOMING_TOPIC', 'platform.incoming')
+    KAFKA_OUTGOING_TOPIC: str = os.getenv('KAFKA_OUTGOING_TOPIC', 'platform.outgoing')
+    KAFKA_PLATFORM_GROUP: str = os.getenv('KAFKA_PLATFORM_GROUP', 'platform-router')
     
     # 게임 설정 - 숫자맞추기
     NUMBER_GUESS_ENTRY_COST: int = int(os.getenv('NUMBER_GUESS_ENTRY_COST', '10'))

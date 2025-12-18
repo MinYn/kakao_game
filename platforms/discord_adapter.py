@@ -7,6 +7,7 @@ from discord.ui import View, Button, Select
 from platforms.base_platform import ChatPlatform
 from config import Config
 from image_generator import ImageGenerator
+from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
 
 class HuntMenuView(View):
@@ -45,8 +46,11 @@ class HuntMenuView(View):
         try:
             # 즉시 응답 (타임아웃 방지)
             await interaction.response.defer(ephemeral=False)
-            
+
             selected = interaction.data['values'][0]  # 선택된 값
+            if self.adapter and self.adapter._enqueue_incoming(self.user_id, selected):
+                await self.adapter._acknowledge_interaction(interaction)
+                return
             if self.message_handler:
                 response = self.message_handler(self.user_id, selected)
                 if response:
@@ -176,7 +180,11 @@ class CommandButtonView(View):
             try:
                 # 즉시 응답 (타임아웃 방지)
                 await interaction.response.defer(ephemeral=False)
-                
+
+                if hasattr(self, 'adapter') and self.adapter and self.adapter._enqueue_incoming(self.user_id, command):
+                    await self.adapter._acknowledge_interaction(interaction)
+                    return
+
                 if self.message_handler:
                     response = self.message_handler(self.user_id, command)
                     if response:
@@ -231,7 +239,7 @@ class CommandButtonView(View):
 class DiscordAdapter(ChatPlatform):
     """디스코드 봇 어댑터"""
     
-    def __init__(self, token: Optional[str] = None, engine=None):
+    def __init__(self, token: Optional[str] = None, engine=None, message_queue: Optional[PlatformMessageQueue] = None):
         super().__init__()
         self.token = token or Config.DISCORD_TOKEN
         self.command_prefix = Config.DISCORD_COMMAND_PREFIX
@@ -241,11 +249,51 @@ class DiscordAdapter(ChatPlatform):
         self.bot_thread = None
         self.engine = engine  # GameEngine 참조
         self.image_generator = ImageGenerator()  # 이미지 생성기
+        self.message_queue = message_queue
+        self._queue_listener_started = False
 
         self.message_handler: Optional[Callable[[str, str], str]] = None
-        
+
         # 메시지 전송을 위한 채널/유저 매핑
         self.user_channels = {}  # user_id -> (channel, last_channel) 매핑
+
+    def set_message_queue(self, queue: PlatformMessageQueue) -> None:
+        self.message_queue = queue
+
+    def _enqueue_incoming(self, user_id: str, content: str) -> bool:
+        """Kafka/큐에 수신 메시지를 적재"""
+        if self.message_queue:
+            self.message_queue.publish_incoming(
+                PlatformMessage(platform="discord", user_id=user_id, content=content)
+            )
+            return True
+        return False
+
+    def _handle_outgoing_message(self, message: PlatformMessage) -> None:
+        if message.platform and message.platform != "discord":
+            return
+        self.send_message(message.user_id, message.content)
+
+    async def _acknowledge_interaction(self, interaction: discord.Interaction) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.followup.send(
+                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
+                    ephemeral=True,
+                )
+        except Exception:
+            pass
+
+    async def _acknowledge_channel(self, channel: discord.abc.Messageable) -> None:
+        try:
+            await channel.send("요청을 접수했어요. 처리 후 답변을 보내드릴게요.")
+        except Exception:
+            pass
     
     def send_message(self, user_id: str, message: str) -> bool:
         """디스코드 메시지 전송"""
@@ -450,6 +498,12 @@ class DiscordAdapter(ChatPlatform):
             print(f"[디스코드] 봇이 로그인했습니다: {self.client.user}")
             print(f"[디스코드] 서버 수: {len(self.client.guilds)}")
             print(f"[디스코드] 명령어 접두사: {self.command_prefix}")
+            if self.message_queue and not self._queue_listener_started:
+                self.message_queue.start_outgoing_consumer(
+                    self._handle_outgoing_message,
+                    group_id=f"{Config.KAFKA_PLATFORM_GROUP}-discord",
+                )
+                self._queue_listener_started = True
         
         @self.client.event
         async def on_message(message):
@@ -464,6 +518,10 @@ class DiscordAdapter(ChatPlatform):
                     # 플랫폼 어댑터 설정 (멘션 기능용)
                     if self.engine:
                         self.engine.set_platform_adapter(self)
+                    if self._enqueue_incoming(user_id, message.content):
+                        self.user_channels[user_id] = (message.channel, message.channel)
+                        await self._acknowledge_channel(message.channel)
+                        return
                     response = self.message_handler(user_id, message.content)
                     if response:
                         # DM 채널 저장
@@ -490,6 +548,10 @@ class DiscordAdapter(ChatPlatform):
                         # 플랫폼 어댑터 설정 (멘션 기능용)
                         if self.engine:
                             self.engine.set_platform_adapter(self)
+                        if self._enqueue_incoming(user_id, content):
+                            self.user_channels[user_id] = (message.channel, message.channel)
+                            await self._acknowledge_channel(message.channel)
+                            return
                         response = self.message_handler(user_id, content)
                         if response:
                             # 채널 저장

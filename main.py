@@ -7,6 +7,7 @@ from typing import Optional
 from game_engine import GameEngine
 from platforms.discord_adapter import DiscordAdapter
 from config import Config
+from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
 
 class GameBot:
@@ -14,16 +15,19 @@ class GameBot:
     
     def __init__(self, platform_type: Optional[str] = None):
         self.engine = GameEngine()
+        self.message_queue = PlatformMessageQueue()
         platform = platform_type or Config.PLATFORM
         self.platform = self._create_platform(platform)
         self.platform.set_message_handler(self._handle_message)
+        if hasattr(self.platform, "set_message_queue"):
+            self.platform.set_message_queue(self.message_queue)
     
     def _create_platform(self, platform_type: str):
         """플랫폼 생성"""
         platform_type = platform_type.lower()
-        
+
         if platform_type == 'discord':
-            return DiscordAdapter(engine=self.engine)
+            return DiscordAdapter(engine=self.engine, message_queue=self.message_queue)
         elif platform_type == 'cli':
             from cli import CLIMode
 
@@ -53,12 +57,30 @@ class GameBot:
             return self.engine.process_message(user_id, message, platform_adapter=self.platform)
         except Exception as e:
             return f"오류가 발생했습니다: {str(e)}"
-    
+
+    def _start_message_pipeline(self) -> None:
+        """Kafka/인메모리 큐를 통한 메시지 라우팅 시작"""
+
+        def process_incoming(message: PlatformMessage) -> None:
+            response = self._handle_message(message.user_id, message.content)
+            if response:
+                self.message_queue.publish_outgoing(
+                    PlatformMessage(
+                        platform=message.platform,
+                        user_id=message.user_id,
+                        content=response,
+                        correlation_id=message.correlation_id,
+                    )
+                )
+
+        self.message_queue.start_incoming_consumer(process_incoming, group_id=f"{Config.KAFKA_PLATFORM_GROUP}-engine")
+
     def start(self) -> None:
         """봇 시작"""
         print("게임 봇을 시작합니다...")
+        self._start_message_pipeline()
         self.platform.start()
-    
+
     def stop(self):
         """봇 종료"""
         print("게임 봇을 종료합니다...")
@@ -66,28 +88,30 @@ class GameBot:
             # 플랫폼 종료
             if self.platform:
                 self.platform.stop()
-            
+
             # 게임 엔진 데이터 저장
             if self.engine:
-                try:
-                    # 모든 활성 게임 종료 및 데이터 저장
-                    if hasattr(self.engine, 'active_games'):
-                        for user_id in list(self.engine.active_games.keys()):
-                            try:
-                                game = self.engine.active_games.get(user_id)
-                                if game and hasattr(game, 'end'):
-                                    game.end()
-                            except Exception as e:
-                                print(f"게임 종료 오류 (user_id: {user_id}): {e}")
-                    
-                    # 데이터베이스 연결 정리
-                    if hasattr(self.engine, 'point_system') and self.engine.gold_system:
-                        # PostgreSQL 연결 풀은 자동으로 관리됨
-                        pass
-                except Exception as e:
-                    print(f"데이터 저장 오류: {e}")
+                # 모든 활성 게임 종료 및 데이터 저장
+                if hasattr(self.engine, 'active_games'):
+                    for user_id in list(self.engine.active_games.keys()):
+                        try:
+                            game = self.engine.active_games.get(user_id)
+                            if game and hasattr(game, 'end'):
+                                game.end()
+                        except Exception as e:
+                            print(f"게임 종료 오류 (user_id: {user_id}): {e}")
+
+                # 데이터베이스 연결 정리
+                if hasattr(self.engine, 'point_system') and self.engine.gold_system:
+                    # PostgreSQL 연결 풀은 자동으로 관리됨
+                    pass
         except Exception as e:
             print(f"종료 중 오류: {e}")
+        try:
+            if self.message_queue:
+                self.message_queue.stop()
+        except Exception as e:
+            print(f"메시지 큐 종료 오류: {e}")
 
 
 def main():

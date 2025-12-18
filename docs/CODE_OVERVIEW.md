@@ -7,7 +7,7 @@
 - **웹 서버**: 카카오 웹훅 서버 코드는 제거되었습니다. `run_server.py`는 단일 프로세스 디스코드 런타임을 실행합니다.
 - **게임 엔진**: `game_engine.py`는 골드 시스템과 우주 탐험 로그 게임(우주선 강화+임무)을 묶는 허브입니다. 메시지 파서를 통해 골드 조회/전송, 리더보드, 게임 시작/종료, 도움말 명령을 처리합니다.
 - **플랫폼 어댑터**: `platforms/discord_adapter.py`가 디스코드 메시지 이벤트를 게임 엔진에 연결합니다. 멘션 문자열 생성 기능을 노출해 게임 엔진이 플랫폼별 멘션을 추가할 수 있습니다.
-- **이벤트/확장성**: Kafka 발행은 선택적(`Config.USE_KAFKA`)이며, 골드/통계 이벤트를 `events.kafka_producer.publish_event`로 내보내도록 훅이 준비돼 있습니다.
+- **이벤트/확장성**: Kafka 발행은 선택적(`Config.USE_KAFKA`)이며, 골드/통계 이벤트를 `events.kafka_producer.publish_event`로 내보내도록 훅이 준비돼 있습니다. Discord 어댑터 메시지는 `events.platform_queue.PlatformMessageQueue`를 통해 `platform.incoming`/`platform.outgoing` 토픽으로 라우팅합니다(비활성화 시 인메모리 큐 대체).
 
 ## 설정 (환경 변수)
 주요 설정은 `config.py`에 정의되며 `.env`로 주입됩니다. 기본값은 다음과 같습니다.
@@ -18,7 +18,7 @@
 | Discord | `DISCORD_TOKEN`, `DISCORD_COMMAND_PREFIX` | `None`, `!` |
 | 데이터 | `DATA_FILE`, `INITIAL_GOLD` | `data.db`, `100` |
 | Postgres | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `localhost`, `5432`, `kakao_game`, `postgres`, `postgres` |
-| Kafka | `KAFKA_BOOTSTRAP_SERVERS`, `USE_KAFKA` | `localhost:9092`, `true` |
+| Kafka | `KAFKA_BOOTSTRAP_SERVERS`, `USE_KAFKA`, `KAFKA_INCOMING_TOPIC`, `KAFKA_OUTGOING_TOPIC`, `KAFKA_PLATFORM_GROUP` | `localhost:9092`, `true`, `platform.incoming`, `platform.outgoing`, `platform-router` |
 | 게임(우주 탐험 로그) | `ENHANCEMENT_MAX_LEVEL`, `ENHANCEMENT_BASE_COST`, `ENHANCEMENT_COST_MULTIPLIER`, `ENHANCEMENT_SELL_MULTIPLIER`, `ENHANCEMENT_LEVEL_BONUS`, `MONSTER_HUNT_REWARD_MULTIPLIER`, `BOSS_TICKET_DROP_RATE` | `15`, `40`, `1.4`, `0.6`, `40`, `0.1`, `0.3` |
 | 서버/로깅 | `SERVER_HOST`, `SERVER_PORT`, `EXTERNAL_PORT`, `USE_NGINX`, `GUNICORN_WORKERS`, `LOG_LEVEL`, `LOG_FILE` | `0.0.0.0`, `5000`, `8080`, `true`, `4`, `INFO`, `None` |
 
