@@ -129,14 +129,18 @@ def main():
         print("💡 .env.example 파일을 참고하여 .env 파일을 생성하세요.")
     
     # 플랫폼 선택 (명령줄 인자 또는 설정 파일)
-    platform = sys.argv[1] if len(sys.argv) > 1 else None
-    
+    platform = sys.argv[1] if len(sys.argv) > 1 else Config.PLATFORM
+
     bot = GameBot(platform_type=platform)
-    
+
     try:
         bot.start()
         if platform == 'discord':
             print("\n✅ 디스코드 모드로 실행 중...")
+            import time
+
+            while True:
+                time.sleep(1)
         else:
             print("\n💡 CLI 모드로 테스트하려면: python main.py cli")
             print("💡 또는: python cli.py")
