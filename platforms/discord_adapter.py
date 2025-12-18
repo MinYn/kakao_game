@@ -294,18 +294,24 @@ class DiscordAdapter(ChatPlatform):
 
     def _enqueue_incoming(self, user_id: str, content: str) -> tuple[bool, bool]:
         """Kafka/큐에 수신 메시지를 적재하며 중복 액션을 표시"""
-        if self.message_queue:
-            now = time.monotonic()
-            duplicate = False
-            last_ts = self._pending_actions.get(user_id)
-            if last_ts and now - last_ts < 2.0:
-                duplicate = True
-            self._pending_actions[user_id] = now
+        now = time.monotonic()
+        duplicate = False
+        last_ts = self._pending_actions.get(user_id)
+        if last_ts and now - last_ts < 2.0:
+            duplicate = True
 
+        # 중복 요청은 큐 적재 없이 처리 차단
+        if duplicate:
+            self._pending_actions[user_id] = now
+            return True, True
+
+        self._pending_actions[user_id] = now
+
+        if self.message_queue:
             self.message_queue.publish_incoming(
                 PlatformMessage(platform="discord", user_id=user_id, content=content)
             )
-            return True, duplicate
+            return True, False
         return False, False
 
     def _clear_pending_action(self, user_id: str) -> None:
@@ -317,21 +323,25 @@ class DiscordAdapter(ChatPlatform):
         self.send_message(message.user_id, message.content)
 
     async def _acknowledge_interaction(self, interaction: discord.Interaction, duplicate: bool = False) -> None:
+        if not duplicate:
+            return
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message(
-                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요." if duplicate else "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
+                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
                     ephemeral=True,
                 )
             else:
                 await interaction.followup.send(
-                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요." if duplicate else "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
+                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
                     ephemeral=True,
                 )
         except Exception:
             pass
 
     async def _acknowledge_channel(self, channel: discord.abc.Messageable, duplicate: bool = False) -> None:
+        if not duplicate:
+            return
         try:
             await channel.send("요청을 접수했어요. 처리 후 답변을 보내드릴게요.")
         except Exception:

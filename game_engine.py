@@ -201,10 +201,12 @@ class GameEngine:
     def _handle_start_command(
         self,
         user_id: str,
-        message: str,
+        message: Optional[str] = None,
         user_name: Optional[str] = None,
         is_new_user: bool = False,
+        **_: Any,
     ) -> str:
+        message = message or ""
         msg_lower = message.lower()
         if msg_lower.startswith('s '):
             game_name = message[2:].strip()
