@@ -13,6 +13,8 @@ class GameEngine:
         self.active_games: Dict[str, Game] = {}
         self.gold_system = gold_system or GoldSystemPostgres()
         self._platform_adapter: Optional[ChatPlatform] = None
+        self.command_definitions = self._build_command_definitions()
+        self._command_index: Dict[str, Dict[str, Any]] = {}
         self.available_games = {
             '모험': AdventureGame,
             'adventure': AdventureGame,
@@ -39,100 +41,17 @@ class GameEngine:
         elif not hasattr(self, '_platform_adapter'):
             self._platform_adapter = None
         
-        message = message.strip()
+        message = self._normalize_command(message)
 
-        # 커맨드 형태 처리 (/명령어 또는 @봇이름 명령어)
-        # "/골드" 또는 "@게임봇 골드" 형태 지원
-        if message.startswith('/'):
-            # 슬래시 커맨드: "/골드" -> "골드"
-            message = message[1:].strip()
-        elif message.startswith('@'):
-            # @봇이름 커맨드: "@게임봇 골드" -> "골드"
-            # @ 뒤의 공백까지 제거
-            parts = message[1:].split(None, 1)  # 최대 1번만 분할
-            if len(parts) > 1:
-                # 봇 이름 뒤의 명령어만 추출
-                message = parts[1].strip()
-            else:
-                message = ''  # "@봇이름"만 입력한 경우
-        
-        # 골드 조회 (단축키: g, gold, p, pt)
-        gold_commands = [
-            '골드', 'gold', 'g', '포인트', 'point', 'points',
-            '잔액', '내골드', 'p', 'pt'
-        ]
-        if message.lower() in gold_commands:
-            response = self._get_gold(user_id)
-            if is_new_user:
-                response = (
-                    f"🎉 환영합니다! 신규 사용자에게 "
-                    f"{Config.INITIAL_GOLD}G를 지급했습니다!\n\n"
-                    f"{response}"
-                )
-            # 액션(버튼 클릭) 시 사용자 멘션 추가
-            mention = self._get_user_mention(user_id, user_name)
-            if mention:
-                response = f"{mention} {response}"
-            return response
-        
-        # 골드 전송 (단축키: pay, send)
-        msg_lower = message.lower()
-        if (msg_lower.startswith('골드주기') or
-                msg_lower.startswith('골드전송') or
-                msg_lower.startswith('pay ') or
-                msg_lower.startswith('send ')):
-            # 단축키 변환
-            if msg_lower.startswith('pay '):
-                message = '골드주기 ' + message[4:]
-            elif msg_lower.startswith('send '):
-                message = '골드주기 ' + message[5:]
-            return self._transfer_gold(user_id, message)
-        
-        # 리더보드 (단축키: l, lb, rank)
-        leaderboard_commands = [
-            '리더보드', '랭킹', 'leaderboard', 'ranking',
-            'l', 'lb', 'rank', 'r'
-        ]
-        if message.lower() in leaderboard_commands:
-            return self._get_leaderboard()
-        
-        # 게임 목록 (단축키: g, gl, list)
-        game_list_commands = [
-            '게임목록', '게임', 'games', 'list', 'g', 'gl'
-        ]
-        if message.lower() in game_list_commands:
-            return self._list_games()
-        
-        # 도움말 (단축키: h, ?)
-        if message.lower() in ['도움말', 'help', '?', 'h']:
-            return self._get_help()
-        
-        # 게임 시작 (단축키: s, start, gs)
-        msg_lower = message.lower()
-        if (msg_lower.startswith('게임시작') or
-                msg_lower.startswith('시작') or
-                msg_lower.startswith('s ') or
-                msg_lower.startswith('start ') or
-                msg_lower.startswith('gs ')):
-            # 단축키 변환
-            if msg_lower.startswith('s '):
-                game_name = message[2:].strip()
-            elif msg_lower.startswith('start '):
-                game_name = message[6:].strip()
-            elif msg_lower.startswith('gs '):
-                game_name = message[3:].strip()
-            else:
-                game_name = (
-                    message.replace('게임시작', '')
-                    .replace('시작', '')
-                    .strip()
-                )
-            return self._start_game(user_id, game_name)
-
-        # 게임 종료 (단축키: e, end, ge)
-        end_commands = ['게임종료', '종료', 'end', 'e', 'ge']
-        if message.lower() in end_commands:
-            return self._end_game(user_id)
+        # 구조화된 기본 명령어 처리
+        handled, command_key = self._run_engine_command(
+            user_id,
+            message,
+            user_name=user_name,
+            is_new_user=is_new_user,
+        )
+        if handled:
+            return handled
         
         # 활성 게임이 있으면 게임 명령 처리
         if user_id in self.active_games:
@@ -146,6 +65,162 @@ class GameEngine:
             "'s [게임]'을 입력하세요.\n"
             "'게임목록' 또는 'g'로 사용 가능한 게임을 확인할 수 있습니다."
         )
+
+    def _normalize_command(self, message: str) -> str:
+        message = message.strip()
+        if message.startswith('/'):
+            return message[1:].strip()
+        if message.startswith('@'):
+            parts = message[1:].split(None, 1)
+            if len(parts) > 1:
+                return parts[1].strip()
+            return ''
+        return message
+
+    def _build_command_definitions(self) -> List[Dict[str, Any]]:
+        return [
+            {
+                "key": "gold",
+                "label": "💰 골드",
+                "triggers": [
+                    '골드', 'gold', 'g', '포인트', 'point', 'points',
+                    '잔액', '내골드', 'p', 'pt'
+                ],
+                "handler": self._handle_gold_command,
+                "match": "exact",
+                "button": {"label": "💰 골드", "messageText": "골드"},
+            },
+            {
+                "key": "leaderboard",
+                "label": "🏆 리더보드",
+                "triggers": ['리더보드', '랭킹', 'leaderboard', 'ranking', 'l', 'lb', 'rank', 'r'],
+                "handler": self._get_leaderboard,
+                "match": "exact",
+                "button": {"label": "🏆 랭킹", "messageText": "리더보드"},
+            },
+            {
+                "key": "game_list",
+                "label": "📋 게임목록",
+                "triggers": ['게임목록', '게임', 'games', 'list', 'g', 'gl'],
+                "handler": self._list_games,
+                "match": "exact",
+                "button": {"label": "📋 게임목록", "messageText": "게임목록"},
+            },
+            {
+                "key": "help",
+                "label": "❓ 도움말",
+                "triggers": ['도움말', 'help', '?', 'h'],
+                "handler": self._get_help,
+                "match": "exact",
+                "button": {"label": "❓ 도움말", "messageText": "도움말"},
+            },
+            {
+                "key": "start",
+                "label": "🎮 게임시작",
+                "triggers": ['게임시작', '시작', 's', 's ', 'start', 'start ', 'gs', 'gs '],
+                "handler": self._handle_start_command,
+                "match": "prefix",
+                "button": {"label": "🎮 게임시작", "messageText": "게임시작 모험"},
+            },
+            {
+                "key": "end",
+                "label": "⏹️ 게임종료",
+                "triggers": ['게임종료', '종료', 'end', 'e', 'ge'],
+                "handler": self._end_game,
+                "match": "exact",
+                "button": {"label": "⏹️ 종료", "messageText": "게임종료"},
+            },
+            {
+                "key": "transfer",
+                "label": "💸 골드주기",
+                "triggers": ['골드주기', '골드전송', 'pay ', 'send '],
+                "handler": self._handle_transfer_command,
+                "match": "prefix",
+            },
+        ]
+
+    def _build_command_index(self) -> None:
+        self._command_index = {}
+        for definition in self.command_definitions:
+            for trigger in definition.get("triggers", []):
+                self._command_index[trigger.lower()] = definition
+
+    def _resolve_command_definition(self, command: str) -> Optional[Dict[str, Any]]:
+        if not self._command_index:
+            self._build_command_index()
+
+        key = command.strip().lower()
+        for trigger, definition in self._command_index.items():
+            match_type = definition.get("match", "exact")
+            if match_type == "prefix":
+                if key.startswith(trigger):
+                    return definition
+            elif key == trigger:
+                return definition
+        return None
+
+    def _run_engine_command(
+        self,
+        user_id: str,
+        command: str,
+        user_name: Optional[str] = None,
+        is_new_user: bool = False,
+    ) -> tuple[Optional[str], Optional[str]]:
+        definition = self._resolve_command_definition(command)
+        if not definition:
+            return None, None
+
+        handler = definition.get("handler")
+        if not handler:
+            return None, None
+
+        if handler in (self._get_leaderboard, self._list_games, self._get_help, self._end_game):
+            result = handler(user_id) if handler is self._end_game else handler()
+        elif handler is self._handle_start_command:
+            result = handler(user_id, command)
+        elif handler is self._handle_transfer_command:
+            result = handler(user_id, command)
+        else:
+            result = handler(user_id, user_name=user_name, is_new_user=is_new_user)
+
+        return result, definition.get("key")
+
+    def _handle_gold_command(self, user_id: str, user_name: Optional[str] = None, is_new_user: bool = False) -> str:
+        response = self._get_gold(user_id)
+        if is_new_user:
+            response = (
+                f"🎉 환영합니다! 신규 사용자에게 "
+                f"{Config.INITIAL_GOLD}G를 지급했습니다!\n\n"
+                f"{response}"
+            )
+        mention = self._get_user_mention(user_id, user_name)
+        if mention:
+            response = f"{mention} {response}"
+        return response
+
+    def _handle_start_command(self, user_id: str, message: str) -> str:
+        msg_lower = message.lower()
+        if msg_lower.startswith('s '):
+            game_name = message[2:].strip()
+        elif msg_lower.startswith('start '):
+            game_name = message[6:].strip()
+        elif msg_lower.startswith('gs '):
+            game_name = message[3:].strip()
+        else:
+            game_name = (
+                message.replace('게임시작', '')
+                .replace('시작', '')
+                .strip()
+            )
+        return self._start_game(user_id, game_name)
+
+    def _handle_transfer_command(self, user_id: str, message: str) -> str:
+        msg_lower = message.lower()
+        if msg_lower.startswith('pay '):
+            message = '골드주기 ' + message[4:]
+        elif msg_lower.startswith('send '):
+            message = '골드주기 ' + message[5:]
+        return self._transfer_gold(user_id, message)
     
     def _list_games(self) -> str:
         """게임 목록 반환"""
@@ -356,20 +431,37 @@ class GameEngine:
             버튼 목록 [{'label': '...', 'messageText': '...'}, ...]
         """
         active_game = self.active_games.get(user_id)
+        game_buttons: List[Dict[str, str]] = []
+
         if active_game and active_game.is_game_active():
             if hasattr(active_game, "get_command_buttons"):
-                buttons = active_game.get_command_buttons(command)
-                if buttons:
-                    return buttons
+                game_buttons = active_game.get_command_buttons(command) or []
 
-        # 기본 버튼
-        return [
-            {'label': '💰 골드', 'messageText': '골드'},
-            {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
-            {'label': '🏆 랭킹', 'messageText': '리더보드'},
-            {'label': '📋 게임목록', 'messageText': '게임목록'},
-            {'label': '❓ 도움말', 'messageText': '도움말'},
-        ]
+        base_buttons = self._build_base_buttons(include_start=not (active_game and active_game.is_game_active()))
+
+        if active_game and active_game.is_game_active():
+            end_button = next((b for b in base_buttons if b.get("messageText") == "게임종료"), None)
+            if end_button:
+                # 게임 전용 버튼보다 우선 노출
+                base_buttons = [end_button] + [b for b in base_buttons if b is not end_button]
+
+        combined = game_buttons + base_buttons
+        # 최대 5개로 제한
+        return combined[:5]
+
+    def _build_base_buttons(self, include_start: bool = True) -> List[Dict[str, str]]:
+        buttons: List[Dict[str, str]] = []
+        for definition in self.command_definitions:
+            button_meta = definition.get("button")
+            if not button_meta:
+                continue
+            if not include_start and definition.get("key") == "start":
+                continue
+            buttons.append({
+                "label": button_meta.get("label", definition.get("label", "")),
+                "messageText": button_meta.get("messageText", ""),
+            })
+        return buttons
     
     def should_generate_image(self, user_id: str, command: str, response: str) -> bool:
         """이미지 생성이 필요한지 확인

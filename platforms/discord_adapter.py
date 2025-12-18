@@ -1,6 +1,7 @@
 from typing import Callable, Optional
 import asyncio
 import os
+import time
 import discord
 from discord.ext import commands
 from discord.ui import View, Button, Select
@@ -48,9 +49,11 @@ class HuntMenuView(View):
             await interaction.response.defer(ephemeral=False)
 
             selected = interaction.data['values'][0]  # 선택된 값
-            if self.adapter and self.adapter._enqueue_incoming(self.user_id, selected):
-                await self.adapter._acknowledge_interaction(interaction)
-                return
+            if self.adapter:
+                queued, duplicate = self.adapter._enqueue_incoming(self.user_id, selected)
+                if queued:
+                    await self.adapter._acknowledge_interaction(interaction, duplicate=duplicate)
+                    return
             if self.message_handler:
                 response = self.message_handler(self.user_id, selected)
                 if response:
@@ -64,6 +67,7 @@ class HuntMenuView(View):
                         response=response,
                         view=self._create_view_for_response(selected, response),
                         image_path=image_path,
+                        user_id=self.user_id,
                     )
                 else:
                     await interaction.followup.send("처리되었습니다.", ephemeral=True)
@@ -197,9 +201,11 @@ class CommandButtonView(View):
                 # 즉시 응답 (타임아웃 방지)
                 await interaction.response.defer(ephemeral=False)
 
-                if hasattr(self, 'adapter') and self.adapter and self.adapter._enqueue_incoming(self.user_id, command):
-                    await self.adapter._acknowledge_interaction(interaction)
-                    return
+                if hasattr(self, 'adapter') and self.adapter:
+                    queued, duplicate = self.adapter._enqueue_incoming(self.user_id, command)
+                    if queued:
+                        await self.adapter._acknowledge_interaction(interaction, duplicate=duplicate)
+                        return
 
                 if self.message_handler:
                     response = self.message_handler(self.user_id, command)
@@ -215,6 +221,7 @@ class CommandButtonView(View):
                             response=response,
                             view=view,
                             image_path=image_path,
+                            user_id=self.user_id,
                         )
                     else:
                         await interaction.followup.send("처리되었습니다.", ephemeral=True)
@@ -275,6 +282,7 @@ class DiscordAdapter(ChatPlatform):
         self.image_generator = ImageGenerator()  # 이미지 생성기
         self.message_queue = message_queue
         self._queue_listener_started = False
+        self._pending_actions: dict[str, float] = {}
 
         self.message_handler: Optional[Callable[[str, str], str]] = None
 
@@ -284,36 +292,46 @@ class DiscordAdapter(ChatPlatform):
     def set_message_queue(self, queue: PlatformMessageQueue) -> None:
         self.message_queue = queue
 
-    def _enqueue_incoming(self, user_id: str, content: str) -> bool:
-        """Kafka/큐에 수신 메시지를 적재"""
+    def _enqueue_incoming(self, user_id: str, content: str) -> tuple[bool, bool]:
+        """Kafka/큐에 수신 메시지를 적재하며 중복 액션을 표시"""
         if self.message_queue:
+            now = time.monotonic()
+            duplicate = False
+            last_ts = self._pending_actions.get(user_id)
+            if last_ts and now - last_ts < 2.0:
+                duplicate = True
+            self._pending_actions[user_id] = now
+
             self.message_queue.publish_incoming(
                 PlatformMessage(platform="discord", user_id=user_id, content=content)
             )
-            return True
-        return False
+            return True, duplicate
+        return False, False
+
+    def _clear_pending_action(self, user_id: str) -> None:
+        self._pending_actions.pop(user_id, None)
 
     def _handle_outgoing_message(self, message: PlatformMessage) -> None:
         if message.platform and message.platform != "discord":
             return
         self.send_message(message.user_id, message.content)
 
-    async def _acknowledge_interaction(self, interaction: discord.Interaction) -> None:
+    async def _acknowledge_interaction(self, interaction: discord.Interaction, duplicate: bool = False) -> None:
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message(
-                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
+                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요." if duplicate else "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
                     ephemeral=True,
                 )
             else:
                 await interaction.followup.send(
-                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
+                    "요청을 접수했어요. 처리 후 답변을 보내드릴게요." if duplicate else "요청을 접수했어요. 처리 후 답변을 보내드릴게요.",
                     ephemeral=True,
                 )
         except Exception:
             pass
 
-    async def _acknowledge_channel(self, channel: discord.abc.Messageable) -> None:
+    async def _acknowledge_channel(self, channel: discord.abc.Messageable, duplicate: bool = False) -> None:
         try:
             await channel.send("요청을 접수했어요. 처리 후 답변을 보내드릴게요.")
         except Exception:
@@ -373,6 +391,7 @@ class DiscordAdapter(ChatPlatform):
             print(f"[디스코드] 메시지 전송 오류: {e}")
             self._cleanup_temp_image(image_path)
         finally:
+            self._clear_pending_action(user_id)
             self._cleanup_temp_image(image_path)
     
     def _create_button_view(
@@ -457,9 +476,12 @@ class DiscordAdapter(ChatPlatform):
         response: str,
         view: Optional[View] = None,
         image_path: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> None:
         files = self._build_files(image_path)
         await interaction.followup.send(response, view=view, files=files or None, ephemeral=False)
+        if user_id:
+            self._clear_pending_action(user_id)
         self._cleanup_temp_image(image_path)
 
     def _build_files(self, image_path: Optional[str]):
@@ -535,9 +557,10 @@ class DiscordAdapter(ChatPlatform):
                     # 플랫폼 어댑터 설정 (멘션 기능용)
                     if self.engine:
                         self.engine.set_platform_adapter(self)
-                    if self._enqueue_incoming(user_id, message.content):
+                    queued, duplicate = self._enqueue_incoming(user_id, message.content)
+                    if queued:
                         self.user_channels[user_id] = (message.channel, message.channel)
-                        await self._acknowledge_channel(message.channel)
+                        await self._acknowledge_channel(message.channel, duplicate=duplicate)
                         return
                     response = self.message_handler(user_id, message.content)
                     if response:
@@ -565,9 +588,10 @@ class DiscordAdapter(ChatPlatform):
                         # 플랫폼 어댑터 설정 (멘션 기능용)
                         if self.engine:
                             self.engine.set_platform_adapter(self)
-                        if self._enqueue_incoming(user_id, content):
+                        queued, duplicate = self._enqueue_incoming(user_id, content)
+                        if queued:
                             self.user_channels[user_id] = (message.channel, message.channel)
-                            await self._acknowledge_channel(message.channel)
+                            await self._acknowledge_channel(message.channel, duplicate=duplicate)
                             return
                         response = self.message_handler(user_id, content)
                         if response:
