@@ -1,18 +1,20 @@
 from typing import Dict, Optional, List, Tuple, Any
+from platforms.base_platform import ChatPlatform
 from games.base_game import Game
 from games.number_guess import NumberGuessGame
 from games.rps import RockPaperScissorsGame
 from games.adventure import AdventureGame
-from gold_system import GoldSystem
+from gold_system_postgres import GoldSystemPostgres
 from config import Config
 
 
 class GameEngine:
     """게임 엔진 - 게임 관리 및 명령 처리"""
     
-    def __init__(self, gold_system: Optional[GoldSystem] = None):
+    def __init__(self, gold_system: Optional[GoldSystemPostgres] = None):
         self.active_games: Dict[str, Game] = {}
-        self.gold_system = gold_system or GoldSystem()
+        self.gold_system = gold_system or GoldSystemPostgres()
+        self._platform_adapter: Optional[ChatPlatform] = None
         self.available_games = {
             '숫자맞추기': NumberGuessGame,
             'number': NumberGuessGame,
@@ -23,10 +25,23 @@ class GameEngine:
             'adv': AdventureGame,
         }
     
-    def process_message(self, user_id: str, message: str) -> str:
-        """사용자 메시지 처리"""
+    def process_message(self, user_id: str, message: str, user_name: Optional[str] = None, platform_adapter=None) -> str:
+        """사용자 메시지 처리
+        
+        Args:
+            user_id: 사용자 ID
+            message: 메시지 내용
+            user_name: 사용자 이름 (선택사항, 멘션용)
+            platform_adapter: 플랫폼 어댑터 (멘션 기능용, 선택사항)
+        """
         # 신규 사용자 초기 골드 지급
         is_new_user = self.gold_system.ensure_initial_gold(user_id)
+        
+        # 플랫폼 어댑터 저장 (멘션 기능용)
+        if platform_adapter:
+            self._platform_adapter = platform_adapter
+        elif not hasattr(self, '_platform_adapter'):
+            self._platform_adapter = None
         
         message = message.strip()
 
@@ -58,6 +73,10 @@ class GameEngine:
                     f"{Config.INITIAL_GOLD}G를 지급했습니다!\n\n"
                     f"{response}"
                 )
+            # 액션(버튼 클릭) 시 사용자 멘션 추가
+            mention = self._get_user_mention(user_id, user_name)
+            if mention:
+                response = f"{mention} {response}"
             return response
         
         # 골드 전송 (단축키: pay, send)
@@ -306,14 +325,19 @@ class GameEngine:
         if result is None:
             return "❌ 골드 전송에 실패했습니다."
         
-        return f"""✅ 골드 전송 완료!
+        # 받는 사람 멘션
+        to_user_mention = self._get_user_mention(to_user)
+        
+        response = f"""✅ 골드 전송 완료!
 
 보낸 사람: {from_user}
-받은 사람: {to_user}
+받은 사람: {to_user_mention if to_user_mention else to_user}
 전송 금액: {amount}G
 
 {from_user}의 남은 골드: {self.gold_system.get_gold(from_user)}G
-{to_user}의 현재 골드: {result}G"""
+{to_user_mention if to_user_mention else to_user}의 현재 골드: {result}G"""
+        
+        return response
     
     def _get_leaderboard(self, limit: int = 10) -> str:
         """리더보드 조회"""
@@ -455,6 +479,24 @@ class GameEngine:
             'successes': successes,
             'failures': failures
         }
+    
+    def _get_user_mention(self, user_id: str, user_name: Optional[str] = None) -> Optional[str]:
+        """사용자 멘션 문자열 생성
+        
+        Args:
+            user_id: 사용자 ID
+            user_name: 사용자 이름 (선택사항)
+            
+        Returns:
+            멘션 문자열 또는 None (플랫폼 어댑터가 없으면 None)
+        """
+        if self._platform_adapter and hasattr(self._platform_adapter, 'mention_user'):
+            return self._platform_adapter.mention_user(user_id, user_name)
+        return None
+    
+    def set_platform_adapter(self, adapter):
+        """플랫폼 어댑터 설정 (멘션 기능용)"""
+        self._platform_adapter = adapter
     
     def get_hunt_image_data(self, user_id: str, command: str, response: str) -> Optional[Dict[str, Any]]:
         """사냥 이미지 생성에 필요한 데이터 반환

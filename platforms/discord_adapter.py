@@ -472,6 +472,9 @@ class DiscordAdapter(ChatPlatform):
             if isinstance(message.channel, discord.DMChannel):
                 user_id = str(message.author.id)
                 if self.message_handler:
+                    # 플랫폼 어댑터 설정 (멘션 기능용)
+                    if self.engine:
+                        self.engine.set_platform_adapter(self)
                     response = self.message_handler(user_id, message.content)
                     if response:
                         # DM 채널 저장
@@ -495,6 +498,9 @@ class DiscordAdapter(ChatPlatform):
                     if self.message_handler:
                         # 접두사 제거
                         content = message.content[len(self.command_prefix):].strip()
+                        # 플랫폼 어댑터 설정 (멘션 기능용)
+                        if self.engine:
+                            self.engine.set_platform_adapter(self)
                         response = self.message_handler(user_id, content)
                         if response:
                             # 채널 저장
@@ -623,3 +629,10 @@ class DiscordAdapter(ChatPlatform):
             response = self.message_handler(user_id, message)
             if response:
                 self.send_message(user_id, response)
+    
+    def mention_user(self, user_id: str, user_name: Optional[str] = None) -> str:
+        """디스코드 사용자 멘션 문자열 생성
+        
+        Discord에서는 <@user_id> 형태로 멘션
+        """
+        return f"<@{user_id}>"

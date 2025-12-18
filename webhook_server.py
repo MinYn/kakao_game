@@ -9,6 +9,8 @@ from typing import Optional, Dict, Any
 from platforms.kakao_adapter import KakaoAdapter
 from game_engine import GameEngine
 from config import Config
+from models.database import init_db
+from api import gold, boss_tickets, enhancement, stats
 import uvicorn
 
 
@@ -16,12 +18,26 @@ class WebhookServer:
     """카카오 챗봇 관리자센터 스킬 서버 클래스"""
     
     def __init__(self, adapter: KakaoAdapter, engine: GameEngine):
-        self.app = FastAPI(title="카카오 게임봇 웹훅 서버")
+        self.app = FastAPI(
+            title="카카오 게임봇 웹훅 서버",
+            description="게임봇 API 및 웹훅 서버",
+            version="1.0.0"
+        )
         self.adapter = adapter
         self.engine = engine
+        
+        # 데이터베이스 초기화
+        init_db()
+        
+        # API 라우터 등록
+        self.app.include_router(gold.router)
+        self.app.include_router(boss_tickets.router)
+        self.app.include_router(enhancement.router)
+        self.app.include_router(stats.router)
+        
         self._setup_routes()
     
-    def _parse_user_request(self, data: Dict[str, Any]) -> tuple[str, str]:
+    def _parse_user_request(self, data: Dict[str, Any]) -> tuple[str, str, Optional[str]]:
         """
         카카오 챗봇 관리자센터 스킬 서버 요청 파싱
         
@@ -29,7 +45,10 @@ class WebhookServer:
         {
             "userRequest": {
                 "user": {
-                    "id": "user_id"
+                    "id": "user_id",
+                    "properties": {
+                        "nickname": "사용자명"
+                    }
                 },
                 "utterance": "사용자 메시지"
             }
@@ -39,8 +58,11 @@ class WebhookServer:
         user = user_request.get('user', {})
         user_id = user.get('id', '')
         utterance = user_request.get('utterance', '')
+        # 사용자 이름 추출 (카카오톡에서 제공하는 경우)
+        user_properties = user.get('properties', {})
+        user_name = user_properties.get('nickname') or user.get('nickname')
         
-        return str(user_id), utterance
+        return str(user_id), utterance, user_name
     
     def _get_default_quick_replies(self) -> list:
         """
@@ -178,12 +200,13 @@ class WebhookServer:
                 print(f"[웹훅 요청] {data}")
                 
                 # 카카오 챗봇 관리자센터 스킬 서버 형식 파싱
-                user_id, message = self._parse_user_request(data)
+                user_id, message, user_name = self._parse_user_request(data)
                 
                 if not user_id or not message:
                     # userRequest 형식이 아닌 경우 다른 형식 시도
                     user_id = data.get('user', {}).get('id') or data.get('user_id', '')
                     message = data.get('content', {}).get('text') or data.get('message', '') or data.get('utterance', '')
+                    user_name = data.get('user', {}).get('nickname') or data.get('user_name')
                 
                 if not user_id or not message:
                     print(f"[웹훅 오류] 잘못된 요청 형식: {data}")
@@ -205,8 +228,11 @@ class WebhookServer:
                         }
                     )
                 
-                # 메시지 처리
-                response_text = self.engine.process_message(user_id, message)
+                # 플랫폼 어댑터 설정 (멘션 기능용)
+                self.engine.set_platform_adapter(self.adapter)
+                
+                # 메시지 처리 (사용자 이름 전달)
+                response_text = self.engine.process_message(user_id, message, user_name=user_name, platform_adapter=self.adapter)
                 
                 # Quick Replies 버튼 결정
                 # 모험 게임 중이면 모험 게임 버튼, 아니면 기본 버튼
@@ -266,4 +292,15 @@ class WebhookServer:
 def create_webhook_server(adapter: KakaoAdapter, engine: GameEngine) -> WebhookServer:
     """웹훅 서버 생성"""
     return WebhookServer(adapter, engine)
+
+
+def create_app():
+    """FastAPI 앱 생성 (Gunicorn용)"""
+    from platforms.kakao_adapter import KakaoAdapter
+    from game_engine import GameEngine
+    
+    adapter = KakaoAdapter()
+    engine = GameEngine()
+    server = WebhookServer(adapter, engine)
+    return server.app
 

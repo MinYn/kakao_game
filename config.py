@@ -26,6 +26,17 @@ class Config:
     DATA_FILE: str = os.getenv('DATA_FILE', 'data.db')
     INITIAL_GOLD: int = int(os.getenv('INITIAL_GOLD', '100'))
     
+    # PostgreSQL 설정
+    POSTGRES_HOST: str = os.getenv('POSTGRES_HOST', 'localhost')
+    POSTGRES_PORT: int = int(os.getenv('POSTGRES_PORT', '5432'))
+    POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'kakao_game')
+    POSTGRES_USER: str = os.getenv('POSTGRES_USER', 'postgres')
+    POSTGRES_PASSWORD: str = os.getenv('POSTGRES_PASSWORD', 'postgres')
+    
+    # Kafka 설정
+    KAFKA_BOOTSTRAP_SERVERS: str = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+    USE_KAFKA: bool = os.getenv('USE_KAFKA', 'true').lower() == 'true'
+    
     # 게임 설정 - 숫자맞추기
     NUMBER_GUESS_ENTRY_COST: int = int(os.getenv('NUMBER_GUESS_ENTRY_COST', '10'))
     NUMBER_GUESS_BASE_REWARD: int = int(os.getenv('NUMBER_GUESS_BASE_REWARD', '50'))
@@ -50,6 +61,9 @@ class Config:
     # 서버 설정
     SERVER_HOST: str = os.getenv('SERVER_HOST', '0.0.0.0')
     SERVER_PORT: int = int(os.getenv('SERVER_PORT', '5000'))
+    EXTERNAL_PORT: int = int(os.getenv('EXTERNAL_PORT', '8080'))  # 외부 노출 포트
+    USE_NGINX: bool = os.getenv('USE_NGINX', 'true').lower() == 'true'  # Nginx 사용 여부
+    GUNICORN_WORKERS: int = int(os.getenv('GUNICORN_WORKERS', '4'))  # Gunicorn 워커 수
     
     # 로깅 설정
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')

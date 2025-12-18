@@ -39,4 +39,13 @@ class KakaoAdapter(ChatPlatform):
             response = self.message_handler(user_id, message)
             if response:
                 self.send_message(user_id, response)
+    
+    def mention_user(self, user_id: str, user_name: Optional[str] = None) -> str:
+        """카카오톡 사용자 멘션 문자열 생성
+        
+        카카오톡에서는 @사용자명 형태로 표시
+        """
+        if user_name:
+            return f"@{user_name}"
+        return f"@{user_id}"
 

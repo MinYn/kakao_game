@@ -4,10 +4,23 @@ python-dotenv>=1.0.0
 # 카카오톡 챗봇 (웹훅 서버 사용, 완전 무료)
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
+gunicorn>=21.2.0
 
 # 디스코드 봇
 discord.py>=2.3.0
 
 # 이미지 생성 (디스코드용)
 Pillow>=10.0.0
+
+# PostgreSQL
+psycopg2-binary>=2.9.0
+
+# Kafka
+kafka-python>=2.0.2
+
+# SQLAlchemy (ORM)
+sqlalchemy>=2.0.0
+
+# Pydantic (스키마 검증)
+pydantic>=2.0.0
 

@@ -34,7 +34,9 @@ class GameBot:
     def _handle_message(self, user_id: str, message: str) -> str:
         """메시지 핸들러"""
         try:
-            return self.engine.process_message(user_id, message)
+            # 플랫폼 어댑터 설정 (멘션 기능용)
+            self.engine.set_platform_adapter(self.platform)
+            return self.engine.process_message(user_id, message, platform_adapter=self.platform)
         except Exception as e:
             return f"오류가 발생했습니다: {str(e)}"
     
@@ -96,8 +98,7 @@ class GameBot:
                     
                     # 데이터베이스 연결 정리
                     if hasattr(self.engine, 'point_system') and self.engine.gold_system:
-                        # SQLite는 자동으로 커밋되므로 명시적 저장 불필요
-                        # 하지만 연결을 명시적으로 닫을 수 있음
+                        # PostgreSQL 연결 풀은 자동으로 관리됨
                         pass
                 except Exception as e:
                     print(f"데이터 저장 오류: {e}")

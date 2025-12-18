@@ -90,6 +90,7 @@ class ImageGenerator:
         elif platform.system() == 'Linux':
             # Galmuri 폰트 (게임톤 폰트) 우선 시도
             galmuri_paths = [
+                "/usr/share/fonts/truetype/custom/Galmuri11.ttf",  # Docker 컨테이너 경로 (최우선)
                 "/usr/share/fonts/truetype/galmuri/Galmuri11.ttf",
                 "/usr/share/fonts/truetype/galmuri/Galmuri11-Regular.ttf",
                 "/usr/share/fonts/truetype/Galmuri11.ttf",
@@ -102,8 +103,11 @@ class ImageGenerator:
             for font_path in galmuri_paths:
                 if os.path.exists(font_path):
                     try:
-                        return ImageFont.truetype(font_path, size)
-                    except:
+                        font = ImageFont.truetype(font_path, size)
+                        # 폰트 로드 성공
+                        return font
+                    except Exception as e:
+                        # 폰트 로드 실패 시 다음 경로 시도
                         continue
             
             # Noto Sans CJK (한글 + 이모지 지원) 시도
@@ -111,6 +115,8 @@ class ImageGenerator:
                 "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
                 "/usr/share/fonts/opentype/noto/NotoSansCJKkr-Regular.otf",
                 "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttf",
+                "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
             ]
             for font_path in noto_paths:
                 if os.path.exists(font_path):
@@ -125,10 +131,14 @@ class ImageGenerator:
                 return ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", size)
             except:
                 try:
-                    # DejaVu Sans
-                    return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
+                    # 나눔고딕 (다른 경로)
+                    return ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic-Regular.ttf", size)
                 except:
-                    pass
+                    try:
+                        # DejaVu Sans
+                        return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
+                    except:
+                        pass
         
         # macOS
         elif platform.system() == 'Darwin':
@@ -217,7 +227,8 @@ class ImageGenerator:
             ]
         elif platform.system() == 'Linux':
             fontawesome_paths = [
-                # Font Awesome 7
+                # Font Awesome 7 (Docker 컨테이너 경로)
+                "/usr/share/fonts/truetype/custom/Font Awesome 7 Free-Solid-900.otf",
                 "/usr/share/fonts/truetype/fontawesome/fa-solid-900.ttf",
                 "/usr/share/fonts/opentype/fontawesome/Font Awesome 7 Free-Solid-900.otf",
                 "/usr/local/share/fonts/fa-solid-900.ttf",
@@ -1008,6 +1019,25 @@ class ImageGenerator:
             img.paste(icon, (icon_x, icon_y), icon)
         
         return img
+    
+    def _get_enhancement_tip(self, level: int, is_success: bool, successes: int, failures: int) -> list:
+        """강화 팁 메시지 생성"""
+        tips = []
+        
+        if is_success:
+            if level >= 10:
+                tips.append("🎉 고레벨 달성! 대단해요!")
+            elif level >= 5:
+                tips.append("💪 잘하고 있어요!")
+            else:
+                tips.append("✨ 계속 도전하세요!")
+        else:
+            if failures > successes:
+                tips.append("💪 포기하지 마세요!")
+            else:
+                tips.append("🎲 운이 따를 거예요!")
+        
+        return tips
     
     def _create_hunt_frames(
         self,

@@ -32,4 +32,17 @@ class ChatPlatform(ABC):
         if self.message_handler:
             return self.message_handler(user_id, message)
         return None
+    
+    @abstractmethod
+    def mention_user(self, user_id: str, user_name: Optional[str] = None) -> str:
+        """사용자 멘션 문자열 생성
+        
+        Args:
+            user_id: 사용자 ID
+            user_name: 사용자 이름 (선택사항, 있으면 사용)
+            
+        Returns:
+            플랫폼별 멘션 문자열 (예: "@사용자명" 또는 "<@user_id>")
+        """
+        pass
 
