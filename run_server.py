@@ -1,45 +1,25 @@
 #!/usr/bin/env python3
 """
-서버 실행 스크립트
-Gunicorn 또는 Uvicorn으로 실행
+디스코드 봇 실행용 스크립트 (단일 프로세스)
 """
-import os
-import sys
-from config import Config
-
-def run_with_gunicorn():
-    """Gunicorn으로 실행"""
-    import gunicorn.app.wsgiapp as wsgi
-    
-    # Gunicorn 명령줄 인자 설정
-    sys.argv = [
-        'gunicorn',
-        'webhook_server:create_app()',
-        '-c', 'gunicorn_config.py',
-    ]
-    
-    wsgi.run()
+from main import GameBot
 
 
-def run_with_uvicorn():
-    """Uvicorn으로 실행 (개발용)"""
-    from webhook_server import create_app
-    import uvicorn
-    
-    app = create_app()
-    uvicorn.run(
-        app,
-        host=Config.SERVER_HOST,
-        port=Config.SERVER_PORT,
-        log_level=Config.LOG_LEVEL.lower()
-    )
+def run_discord() -> None:
+    """단일 프로세스로 디스코드 봇 실행"""
+    bot = GameBot(platform_type='discord')
+    try:
+        bot.start()
+        print("\n✅ 디스코드 모드로 실행 중...")
+        import time
+
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n종료 신호를 받았습니다...")
+    finally:
+        bot.stop()
 
 
 if __name__ == '__main__':
-    # 환경변수로 실행 방식 결정
-    use_gunicorn = os.getenv('USE_GUNICORN', 'true').lower() == 'true'
-    
-    if use_gunicorn:
-        run_with_gunicorn()
-    else:
-        run_with_uvicorn()
+    run_discord()

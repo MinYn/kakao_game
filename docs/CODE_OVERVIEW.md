@@ -1,12 +1,12 @@
 # Code-Driven Project Overview
 
-이 문서는 현재 코드베이스(비 MD 파일 기준)를 분석하여 재구성한 개요입니다. 카카오/디스코드 챗봇용 게임 서버의 흐름, API, 데이터 모델, 실행 방법을 간략히 정리합니다.
+이 문서는 현재 코드베이스(비 MD 파일 기준)를 분석하여 재구성한 개요입니다. 디스코드 챗봇(및 로컬 CLI)용 게임 서버 흐름, API, 데이터 모델, 실행 방법을 간략히 정리합니다. 카카오 웹훅 기반 구성은 제거되었습니다.
 
 ## 아키텍처
-- **엔트리 포인트**: `main.py`는 `GameBot`을 생성해 플랫폼(카카오/디스코드) 어댑터와 게임 엔진을 연결하고, 카카오의 경우 FastAPI 웹훅 서버를 스레드로 구동합니다. 디스코드는 라이브러리 기반 런타임을 사용하며 CLI 모드도 지원합니다.
-- **웹 서버**: `webhook_server.py`의 `WebhookServer`는 FastAPI 앱을 생성하고 `/webhook`(카카오 스킬 서버 규격)과 `/health`를 노출하며, API 라우터(`/api/gold`, `/api/boss-tickets`, `/api/enhancement`, `/api/stats`)를 포함합니다. `run_server.py`는 Gunicorn(`webhook_server:create_app()`) 또는 Uvicorn 개발 서버를 선택적으로 실행합니다.
+- **엔트리 포인트**: `main.py`는 `GameBot`을 생성해 디스코드 어댑터와 게임 엔진을 연결하며 CLI 모드도 지원합니다.
+- **웹 서버**: 카카오 웹훅 서버 코드는 제거되었습니다. `run_server.py`는 단일 프로세스 디스코드 런타임을 실행합니다.
 - **게임 엔진**: `game_engine.py`는 골드 시스템과 우주 탐험 로그 게임(우주선 강화+임무)을 묶는 허브입니다. 메시지 파서를 통해 골드 조회/전송, 리더보드, 게임 시작/종료, 도움말 명령을 처리합니다.
-- **플랫폼 어댑터**: `platforms/kakao_adapter.py`와 `platforms/discord_adapter.py`는 각각 카카오 웹훅 응답 포맷과 디스코드 메시지 이벤트를 게임 엔진에 연결합니다. 멘션 문자열 생성 기능을 노출해 게임 엔진이 플랫폼별 멘션을 추가할 수 있습니다.
+- **플랫폼 어댑터**: `platforms/discord_adapter.py`가 디스코드 메시지 이벤트를 게임 엔진에 연결합니다. 멘션 문자열 생성 기능을 노출해 게임 엔진이 플랫폼별 멘션을 추가할 수 있습니다.
 - **이벤트/확장성**: Kafka 발행은 선택적(`Config.USE_KAFKA`)이며, 골드/통계 이벤트를 `events.kafka_producer.publish_event`로 내보내도록 훅이 준비돼 있습니다.
 
 ## 설정 (환경 변수)
@@ -14,7 +14,7 @@
 
 | 구분 | 주요 항목 | 기본값 |
 | --- | --- | --- |
-| 플랫폼 | `PLATFORM` | `kakao` |
+| 플랫폼 | `PLATFORM` | `discord` |
 | Discord | `DISCORD_TOKEN`, `DISCORD_COMMAND_PREFIX` | `None`, `!` |
 | 데이터 | `DATA_FILE`, `INITIAL_GOLD` | `data.db`, `100` |
 | Postgres | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `localhost`, `5432`, `kakao_game`, `postgres`, `postgres` |
@@ -58,23 +58,19 @@
 세션 관리는 `models.database`의 `SessionLocal` 의존성을 통해 FastAPI에서 주입되며, `init_db()`로 테이블을 생성합니다.
 
 ## 실행 흐름 요약
-1. `python main.py [kakao|discord|cli]`로 시작. 카카오 모드에서는 FastAPI 웹훅 서버가 백그라운드 스레드에서 실행되며 `/webhook`에 카카오 스킬 서버 요청을 받습니다. 디스코드 모드는 봇 런타임을 시작하고 CLI 모드는 터미널 상호작용을 제공합니다.
-2. 웹훅 진입 시 `WebhookServer`가 카카오 스킬 포맷을 파싱하여 `GameEngine.process_message()`에 전달하고, 응답을 카카오 템플릿(JSON)으로 변환해 반환합니다. 게임 진행 중에는 모험용 Quick Reply 버튼 세트를 제공해 UX를 유지합니다.
-3. 게임 엔진은 최초 메시지에서 초기 골드를 지급하고, 골드/리더보드/게임 목록/도움말/게임 시작/종료 등의 명령을 처리합니다. 활성 게임이 있을 때는 해당 게임 객체에 명령을 위임하며, 우주 탐험 로그 게임 시 강화/임무/정산/상태 확인 등의 행동을 지원합니다.
-4. 관리형 API는 `run_server.py`로 Gunicorn 또는 Uvicorn 개발 서버를 통해 노출할 수 있습니다. Kafka 사용 시 골드·통계 이벤트가 브로커로 발행됩니다.
+1. `python main.py [discord|cli]`로 시작. 디스코드 모드는 봇 런타임을 시작하고 CLI 모드는 터미널 상호작용을 제공합니다.
+2. 게임 엔진은 최초 메시지에서 초기 골드를 지급하고, 골드/리더보드/게임 목록/도움말/게임 시작/종료 등의 명령을 처리합니다. 활성 게임이 있을 때는 해당 게임 객체에 명령을 위임하며, 우주 탐험 로그 게임 시 강화/임무/정산/상태 확인 등의 행동을 지원합니다.
+3. Kafka 사용 시 골드·통계 이벤트가 브로커로 발행됩니다.
 
 ### 실행 흐름 다이어그램 (Mermaid)
 
 ```mermaid
 flowchart LR
-    A[입력] -->|카카오 웹훅/디스코드 이벤트/CLI| B[main.py]
-    B -->|플랫폼별 어댑터 등록| C[GameBot]
-    C -->|카카오| D[WebhookServer]
+    A[입력] -->|디스코드 이벤트/CLI| B[main.py]
+    B -->|플랫폼 어댑터 등록| C[GameBot]
     C -->|디스코드| E[Discord Adapter]
     C -->|CLI| F[CLI Loop]
-    D -->|/webhook 요청| G[FastAPI Router]
-    G --> H[GameEngine.process_message]
-    E --> H
+    E --> H[GameEngine.process_message]
     F --> H
     H -->|골드/게임 로직| I[(PostgreSQL)]
     H -->|이벤트| J[(Kafka)]
@@ -84,7 +80,7 @@ flowchart LR
 
 ### 이벤트·API 흐름 아이콘 요약
 
-- ▶️ 입력 경로: 카카오 `/webhook`, 디스코드 이벤트 핸들러, 로컬 CLI.
+- ▶️ 입력 경로: 디스코드 이벤트 핸들러, 로컬 CLI.
 - 🧭 라우팅: 플랫폼 어댑터가 메시지를 `GameEngine`으로 전달.
 - 🧮 도메인 로직: 골드 시스템/게임 엔진이 DB 읽기·쓰기, 이벤트 발행(Kafka).
 - 📨 응답: 플랫폼별 템플릿(카카오 스킬 JSON, 디스코드 메시지) 또는 CLI 텍스트로 전달.
@@ -92,5 +88,4 @@ flowchart LR
 ## 운영 팁
 - 환경 변수로 플랫폼·DB·Kafka·게임 파라미터·서버 포트를 관리하세요(`.env` 필요).
 - PostgreSQL 연결 풀은 기본 `pool_size=10`, `max_overflow=20`로 설정되어 있어 트래픽 증가에 대비합니다.
-- 카카오 스킬 서버 연동 시 `Config.SERVER_HOST:SERVER_PORT/webhook` 주소를 관리자센터에 등록해야 합니다.
 - Kafka 비사용 시 `USE_KAFKA=false`로 비활성화하면 이벤트 발행이 건너뜁니다.

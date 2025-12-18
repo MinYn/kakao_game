@@ -32,9 +32,6 @@ ENV PYTHONUNBUFFERED=1
 # 포트 노출
 EXPOSE 5000
 
-# 애플리케이션 실행
-# 환경변수 USE_GUNICORN으로 Gunicorn 또는 직접 실행 선택
-# Gunicorn 사용 시: gunicorn webhook_server:create_app -c gunicorn_config.py
-# 직접 실행 시: python main.py kakao
-CMD ["sh", "-c", "if [ \"$USE_GUNICORN\" = \"true\" ]; then gunicorn webhook_server:create_app -c gunicorn_config.py; else python main.py kakao; fi"]
+# 애플리케이션 실행 (디스코드 모드)
+CMD ["python", "run_server.py"]
 

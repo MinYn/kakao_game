@@ -13,10 +13,7 @@ class Config:
     """설정 클래스"""
     
     # 플랫폼 설정
-    PLATFORM: str = os.getenv('PLATFORM', 'kakao')
-    
-    # 카카오톡 설정 (웹훅 서버 사용)
-    # KAKAO_API_KEY는 더 이상 필요 없음 (웹훅 서버 방식 사용)
+    PLATFORM: str = os.getenv('PLATFORM', 'discord')
     
     # 디스코드 설정
     DISCORD_TOKEN: Optional[str] = os.getenv('DISCORD_TOKEN')
