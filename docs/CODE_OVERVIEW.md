@@ -65,6 +65,32 @@
 3. 게임 엔진은 최초 메시지에서 초기 골드를 지급하고, 골드/리더보드/게임 목록/도움말/게임 시작/종료 등의 명령을 처리합니다. 활성 게임이 있을 때는 해당 게임 객체에 명령을 위임하며, 모험 게임 시 강화/사냥/판매/상태 등의 행동을 지원합니다.
 4. 관리형 API는 `run_server.py`로 Gunicorn 또는 Uvicorn 개발 서버를 통해 노출할 수 있습니다. Kafka 사용 시 골드·통계 이벤트가 브로커로 발행됩니다.
 
+### 실행 흐름 다이어그램 (Mermaid)
+
+```mermaid
+flowchart LR
+    A[입력] -->|카카오 웹훅/디스코드 이벤트/CLI| B[main.py]
+    B -->|플랫폼별 어댑터 등록| C[GameBot]
+    C -->|카카오| D[WebhookServer]
+    C -->|디스코드| E[Discord Adapter]
+    C -->|CLI| F[CLI Loop]
+    D -->|/webhook 요청| G[FastAPI Router]
+    G --> H[GameEngine.process_message]
+    E --> H
+    F --> H
+    H -->|골드/게임 로직| I[(PostgreSQL)]
+    H -->|이벤트| J[(Kafka)]
+    H -->|응답 메시지| K[플랫폼별 응답 포맷]
+    K --> L[사용자]
+```
+
+### 이벤트·API 흐름 아이콘 요약
+
+- ▶️ 입력 경로: 카카오 `/webhook`, 디스코드 이벤트 핸들러, 로컬 CLI.
+- 🧭 라우팅: 플랫폼 어댑터가 메시지를 `GameEngine`으로 전달.
+- 🧮 도메인 로직: 골드 시스템/게임 엔진이 DB 읽기·쓰기, 이벤트 발행(Kafka).
+- 📨 응답: 플랫폼별 템플릿(카카오 스킬 JSON, 디스코드 메시지) 또는 CLI 텍스트로 전달.
+
 ## 운영 팁
 - 환경 변수로 플랫폼·DB·Kafka·게임 파라미터·서버 포트를 관리하세요(`.env` 필요).
 - PostgreSQL 연결 풀은 기본 `pool_size=10`, `max_overflow=20`로 설정되어 있어 트래픽 증가에 대비합니다.
