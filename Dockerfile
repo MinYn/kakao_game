@@ -6,6 +6,7 @@ WORKDIR /app
 # 시스템 패키지 업데이트 및 필수 패키지 설치
 RUN apt-get update && apt-get install -y \
     curl \
+    procps \
     fonts-noto-cjk \
     fonts-noto-color-emoji \
     fonts-dejavu-core \

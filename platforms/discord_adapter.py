@@ -1,6 +1,7 @@
 from typing import Callable, Optional
 import asyncio
 import os
+import time
 import discord
 from discord.ext import commands
 from discord.ui import View, Button, Select
@@ -48,14 +49,14 @@ class HuntMenuView(View):
             await interaction.response.defer(ephemeral=False)
 
             selected = interaction.data['values'][0]  # 선택된 값
-            if self.adapter and self.adapter._enqueue_incoming(self.user_id, selected):
-                await self.adapter._acknowledge_interaction(interaction)
-                return
+            if self.adapter:
+                queued, duplicate = self.adapter._enqueue_incoming(self.user_id, selected)
+                if queued:
+                    await self.adapter._acknowledge_interaction(interaction, duplicate=duplicate)
+                    return
             if self.message_handler:
                 response = self.message_handler(self.user_id, selected)
                 if response:
-                    # 응답에 따라 새로운 버튼 생성
-                    view = self._create_view_for_response(response)
                     # 이미지 생성 (사냥 결과인 경우)
                     image_path = None
                     if hasattr(self, 'adapter') and self.adapter:
@@ -64,8 +65,9 @@ class HuntMenuView(View):
                     await self.adapter._send_interaction_message(
                         interaction=interaction,
                         response=response,
-                        view=view,
+                        view=self._create_view_for_response(selected, response),
                         image_path=image_path,
+                        user_id=self.user_id,
                     )
                 else:
                     await interaction.followup.send("처리되었습니다.", ephemeral=True)
@@ -83,36 +85,52 @@ class HuntMenuView(View):
             except:
                 pass
     
-    def _create_view_for_response(self, response: str):
+    def _create_view_for_response(self, command: Optional[str], response: str):
         """응답에 따라 적절한 버튼 뷰 생성"""
         if not self.message_handler:
             return None
-        
-        # GameEngine에서 버튼 목록 가져오기
-        if self.engine:
-            buttons = self.engine.get_ui_buttons(self.user_id, response)
+
+        if self.adapter:
+            buttons = self.adapter._get_button_definitions(self.user_id, command, response)
+        elif self.engine:
+            buttons = self.engine.get_ui_buttons(self.user_id, command, response)
         else:
             # 기본 버튼 (engine이 없는 경우)
             buttons = [
                 {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
                 {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '📋 게임목록', 'messageText': '게임목록'},
                 {'label': '❓ 도움말', 'messageText': '도움말'},
             ]
-        
-        return CommandButtonView(buttons, self.message_handler, self.user_id, self.engine, self.adapter)
+
+        return CommandButtonView(
+            buttons,
+            self.message_handler,
+            self.user_id,
+            self.engine,
+            self.adapter,
+            last_command=command,
+        )
 
 
 class CommandButtonView(View):
     """명령어 버튼 뷰"""
-    
-    def __init__(self, buttons: list, message_handler, user_id: str, engine=None, adapter=None, timeout: float = 300.0):
+
+    def __init__(
+        self,
+        buttons: list,
+        message_handler,
+        user_id: str,
+        engine=None,
+        adapter=None,
+        last_command: Optional[str] = None,
+        timeout: float = 300.0,
+    ):
         super().__init__(timeout=timeout)
         self.message_handler = message_handler
         self.user_id = user_id
         self.engine = engine
         self.adapter = adapter
+        self.last_command = last_command
         
         # 버튼 생성 (최대 5개)
         for btn_data in buttons[:5]:
@@ -181,15 +199,17 @@ class CommandButtonView(View):
                 # 즉시 응답 (타임아웃 방지)
                 await interaction.response.defer(ephemeral=False)
 
-                if hasattr(self, 'adapter') and self.adapter and self.adapter._enqueue_incoming(self.user_id, command):
-                    await self.adapter._acknowledge_interaction(interaction)
-                    return
+                if hasattr(self, 'adapter') and self.adapter:
+                    queued, duplicate = self.adapter._enqueue_incoming(self.user_id, command)
+                    if queued:
+                        await self.adapter._acknowledge_interaction(interaction, duplicate=duplicate)
+                        return
 
                 if self.message_handler:
                     response = self.message_handler(self.user_id, command)
                     if response:
                         # 응답에 따라 새로운 버튼 생성
-                        view = self._create_view_for_response(response)
+                        view = self._create_view_for_response(command, response)
                         image_path = None
                         if self.adapter:
                             image_path = self.adapter._generate_image_if_needed(self.user_id, command, response)
@@ -199,6 +219,7 @@ class CommandButtonView(View):
                             response=response,
                             view=view,
                             image_path=image_path,
+                            user_id=self.user_id,
                         )
                     else:
                         await interaction.followup.send("처리되었습니다.", ephemeral=True)
@@ -218,22 +239,28 @@ class CommandButtonView(View):
         
         return callback
     
-    def _create_view_for_response(self, response: str):
+    def _create_view_for_response(self, command: Optional[str], response: str):
         """응답에 따라 적절한 버튼 뷰 생성"""
-        # GameEngine에서 버튼 목록 가져오기
-        if self.engine:
-            buttons = self.engine.get_ui_buttons(self.user_id, response)
+        if self.adapter:
+            buttons = self.adapter._get_button_definitions(self.user_id, command, response)
+        elif self.engine:
+            buttons = self.engine.get_ui_buttons(self.user_id, command, response)
         else:
             # 기본 버튼 (engine이 없는 경우)
             buttons = [
                 {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
                 {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '📋 게임목록', 'messageText': '게임목록'},
                 {'label': '❓ 도움말', 'messageText': '도움말'},
             ]
-        
-        return CommandButtonView(buttons, self.message_handler, self.user_id, self.engine, self.adapter)
+
+        return CommandButtonView(
+            buttons,
+            self.message_handler,
+            self.user_id,
+            self.engine,
+            self.adapter,
+            last_command=command,
+        )
 
 
 class DiscordAdapter(ChatPlatform):
@@ -251,6 +278,7 @@ class DiscordAdapter(ChatPlatform):
         self.image_generator = ImageGenerator()  # 이미지 생성기
         self.message_queue = message_queue
         self._queue_listener_started = False
+        self._pending_actions: dict[str, float] = {}
 
         self.message_handler: Optional[Callable[[str, str], str]] = None
 
@@ -260,21 +288,39 @@ class DiscordAdapter(ChatPlatform):
     def set_message_queue(self, queue: PlatformMessageQueue) -> None:
         self.message_queue = queue
 
-    def _enqueue_incoming(self, user_id: str, content: str) -> bool:
-        """Kafka/큐에 수신 메시지를 적재"""
+    def _enqueue_incoming(self, user_id: str, content: str) -> tuple[bool, bool]:
+        """Kafka/큐에 수신 메시지를 적재하며 중복 액션을 표시"""
+        now = time.monotonic()
+        duplicate = False
+        last_ts = self._pending_actions.get(user_id)
+        if last_ts and now - last_ts < 2.0:
+            duplicate = True
+
+        # 중복 요청은 큐 적재 없이 처리 차단
+        if duplicate:
+            self._pending_actions[user_id] = now
+            return True, True
+
+        self._pending_actions[user_id] = now
+
         if self.message_queue:
             self.message_queue.publish_incoming(
                 PlatformMessage(platform="discord", user_id=user_id, content=content)
             )
-            return True
-        return False
+            return True, False
+        return False, False
+
+    def _clear_pending_action(self, user_id: str) -> None:
+        self._pending_actions.pop(user_id, None)
 
     def _handle_outgoing_message(self, message: PlatformMessage) -> None:
         if message.platform and message.platform != "discord":
             return
         self.send_message(message.user_id, message.content)
 
-    async def _acknowledge_interaction(self, interaction: discord.Interaction) -> None:
+    async def _acknowledge_interaction(self, interaction: discord.Interaction, duplicate: bool = False) -> None:
+        if not duplicate:
+            return
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message(
@@ -289,7 +335,9 @@ class DiscordAdapter(ChatPlatform):
         except Exception:
             pass
 
-    async def _acknowledge_channel(self, channel: discord.abc.Messageable) -> None:
+    async def _acknowledge_channel(self, channel: discord.abc.Messageable, duplicate: bool = False) -> None:
+        if not duplicate:
+            return
         try:
             await channel.send("요청을 접수했어요. 처리 후 답변을 보내드릴게요.")
         except Exception:
@@ -301,20 +349,17 @@ class DiscordAdapter(ChatPlatform):
             print(f"[디스코드] 메시지 전송 실패: 플랫폼이 실행 중이 아닙니다.")
             return False
         
-        # 버튼 뷰 생성
-        view = self._create_button_view(user_id, message)
-        
         # 비동기 함수를 동기적으로 실행
         try:
             if self.loop and self.loop.is_running():
                 # 이미 실행 중인 루프가 있으면 태스크로 추가
                 asyncio.run_coroutine_threadsafe(
-                    self._send_message_async(user_id, message, view),
+                    self._send_message_async(user_id, message),
                     self.loop
                 )
             else:
                 # 루프가 없으면 새로 생성해서 실행
-                asyncio.run(self._send_message_async(user_id, message, view))
+                asyncio.run(self._send_message_async(user_id, message))
             return True
         except Exception as e:
             print(f"[디스코드] 메시지 전송 오류: {e}")
@@ -324,11 +369,13 @@ class DiscordAdapter(ChatPlatform):
         self,
         user_id: str,
         message: str,
-        view: Optional[View] = None,
         image_path: Optional[str] = None,
+        last_command: Optional[str] = None,
     ) -> None:
         """비동기 메시지 전송"""
         try:
+            # 버튼 뷰는 실행 중인 이벤트 루프 내에서 생성해야 함
+            view = self._create_button_view(user_id, message, last_command)
             files = self._build_files(image_path)
             
             # 마지막으로 메시지를 보낸 채널이 있으면 그 채널에 전송
@@ -350,43 +397,36 @@ class DiscordAdapter(ChatPlatform):
             print(f"[디스코드] 메시지 전송 오류: {e}")
             self._cleanup_temp_image(image_path)
         finally:
+            self._clear_pending_action(user_id)
             self._cleanup_temp_image(image_path)
     
-    def _create_button_view(self, user_id: str, response: str) -> Optional[View]:
+    def _create_button_view(
+        self, user_id: str, response: str, last_command: Optional[str] = None
+    ) -> Optional[View]:
         """응답에 따라 버튼 뷰 생성"""
         if not self.message_handler:
             return None
-        
-        # 모험 게임 중인지 확인
-        if self.engine and self.engine.has_active_game(user_id):
-            # 응답 텍스트로 모험 게임인지 확인
-            if '강화' in response or '일반몹' in response or '특수몹' in response or '보스몹' in response or '모험' in response:
-                buttons = [
-                    {'label': '🔨 강화', 'messageText': '강화'},
-                    {'label': '🗡️ 사냥', 'messageText': '사냥'},
-                    {'label': '💰 판매', 'messageText': '판매'},
-                    {'label': '📊 상태', 'messageText': '상태'},
-                    {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                ]
-            else:
-                buttons = [
-                    {'label': '💰 골드', 'messageText': '골드'},
-                    {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
-                    {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                    {'label': '📋 게임목록', 'messageText': '게임목록'},
-                    {'label': '❓ 도움말', 'messageText': '도움말'},
-                ]
-        else:
-            # 기본 버튼
-            buttons = [
-                {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🎮 게임시작', 'messageText': '게임시작 모험'},
-                {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '📋 게임목록', 'messageText': '게임목록'},
-                {'label': '❓ 도움말', 'messageText': '도움말'},
-            ]
-        
-        return CommandButtonView(buttons, self.message_handler, user_id, self.engine, self)
+
+        buttons = self._get_button_definitions(user_id, last_command, response)
+        return CommandButtonView(
+            buttons,
+            self.message_handler,
+            user_id,
+            self.engine,
+            self,
+            last_command=last_command,
+        )
+
+    def _get_button_definitions(
+        self, user_id: str, command: Optional[str], response: Optional[str]
+    ) -> list:
+        if self.engine:
+            return self.engine.get_ui_buttons(user_id, command, response)
+        return [
+            {'label': '💰 골드', 'messageText': '골드'},
+            {'label': '🏆 랭킹', 'messageText': '리더보드'},
+            {'label': '❓ 도움말', 'messageText': '도움말'},
+        ]
     
     def _generate_image_if_needed(self, user_id: str, command: str, response: str) -> Optional[str]:
         """강화/사냥 결과인 경우 이미지 생성"""
@@ -440,9 +480,12 @@ class DiscordAdapter(ChatPlatform):
         response: str,
         view: Optional[View] = None,
         image_path: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> None:
         files = self._build_files(image_path)
         await interaction.followup.send(response, view=view, files=files or None, ephemeral=False)
+        if user_id:
+            self._clear_pending_action(user_id)
         self._cleanup_temp_image(image_path)
 
     def _build_files(self, image_path: Optional[str]):
@@ -518,16 +561,17 @@ class DiscordAdapter(ChatPlatform):
                     # 플랫폼 어댑터 설정 (멘션 기능용)
                     if self.engine:
                         self.engine.set_platform_adapter(self)
-                    if self._enqueue_incoming(user_id, message.content):
+                    queued, duplicate = self._enqueue_incoming(user_id, message.content)
+                    if queued:
                         self.user_channels[user_id] = (message.channel, message.channel)
-                        await self._acknowledge_channel(message.channel)
+                        await self._acknowledge_channel(message.channel, duplicate=duplicate)
                         return
                     response = self.message_handler(user_id, message.content)
                     if response:
                         # DM 채널 저장
                         self.user_channels[user_id] = (message.channel, message.channel)
                         # 버튼 뷰 생성
-                        view = self._create_button_view(user_id, response)
+                        view = self._create_button_view(user_id, response, message.content)
                         # 이미지 생성 (강화/사냥 결과인 경우)
                         image_path = self._generate_image_if_needed(user_id, message.content, response)
                         await message.channel.send(response, view=view, files=[discord.File(image_path)] if image_path and os.path.exists(image_path) else None)
@@ -548,16 +592,17 @@ class DiscordAdapter(ChatPlatform):
                         # 플랫폼 어댑터 설정 (멘션 기능용)
                         if self.engine:
                             self.engine.set_platform_adapter(self)
-                        if self._enqueue_incoming(user_id, content):
+                        queued, duplicate = self._enqueue_incoming(user_id, content)
+                        if queued:
                             self.user_channels[user_id] = (message.channel, message.channel)
-                            await self._acknowledge_channel(message.channel)
+                            await self._acknowledge_channel(message.channel, duplicate=duplicate)
                             return
                         response = self.message_handler(user_id, content)
                         if response:
                             # 채널 저장
                             self.user_channels[user_id] = (message.channel, message.channel)
                             # 버튼 뷰 생성
-                            view = self._create_button_view(user_id, response)
+                            view = self._create_button_view(user_id, response, content)
                             # 이미지 생성 (강화/사냥 결과인 경우)
                             image_path = self._generate_image_if_needed(user_id, content, response)
                             await message.channel.send(response, view=view, files=[discord.File(image_path)] if image_path and os.path.exists(image_path) else None)
