@@ -198,7 +198,13 @@ class GameEngine:
             response = f"{mention} {response}"
         return response
 
-    def _handle_start_command(self, user_id: str, message: str) -> str:
+    def _handle_start_command(
+        self,
+        user_id: str,
+        message: str,
+        user_name: Optional[str] = None,
+        is_new_user: bool = False,
+    ) -> str:
         msg_lower = message.lower()
         if msg_lower.startswith('s '):
             game_name = message[2:].strip()
