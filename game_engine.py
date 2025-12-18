@@ -327,11 +327,14 @@ class GameEngine:
         except (ValueError, AttributeError, KeyError) as e:
             return f"게임 시작 중 오류가 발생했습니다: {str(e)}"
     
-    def _end_game(self, user_id: str) -> str:
+    def _end_game(self, user_id: Optional[str] = None, *_: Any, **__: Any) -> str:
         """게임 종료"""
+        if not user_id:
+            return "사용자 정보를 확인할 수 없어 게임을 종료할 수 없습니다."
+
         if user_id not in self.active_games:
             return "진행 중인 게임이 없습니다."
-        
+
         game = self.active_games[user_id]
         result = game.end()
         del self.active_games[user_id]
