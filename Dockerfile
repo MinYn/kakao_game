@@ -7,6 +7,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     curl \
     procps \
+    libcairo2 \
+    libgdk-pixbuf2.0-0 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
     fonts-noto-cjk \
     fonts-noto-color-emoji \
     fonts-dejavu-core \
@@ -35,4 +39,3 @@ EXPOSE 5000
 
 # 애플리케이션 실행 (디스코드 모드)
 CMD ["python", "run_server.py"]
-
