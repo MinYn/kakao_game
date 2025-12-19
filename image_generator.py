@@ -3,6 +3,7 @@
 강화 및 사냥 결과를 PNG 이미지로 생성
 """
 from typing import Optional
+import importlib.util
 import os
 import tempfile
 
@@ -191,6 +192,35 @@ class ImageGenerator:
             except:
                 pass
         return None
+
+    def generate_svg_image(self, svg_code: str, filename_prefix: str = "badge") -> str:
+        """SVG 코드를 이미지 파일로 저장 (PNG 우선, 미지원 시 SVG 반환)"""
+        if not svg_code:
+            raise ValueError("SVG 코드가 필요합니다.")
+
+        if self._has_cairosvg():
+            return self._write_svg_as_png(svg_code, filename_prefix)
+
+        return self._write_svg(svg_code, filename_prefix)
+
+    def _has_cairosvg(self) -> bool:
+        return importlib.util.find_spec("cairosvg") is not None
+
+    def _write_svg_as_png(self, svg_code: str, filename_prefix: str) -> str:
+        import cairosvg
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".png", prefix=f"{filename_prefix}_", dir=self.output_dir, delete=False
+        ) as temp_file:
+            cairosvg.svg2png(bytestring=svg_code.encode("utf-8"), write_to=temp_file.name)
+            return temp_file.name
+
+    def _write_svg(self, svg_code: str, filename_prefix: str) -> str:
+        with tempfile.NamedTemporaryFile(
+            suffix=".svg", prefix=f"{filename_prefix}_", dir=self.output_dir, delete=False
+        ) as temp_file:
+            temp_file.write(svg_code.encode("utf-8"))
+            return temp_file.name
     
     def _get_text_size(self, draw, text: str, font) -> tuple:
         """텍스트 크기 가져오기 (호환성 처리)"""

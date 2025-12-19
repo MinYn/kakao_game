@@ -142,6 +142,24 @@ class GameStatsResponse(GameStatsBase):
         from_attributes = True
 
 
+# Space Badge 스키마
+class SpaceBadgeBase(BaseModel):
+    user_id: str = Field(..., description="사용자 ID")
+    name: str = Field(..., description="배지 이름")
+    sub: str = Field(..., description="배지 서브 타이틀")
+    shape: str = Field(..., description="우주선 타입")
+    color: str = Field(..., description="우주선 컬러")
+
+
+class SpaceBadgeResponse(SpaceBadgeBase):
+    svg: str = Field(..., description="SVG 코드")
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # Leaderboard 스키마
 class LeaderboardEntry(BaseModel):
     user_id: str

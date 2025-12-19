@@ -8,6 +8,7 @@ from discord.ui import View, Button, Select
 from platforms.base_platform import ChatPlatform
 from config import Config
 from image_generator import ImageGenerator
+from space_badges import SpaceBadgeService, generate_svg
 from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
 
@@ -434,6 +435,9 @@ class DiscordAdapter(ChatPlatform):
             return None
         
         try:
+            if "우주 탐험 로그를 시작합니다!" in response:
+                return self._generate_space_badge_image(user_id)
+
             # 이미지 생성 필요 여부 확인
             if not self.engine.should_generate_image(user_id, command, response):
                 return None
@@ -473,6 +477,17 @@ class DiscordAdapter(ChatPlatform):
             traceback.print_exc()
 
         return None
+
+    def _generate_space_badge_image(self, user_id: str) -> Optional[str]:
+        try:
+            service = SpaceBadgeService()
+            variant = service.get_variant_for_user(user_id)
+            variant_index = service.find_variant_index(variant)
+            svg_code = generate_svg(variant, variant_index, star_seed=service.stable_seed(user_id))
+            return self.image_generator.generate_svg_image(svg_code, filename_prefix="space_badge")
+        except Exception as e:
+            print(f"[디스코드] 배지 이미지 생성 오류: {e}")
+            return None
 
     async def _send_interaction_message(
         self,
