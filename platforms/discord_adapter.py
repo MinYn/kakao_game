@@ -375,6 +375,12 @@ class DiscordAdapter(ChatPlatform):
     ) -> None:
         """비동기 메시지 전송"""
         try:
+            if image_path is None:
+                image_path = self._generate_image_if_needed(
+                    user_id,
+                    last_command or "",
+                    message,
+                )
             # 버튼 뷰는 실행 중인 이벤트 루프 내에서 생성해야 함
             view = self._create_button_view(user_id, message, last_command)
             files = self._build_files(image_path)
