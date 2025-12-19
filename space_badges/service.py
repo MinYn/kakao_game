@@ -22,6 +22,17 @@ class SpaceBadgeService:
         return 0
 
     @staticmethod
+    def upgrade_stage_from_attempts(attempts: int) -> int:
+        attempts = max(0, attempts)
+        if attempts >= 20:
+            return 3
+        if attempts >= 10:
+            return 2
+        if attempts >= 5:
+            return 1
+        return 0
+
+    @staticmethod
     def stable_seed(value: str) -> int:
         digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
         return int(digest[:16], 16)

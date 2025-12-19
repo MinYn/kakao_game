@@ -6,11 +6,13 @@ from datetime import datetime
 from fastapi import APIRouter
 
 from api.schemas import SpaceBadgeResponse
+from gold_system_postgres import GoldSystemPostgres
 from space_badges import SpaceBadgeService, generate_svg
 
 
 router = APIRouter(prefix="/api/space-badges", tags=["space-badges"])
 service = SpaceBadgeService()
+gold_system = GoldSystemPostgres()
 
 
 @router.get("/{user_id}", response_model=SpaceBadgeResponse)
@@ -18,7 +20,16 @@ def get_space_badge(user_id: str):
     """사용자 배지 조회 (DB 없이 결정적 랜덤)"""
     variant = service.get_variant_for_user(user_id, offset=0)
     variant_index = service.find_variant_index(variant)
-    svg_code = generate_svg(variant, variant_index, star_seed=service.stable_seed(user_id))
+    stats = gold_system.get_game_stats(user_id)
+    upgrade_stage = service.upgrade_stage_from_attempts(
+        stats.get("enhancement_attempts", 0)
+    )
+    svg_code = generate_svg(
+        variant,
+        variant_index,
+        star_seed=service.stable_seed(user_id),
+        upgrade_stage=upgrade_stage,
+    )
     now = datetime.utcnow()
     return SpaceBadgeResponse(
         user_id=user_id,

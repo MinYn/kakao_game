@@ -96,12 +96,7 @@ class HuntMenuView(View):
         elif self.engine:
             buttons = self.engine.get_ui_buttons(self.user_id, command, response)
         else:
-            # 기본 버튼 (engine이 없는 경우)
-            buttons = [
-                {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '❓ 도움말', 'messageText': '도움말'},
-            ]
+            buttons = []
 
         return CommandButtonView(
             buttons,
@@ -247,12 +242,7 @@ class CommandButtonView(View):
         elif self.engine:
             buttons = self.engine.get_ui_buttons(self.user_id, command, response)
         else:
-            # 기본 버튼 (engine이 없는 경우)
-            buttons = [
-                {'label': '💰 골드', 'messageText': '골드'},
-                {'label': '🏆 랭킹', 'messageText': '리더보드'},
-                {'label': '❓ 도움말', 'messageText': '도움말'},
-            ]
+            buttons = []
 
         return CommandButtonView(
             buttons,
@@ -429,13 +419,7 @@ class DiscordAdapter(ChatPlatform):
     ) -> list:
         if self.engine:
             return self.engine.get_ui_buttons(user_id, command, response)
-        return [
-            {'label': '🔨 강화', 'messageText': '강화'},
-            {'label': '📊 상태', 'messageText': '상태'},
-            {'label': '🛰️ 정찰', 'messageText': '정찰'},
-            {'label': '🧭 탐사', 'messageText': '탐사'},
-            {'label': '🚨 구조', 'messageText': '구조'},
-        ]
+        return []
     
     def _generate_image_if_needed(self, user_id: str, command: str, response: str) -> Optional[str]:
         """강화/사냥 결과인 경우 이미지 생성"""
@@ -514,8 +498,11 @@ class DiscordAdapter(ChatPlatform):
         try:
             service = SpaceBadgeService()
             offset = 0
+            upgrade_stage = 0
             if self.engine and hasattr(self.engine, "get_badge_offset"):
                 offset = self.engine.get_badge_offset(user_id)
+            if self.engine and hasattr(self.engine, "get_badge_upgrade_stage"):
+                upgrade_stage = self.engine.get_badge_upgrade_stage(user_id)
             variant = service.get_variant_for_user(user_id, offset=offset)
             variant_index = service.find_variant_index(variant)
             star_seed = service.stable_seed(f"{user_id}:{offset}")
@@ -524,6 +511,7 @@ class DiscordAdapter(ChatPlatform):
                 variant_index,
                 star_seed=star_seed,
                 frame_count=2,
+                upgrade_stage=upgrade_stage,
             )
             try:
                 return self.image_generator.generate_svg_gif(
@@ -536,6 +524,7 @@ class DiscordAdapter(ChatPlatform):
                     variant,
                     variant_index,
                     star_seed=star_seed,
+                    upgrade_stage=upgrade_stage,
                 )
                 return self.image_generator.generate_svg_image(
                     svg_code,
