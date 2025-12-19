@@ -3,10 +3,13 @@
 CLI 테스트 모드 - 로컬에서 게임 봇을 테스트할 수 있는 인터페이스
 """
 import readline
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
 from platforms.base_platform import ChatPlatform
 from config import Config
-from game_engine import GameEngine
+
+if TYPE_CHECKING:
+    from game_engine import GameEngine
 
 # readline 설정 (한글 입력 개선)
 try:
@@ -22,7 +25,7 @@ except (ImportError, AttributeError):
 class CLIAdapter(ChatPlatform):
     """CLI 모드 어댑터"""
 
-    def __init__(self, engine: Optional[GameEngine] = None):
+    def __init__(self, engine: Optional["GameEngine"] = None):
         super().__init__()
         self.engine = engine
         self.current_user = "test_user"
