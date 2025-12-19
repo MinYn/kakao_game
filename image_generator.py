@@ -194,12 +194,15 @@ class ImageGenerator:
         return None
 
     def generate_svg_image(self, svg_code: str, filename_prefix: str = "badge") -> str:
-        """SVG 코드를 이미지 파일로 저장 (PNG 우선, 미지원 시 SVG 반환)"""
+        """SVG 코드를 이미지 파일로 저장 (PNG 우선, 미지원 시 PNG 플레이스홀더)"""
         if not svg_code:
             raise ValueError("SVG 코드가 필요합니다.")
 
         if self._has_cairosvg():
             return self._write_svg_as_png(svg_code, filename_prefix)
+
+        if HAS_PIL:
+            return self._write_placeholder_png(filename_prefix)
 
         return self._write_svg(svg_code, filename_prefix)
 
@@ -220,6 +223,22 @@ class ImageGenerator:
             suffix=".svg", prefix=f"{filename_prefix}_", dir=self.output_dir, delete=False
         ) as temp_file:
             temp_file.write(svg_code.encode("utf-8"))
+            return temp_file.name
+
+    def _write_placeholder_png(self, filename_prefix: str) -> str:
+        image = Image.new("RGBA", (512, 512), (5, 5, 16, 255))
+        draw = ImageDraw.Draw(image)
+        font = self._get_font(20)
+        text = "SVG 미리보기는\nCairoSVG 필요"
+        text_width, text_height = self._get_text_size(draw, text, font)
+        x = (512 - text_width) / 2
+        y = (512 - text_height) / 2
+        draw.multiline_text((x, y), text, font=font, fill=(255, 215, 0, 255), align="center")
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".png", prefix=f"{filename_prefix}_", dir=self.output_dir, delete=False
+        ) as temp_file:
+            image.save(temp_file.name, format="PNG")
             return temp_file.name
     
     def _get_text_size(self, draw, text: str, font) -> tuple:
