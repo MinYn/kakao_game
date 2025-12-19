@@ -247,6 +247,7 @@ class AdventureGame(Game):
             "attempts": 0,
             "successes": 0,
             "failures": 0,
+            "badge_cycle": 0,
         }
 
     def start(self) -> str:
@@ -267,6 +268,7 @@ class AdventureGame(Game):
             "activity_count": self.activity_count,
             "total_reward": self.total_reward,
             "activity_stats": self.activity_stats,
+            "badge_cycle": stats.get("badge_cycle", 0),
         }
 
         challenge_passes = self._get_challenge_passes()
@@ -423,6 +425,7 @@ class AdventureGame(Game):
 
         self.current_level = 0
         self.game_data["level"] = 0
+        self.game_data["badge_cycle"] = self.game_data.get("badge_cycle", 0) + 1
         if self.point_system:
             self.point_system.set_enhancement_level(self.user_id, 0)
 
@@ -431,7 +434,8 @@ class AdventureGame(Game):
             f"정산한 강화 단계: +{sold_level}\n"
             f"정산 보상: {sell_price}G\n"
             f"현재 골드: {self.get_user_points()}G\n\n"
-            "새로운 모듈로 다시 업그레이드해봐요!"
+            "새로운 모듈로 다시 업그레이드해봐요!\n"
+            "🚀 정산 후 우주선 기종이 업데이트되었습니다."
         )
 
     # ========== 활동 관련 메서드 ==========

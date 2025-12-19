@@ -10,8 +10,8 @@ class SpaceBadgeService:
     def __init__(self, variants: list[BadgeVariant] | None = None) -> None:
         self.variants = variants or VARIANTS
 
-    def get_variant_for_user(self, user_id: str) -> BadgeVariant:
-        seed = self.stable_seed(user_id)
+    def get_variant_for_user(self, user_id: str, offset: int = 0) -> BadgeVariant:
+        seed = self.stable_seed(f"{user_id}:{offset}")
         rng = random.Random(seed)
         return rng.choice(self.variants)
 

@@ -491,7 +491,18 @@ class DiscordAdapter(ChatPlatform):
 
     def _should_attach_badge(self, command: str, response: str) -> bool:
         normalized = (command or "").strip().lower()
-        if normalized in {"강화", "성장", "train", "업그레이드", "상태", "status", "info"}:
+        if normalized in {
+            "강화",
+            "성장",
+            "train",
+            "업그레이드",
+            "상태",
+            "status",
+            "info",
+            "정산",
+            "sell",
+            "판매",
+        }:
             return True
 
         if "현재 우주선 강화 레벨" in response or "콜사인" in response:
@@ -502,9 +513,16 @@ class DiscordAdapter(ChatPlatform):
     def _generate_space_badge_image(self, user_id: str) -> Optional[str]:
         try:
             service = SpaceBadgeService()
-            variant = service.get_variant_for_user(user_id)
+            offset = 0
+            if self.engine and hasattr(self.engine, "get_badge_offset"):
+                offset = self.engine.get_badge_offset(user_id)
+            variant = service.get_variant_for_user(user_id, offset=offset)
             variant_index = service.find_variant_index(variant)
-            svg_code = generate_svg(variant, variant_index, star_seed=service.stable_seed(user_id))
+            svg_code = generate_svg(
+                variant,
+                variant_index,
+                star_seed=service.stable_seed(f"{user_id}:{offset}"),
+            )
             return self.image_generator.generate_svg_image(svg_code, filename_prefix="space_badge")
         except Exception as e:
             print(f"[디스코드] 배지 이미지 생성 오류: {e}")
