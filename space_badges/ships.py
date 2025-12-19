@@ -22,23 +22,28 @@ class ShuttleShip(ShipRenderer):
         if upgrade_stage >= 1:
             parts.append(
                 f"""
-    <rect x="-2" y="-175" width="4" height="22" fill="#666" />
-    <circle cx="0" cy="-182" r="5" fill="#0ff" filter="url(#glow_{badge_id})"/>
+    <rect x="-5" y="-185" width="10" height="30" fill="#7ef" opacity="0.9" />
+    <circle cx="0" cy="-192" r="10" fill="#3ff" filter="url(#glow_{badge_id})"/>
+    <circle cx="0" cy="-192" r="16" fill="none" stroke="#6ff" stroke-width="2" opacity="0.6" />
     """.strip()
             )
         if upgrade_stage >= 2:
             parts.append(
                 """
-    <path d="M-70 35 L-95 70 L-60 80 Z" fill="#444" stroke="#777" stroke-width="0.5"/>
-    <path d="M70 35 L95 70 L60 80 Z" fill="#444" stroke="#777" stroke-width="0.5"/>
+    <path d="M-90 20 L-140 80 L-100 100 Z" fill="#2dd" stroke="#9ff" stroke-width="1.2" opacity="0.8"/>
+    <path d="M90 20 L140 80 L100 100 Z" fill="#2dd" stroke="#9ff" stroke-width="1.2" opacity="0.8"/>
+    <rect x="-120" y="100" width="240" height="12" rx="6" fill="#1bf" opacity="0.5"/>
     """.strip()
             )
         if upgrade_stage >= 3:
             parts.append(
-                '<rect x="-55" y="60" width="20" height="50" rx="4" fill="#2dd" opacity="0.6" />'
+                '<rect x="-70" y="40" width="30" height="80" rx="6" fill="#ffd54f" opacity="0.85" />'
             )
             parts.append(
-                '<rect x="35" y="60" width="20" height="50" rx="4" fill="#2dd" opacity="0.6" />'
+                '<rect x="40" y="40" width="30" height="80" rx="6" fill="#ffd54f" opacity="0.85" />'
+            )
+            parts.append(
+                f'<circle cx="0" cy="20" r="30" fill="#fff3b0" opacity="0.35" filter="url(#glow_{badge_id})" />'
             )
         return parts
 
@@ -82,21 +87,27 @@ class RocketShip(ShipRenderer):
         if upgrade_stage >= 1:
             parts.append(
                 """
-    <path d="M-35 120 L-55 170 L-25 165 Z" fill="#333" stroke="#666" stroke-width="0.6"/>
-    <path d="M35 120 L55 170 L25 165 Z" fill="#333" stroke="#666" stroke-width="0.6"/>
+    <path d="M-45 110 L-80 190 L-30 180 Z" fill="#7cf" stroke="#cff" stroke-width="1.2" opacity="0.8"/>
+    <path d="M45 110 L80 190 L30 180 Z" fill="#7cf" stroke="#cff" stroke-width="1.2" opacity="0.8"/>
+    <rect x="-60" y="185" width="120" height="10" rx="5" fill="#4ef" opacity="0.5"/>
     """.strip()
             )
         if upgrade_stage >= 2:
             parts.append(
                 f"""
-    <ellipse cx="0" cy="30" rx="32" ry="8" fill="none" stroke="#9cf"
-             stroke-width="2" filter="url(#glow_{badge_id})"/>
+    <ellipse cx="0" cy="30" rx="55" ry="14" fill="none" stroke="#aef"
+             stroke-width="3" filter="url(#glow_{badge_id})"/>
+    <ellipse cx="0" cy="30" rx="40" ry="10" fill="none" stroke="#5ff"
+             stroke-width="2" opacity="0.7"/>
     """.strip()
             )
         if upgrade_stage >= 3:
             parts.append(
-                '<circle cx="0" cy="40" r="18" fill="#ffd54f" opacity="0.5" '
+                f'<circle cx="0" cy="40" r="30" fill="#ffd54f" opacity="0.6" '
                 f'filter="url(#glow_{badge_id})" />'
+            )
+            parts.append(
+                '<path d="M-25 -120 L0 -170 L25 -120 Z" fill="#ffe082" opacity="0.8" />'
             )
         return parts
 
@@ -136,20 +147,24 @@ class InterceptorShip(ShipRenderer):
         if upgrade_stage >= 1:
             parts.append(
                 """
-    <path d="M-60 10 L-120 70 L-95 90 L-50 45 Z" fill="#2a2a35" stroke="#666" stroke-width="0.6"/>
-    <path d="M60 10 L120 70 L95 90 L50 45 Z" fill="#2a2a35" stroke="#666" stroke-width="0.6"/>
+    <path d="M-70 -5 L-150 70 L-120 110 L-40 50 Z" fill="#7af" stroke="#cfe" stroke-width="1.2" opacity="0.85"/>
+    <path d="M70 -5 L150 70 L120 110 L40 50 Z" fill="#7af" stroke="#cfe" stroke-width="1.2" opacity="0.85"/>
     """.strip()
             )
         if upgrade_stage >= 2:
             parts.append(
                 f"""
-    <circle cx="0" cy="-125" r="10" fill="#0ff" opacity="0.7" filter="url(#glow_{badge_id})"/>
+    <circle cx="0" cy="-130" r="18" fill="#0ff" opacity="0.75" filter="url(#glow_{badge_id})"/>
+    <circle cx="0" cy="-130" r="28" fill="none" stroke="#7ff" stroke-width="2" opacity="0.6" />
     """.strip()
             )
         if upgrade_stage >= 3:
             parts.append(
-                f'<circle cx="0" cy="-20" r="14" fill="#55f" opacity="0.5" '
+                f'<circle cx="0" cy="-20" r="26" fill="#7bf" opacity="0.55" '
                 f'filter="url(#glow_{badge_id})" />'
+            )
+            parts.append(
+                '<rect x="-90" y="90" width="180" height="14" rx="7" fill="#4ff" opacity="0.5" />'
             )
         return parts
 
@@ -182,21 +197,25 @@ class LifterShip(ShipRenderer):
         if upgrade_stage >= 1:
             parts.append(
                 """
-    <rect x="-22" y="-120" width="44" height="35" rx="4" fill="#cc7755" stroke="#333" />
-    <rect x="-16" y="-112" width="32" height="10" rx="2" fill="#fff" opacity="0.6" />
+    <rect x="-30" y="-130" width="60" height="45" rx="6" fill="#9ef" stroke="#cff" stroke-width="1.2" />
+    <rect x="-22" y="-120" width="44" height="14" rx="2" fill="#fff" opacity="0.75" />
     """.strip()
             )
         if upgrade_stage >= 2:
             parts.append(
                 f"""
-    <rect x="-40" y="90" width="80" height="16" rx="4" fill="#444"
-          filter="url(#shadow_{badge_id})" opacity="0.7" />
+    <rect x="-70" y="85" width="140" height="22" rx="6" fill="#3cf"
+          filter="url(#glow_{badge_id})" opacity="0.65" />
+    <rect x="-50" y="60" width="100" height="10" rx="5" fill="#7ff" opacity="0.5" />
     """.strip()
             )
         if upgrade_stage >= 3:
             parts.append(
-                f'<path d="M-10 100 L0 140 L10 100 Z" fill="#0ff" opacity="0.5" '
+                f'<path d="M-20 95 L0 150 L20 95 Z" fill="#ffd54f" opacity="0.8" '
                 f'filter="url(#glow_{badge_id})" />'
+            )
+            parts.append(
+                '<circle cx="0" cy="-20" r="22" fill="#ffe082" opacity="0.4" />'
             )
         return parts
 
