@@ -199,7 +199,10 @@ class ImageGenerator:
             raise ValueError("SVG 코드가 필요합니다.")
 
         if self._has_cairosvg():
-            return self._write_svg_as_png(svg_code, filename_prefix)
+            try:
+                return self._write_svg_as_png(svg_code, filename_prefix)
+            except Exception as e:
+                print(f"⚠️ SVG PNG 변환 실패: {e}")
 
         if HAS_PIL:
             return self._write_placeholder_png(filename_prefix)
