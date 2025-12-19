@@ -11,7 +11,7 @@ class SpaceBadgeService:
         self.variants = variants or VARIANTS
 
     def get_variant_for_user(self, user_id: str) -> BadgeVariant:
-        seed = self._stable_seed(user_id)
+        seed = self.stable_seed(user_id)
         rng = random.Random(seed)
         return rng.choice(self.variants)
 
