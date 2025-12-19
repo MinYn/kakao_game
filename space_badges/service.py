@@ -22,15 +22,9 @@ class SpaceBadgeService:
         return 0
 
     @staticmethod
-    def upgrade_stage_from_attempts(attempts: int) -> int:
-        attempts = max(0, attempts)
-        if attempts >= 20:
-            return 3
-        if attempts >= 10:
-            return 2
-        if attempts >= 5:
-            return 1
-        return 0
+    def upgrade_stage_from_level(level: int) -> int:
+        level = max(0, level)
+        return min(level // 5, 3)
 
     @staticmethod
     def stable_seed(value: str) -> int:

@@ -21,9 +21,8 @@ def get_space_badge(user_id: str):
     variant = service.get_variant_for_user(user_id, offset=0)
     variant_index = service.find_variant_index(variant)
     stats = gold_system.get_game_stats(user_id)
-    upgrade_stage = service.upgrade_stage_from_attempts(
-        stats.get("enhancement_attempts", 0)
-    )
+    enhancement_level = gold_system.get_enhancement_level(user_id)
+    upgrade_stage = service.upgrade_stage_from_level(enhancement_level)
     svg_code = generate_svg(
         variant,
         variant_index,
