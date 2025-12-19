@@ -424,9 +424,11 @@ class DiscordAdapter(ChatPlatform):
         if self.engine:
             return self.engine.get_ui_buttons(user_id, command, response)
         return [
-            {'label': '💰 골드', 'messageText': '골드'},
-            {'label': '🏆 랭킹', 'messageText': '리더보드'},
-            {'label': '❓ 도움말', 'messageText': '도움말'},
+            {'label': '🔨 강화', 'messageText': '강화'},
+            {'label': '📊 상태', 'messageText': '상태'},
+            {'label': '🛰️ 정찰', 'messageText': '정찰'},
+            {'label': '🧭 탐사', 'messageText': '탐사'},
+            {'label': '🚨 구조', 'messageText': '구조'},
         ]
     
     def _generate_image_if_needed(self, user_id: str, command: str, response: str) -> Optional[str]:
@@ -436,6 +438,9 @@ class DiscordAdapter(ChatPlatform):
         
         try:
             if "우주 탐험 로그를 시작합니다!" in response:
+                return self._generate_space_badge_image(user_id)
+
+            if self._should_attach_badge(command, response):
                 return self._generate_space_badge_image(user_id)
 
             # 이미지 생성 필요 여부 확인
@@ -477,6 +482,16 @@ class DiscordAdapter(ChatPlatform):
             traceback.print_exc()
 
         return None
+
+    def _should_attach_badge(self, command: str, response: str) -> bool:
+        normalized = (command or "").strip().lower()
+        if normalized in {"강화", "성장", "train", "업그레이드", "상태", "status", "info"}:
+            return True
+
+        if "현재 우주선 강화 레벨" in response or "콜사인" in response:
+            return True
+
+        return False
 
     def _generate_space_badge_image(self, user_id: str) -> Optional[str]:
         try:
