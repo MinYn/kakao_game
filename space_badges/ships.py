@@ -5,14 +5,31 @@ from abc import ABC, abstractmethod
 
 class ShipRenderer(ABC):
     @abstractmethod
-    def render(self, hull_fill: str, badge_id: str, color: str) -> str:
+    def render(
+        self,
+        hull_fill: str,
+        badge_id: str,
+        color: str,
+        frame_index: int = 0,
+    ) -> str:
         raise NotImplementedError
 
 
 class ShuttleShip(ShipRenderer):
-    def render(self, hull_fill: str, badge_id: str, color: str) -> str:
+    def render(
+        self,
+        hull_fill: str,
+        badge_id: str,
+        color: str,
+        frame_index: int = 0,
+    ) -> str:
         tile_fill = "#222" if color == "black" else "#333"
         window_fill = "#112244"
+        flame_frames = [
+            ("M-15 125 L-20 160 L-10 160 Z", "M15 125 L10 160 L20 160 Z"),
+            ("M-15 125 L-22 170 L-8 170 Z", "M15 125 L8 170 L22 170 Z"),
+        ]
+        flame_left, flame_right = flame_frames[frame_index % len(flame_frames)]
         return f"""
 <g transform="translate(0, -20)">
     <path d="M-30 -20 L-60 20 L-130 90 L-130 110 L-40 100 L-30 80 Z" fill="{hull_fill}" stroke="#999"
@@ -24,22 +41,25 @@ class ShuttleShip(ShipRenderer):
     <path d="M-15 -135 C-10 -145 0 -150 0 -150 C0 -150 10 -145 15 -135 L0 -125 Z" fill="{tile_fill}" />
     <path d="M-18 -10 L0 -15 L18 -10 L14 0 L-14 0 Z" fill="{window_fill}" stroke="#555" stroke-width="0.5"/>
     <path d="M0 40 L-2 100 L2 100 Z" fill="{hull_fill}" stroke="#ccc" />
-    <path d="M-15 125 L-20 160 L-10 160 Z" fill="#0af" opacity="0.6">
-        <animate attributeName="d"
-                 values="M-15 125 L-20 160 L-10 160 Z;M-15 125 L-22 170 L-8 170 Z;M-15 125 L-20 160 L-10 160 Z"
-                 dur="0.2s" repeatCount="indefinite"/>
-    </path>
-    <path d="M15 125 L10 160 L20 160 Z" fill="#0af" opacity="0.6">
-        <animate attributeName="d"
-                 values="M15 125 L10 160 L20 160 Z;M15 125 L8 170 L22 170 Z;M15 125 L10 160 L20 160 Z"
-                 dur="0.2s" repeatCount="indefinite"/>
-    </path>
+    <path d="{flame_left}" fill="#0af" opacity="0.6" />
+    <path d="{flame_right}" fill="#0af" opacity="0.6" />
 </g>
 """.strip()
 
 
 class RocketShip(ShipRenderer):
-    def render(self, hull_fill: str, badge_id: str, color: str) -> str:
+    def render(
+        self,
+        hull_fill: str,
+        badge_id: str,
+        color: str,
+        frame_index: int = 0,
+    ) -> str:
+        flame_frames = [
+            "M0 180 L-10 230 L10 230 Z",
+            "M0 180 L-12 250 L12 250 Z",
+        ]
+        flame_path = flame_frames[frame_index % len(flame_frames)]
         return f"""
 <g transform="translate(0, -30)">
     <path d="M-25 100 L-60 160 L-25 150 Z" fill="{hull_fill}" stroke="#555"/>
@@ -50,17 +70,19 @@ class RocketShip(ShipRenderer):
     <path d="M-25 -50 L-15 -100 L0 -140 L15 -100 L25 -50 Z" fill="{hull_fill}" />
     <rect x="-2" y="-140" width="4" height="30" fill="#999" />
     <path d="M-15 150 L-20 180 L20 180 L15 150 Z" fill="#222" />
-    <path d="M0 180 L-10 230 L10 230 Z" fill="#f50" opacity="0.8">
-        <animate attributeName="d"
-                 values="M0 180 L-10 230 L10 230 Z;M0 180 L-12 250 L12 250 Z;M0 180 L-10 230 L10 230 Z"
-                 dur="0.1s" repeatCount="indefinite"/>
-    </path>
+    <path d="{flame_path}" fill="#f50" opacity="0.8" />
 </g>
 """.strip()
 
 
 class InterceptorShip(ShipRenderer):
-    def render(self, hull_fill: str, badge_id: str, color: str) -> str:
+    def render(
+        self,
+        hull_fill: str,
+        badge_id: str,
+        color: str,
+        frame_index: int = 0,
+    ) -> str:
         window_fill = "#112244"
         return f"""
 <g transform="translate(0, 0)">
@@ -75,7 +97,13 @@ class InterceptorShip(ShipRenderer):
 
 
 class LifterShip(ShipRenderer):
-    def render(self, hull_fill: str, badge_id: str, color: str) -> str:
+    def render(
+        self,
+        hull_fill: str,
+        badge_id: str,
+        color: str,
+        frame_index: int = 0,
+    ) -> str:
         return f"""
 <g transform="translate(0, -10)">
     <rect x="-30" y="-80" width="60" height="180" rx="10" fill="#e76" />

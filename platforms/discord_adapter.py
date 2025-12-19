@@ -8,7 +8,7 @@ from discord.ui import View, Button, Select
 from platforms.base_platform import ChatPlatform
 from config import Config
 from image_generator import ImageGenerator
-from space_badges import SpaceBadgeService, generate_svg
+from space_badges import SpaceBadgeService, generate_svg, generate_svg_frames
 from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
 
@@ -518,12 +518,29 @@ class DiscordAdapter(ChatPlatform):
                 offset = self.engine.get_badge_offset(user_id)
             variant = service.get_variant_for_user(user_id, offset=offset)
             variant_index = service.find_variant_index(variant)
-            svg_code = generate_svg(
+            star_seed = service.stable_seed(f"{user_id}:{offset}")
+            svg_frames = generate_svg_frames(
                 variant,
                 variant_index,
-                star_seed=service.stable_seed(f"{user_id}:{offset}"),
+                star_seed=star_seed,
+                frame_count=2,
             )
-            return self.image_generator.generate_svg_image(svg_code, filename_prefix="space_badge")
+            try:
+                return self.image_generator.generate_svg_gif(
+                    svg_frames,
+                    filename_prefix="space_badge",
+                )
+            except Exception as e:
+                print(f"[디스코드] 배지 GIF 생성 오류: {e}")
+                svg_code = generate_svg(
+                    variant,
+                    variant_index,
+                    star_seed=star_seed,
+                )
+                return self.image_generator.generate_svg_image(
+                    svg_code,
+                    filename_prefix="space_badge",
+                )
         except Exception as e:
             print(f"[디스코드] 배지 이미지 생성 오류: {e}")
             return None

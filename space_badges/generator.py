@@ -16,9 +16,30 @@ SHIP_RENDERERS = {
 
 
 def generate_svg(variant: BadgeVariant, index: int, star_seed: Optional[int] = None) -> str:
+    return _build_svg(variant, index, star_seed=star_seed, frame_index=0)
+
+
+def generate_svg_frames(
+    variant: BadgeVariant,
+    index: int,
+    star_seed: Optional[int] = None,
+    frame_count: int = 2,
+) -> list[str]:
+    return [
+        _build_svg(variant, index, star_seed=star_seed, frame_index=frame)
+        for frame in range(frame_count)
+    ]
+
+
+def _build_svg(
+    variant: BadgeVariant,
+    index: int,
+    star_seed: Optional[int],
+    frame_index: int,
+) -> str:
     badge_id = f"badge_{index}"
     defs = _get_defs(badge_id, variant.color)
-    ship_path = _get_ship_path(variant.shape, badge_id, variant.color)
+    ship_path = _get_ship_path(variant.shape, badge_id, variant.color, frame_index)
     star_random = random.Random(star_seed)
 
     return f"""
@@ -101,10 +122,15 @@ def _get_defs(badge_id: str, color: str) -> str:
 """.strip()
 
 
-def _get_ship_path(shape: ShipShape, badge_id: str, color: str) -> str:
+def _get_ship_path(shape: ShipShape, badge_id: str, color: str, frame_index: int) -> str:
     hull_fill = f"url(#hull_{badge_id})"
     renderer = SHIP_RENDERERS.get(shape, SHIP_RENDERERS[ShipShape.SHUTTLE])
-    return renderer.render(hull_fill=hull_fill, badge_id=badge_id, color=color)
+    return renderer.render(
+        hull_fill=hull_fill,
+        badge_id=badge_id,
+        color=color,
+        frame_index=frame_index,
+    )
 
 
 def _generate_stars(rng: random.Random, count: int) -> str:

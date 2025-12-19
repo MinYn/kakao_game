@@ -3,6 +3,7 @@
 강화 및 사냥 결과를 PNG 이미지로 생성
 """
 from typing import Optional
+import io
 import importlib.util
 import os
 import tempfile
@@ -208,6 +209,38 @@ class ImageGenerator:
             return self._write_placeholder_png(filename_prefix)
 
         return self._write_svg(svg_code, filename_prefix)
+
+    def generate_svg_gif(
+        self,
+        svg_frames: list[str],
+        filename_prefix: str = "badge",
+        duration_ms: int = 120,
+    ) -> str:
+        if not svg_frames:
+            raise ValueError("SVG 프레임이 필요합니다.")
+
+        if not self._has_cairosvg() or not HAS_PIL:
+            return self.generate_svg_image(svg_frames[0], filename_prefix=filename_prefix)
+
+        import cairosvg
+
+        images = []
+        for frame in svg_frames:
+            png_bytes = cairosvg.svg2png(bytestring=frame.encode("utf-8"))
+            images.append(Image.open(io.BytesIO(png_bytes)).convert("RGBA"))
+
+        with tempfile.NamedTemporaryFile(
+            suffix=".gif", prefix=f"{filename_prefix}_", dir=self.output_dir, delete=False
+        ) as temp_file:
+            images[0].save(
+                temp_file.name,
+                save_all=True,
+                append_images=images[1:],
+                duration=duration_ms,
+                loop=0,
+                disposal=2,
+            )
+            return temp_file.name
 
     def _has_cairosvg(self) -> bool:
         return importlib.util.find_spec("cairosvg") is not None
