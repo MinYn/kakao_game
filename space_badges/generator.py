@@ -15,8 +15,19 @@ SHIP_RENDERERS = {
 }
 
 
-def generate_svg(variant: BadgeVariant, index: int, star_seed: Optional[int] = None) -> str:
-    return _build_svg(variant, index, star_seed=star_seed, frame_index=0)
+def generate_svg(
+    variant: BadgeVariant,
+    index: int,
+    star_seed: Optional[int] = None,
+    upgrade_stage: int = 0,
+) -> str:
+    return _build_svg(
+        variant,
+        index,
+        star_seed=star_seed,
+        frame_index=0,
+        upgrade_stage=upgrade_stage,
+    )
 
 
 def generate_svg_frames(
@@ -24,9 +35,16 @@ def generate_svg_frames(
     index: int,
     star_seed: Optional[int] = None,
     frame_count: int = 2,
+    upgrade_stage: int = 0,
 ) -> list[str]:
     return [
-        _build_svg(variant, index, star_seed=star_seed, frame_index=frame)
+        _build_svg(
+            variant,
+            index,
+            star_seed=star_seed,
+            frame_index=frame,
+            upgrade_stage=upgrade_stage,
+        )
         for frame in range(frame_count)
     ]
 
@@ -36,10 +54,17 @@ def _build_svg(
     index: int,
     star_seed: Optional[int],
     frame_index: int,
+    upgrade_stage: int,
 ) -> str:
     badge_id = f"badge_{index}"
     defs = _get_defs(badge_id, variant.color)
-    ship_path = _get_ship_path(variant.shape, badge_id, variant.color, frame_index)
+    ship_path = _get_ship_path(
+        variant.shape,
+        badge_id,
+        variant.color,
+        frame_index,
+        upgrade_stage,
+    )
     star_random = random.Random(star_seed)
 
     return f"""
@@ -122,7 +147,13 @@ def _get_defs(badge_id: str, color: str) -> str:
 """.strip()
 
 
-def _get_ship_path(shape: ShipShape, badge_id: str, color: str, frame_index: int) -> str:
+def _get_ship_path(
+    shape: ShipShape,
+    badge_id: str,
+    color: str,
+    frame_index: int,
+    upgrade_stage: int,
+) -> str:
     hull_fill = f"url(#hull_{badge_id})"
     renderer = SHIP_RENDERERS.get(shape, SHIP_RENDERERS[ShipShape.SHUTTLE])
     return renderer.render(
@@ -130,6 +161,7 @@ def _get_ship_path(shape: ShipShape, badge_id: str, color: str, frame_index: int
         badge_id=badge_id,
         color=color,
         frame_index=frame_index,
+        upgrade_stage=upgrade_stage,
     )
 
 

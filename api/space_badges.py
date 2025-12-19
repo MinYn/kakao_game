@@ -18,7 +18,13 @@ def get_space_badge(user_id: str):
     """사용자 배지 조회 (DB 없이 결정적 랜덤)"""
     variant = service.get_variant_for_user(user_id, offset=0)
     variant_index = service.find_variant_index(variant)
-    svg_code = generate_svg(variant, variant_index, star_seed=service.stable_seed(user_id))
+    upgrade_stage = 2
+    svg_code = generate_svg(
+        variant,
+        variant_index,
+        star_seed=service.stable_seed(user_id),
+        upgrade_stage=upgrade_stage,
+    )
     now = datetime.utcnow()
     return SpaceBadgeResponse(
         user_id=user_id,
