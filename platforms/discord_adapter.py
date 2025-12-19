@@ -498,8 +498,11 @@ class DiscordAdapter(ChatPlatform):
         try:
             service = SpaceBadgeService()
             offset = 0
+            upgrade_stage = 0
             if self.engine and hasattr(self.engine, "get_badge_offset"):
                 offset = self.engine.get_badge_offset(user_id)
+            if self.engine and hasattr(self.engine, "get_badge_upgrade_stage"):
+                upgrade_stage = self.engine.get_badge_upgrade_stage(user_id)
             variant = service.get_variant_for_user(user_id, offset=offset)
             variant_index = service.find_variant_index(variant)
             star_seed = service.stable_seed(f"{user_id}:{offset}")
@@ -508,6 +511,7 @@ class DiscordAdapter(ChatPlatform):
                 variant_index,
                 star_seed=star_seed,
                 frame_count=2,
+                upgrade_stage=upgrade_stage,
             )
             try:
                 return self.image_generator.generate_svg_gif(
@@ -520,6 +524,7 @@ class DiscordAdapter(ChatPlatform):
                     variant,
                     variant_index,
                     star_seed=star_seed,
+                    upgrade_stage=upgrade_stage,
                 )
                 return self.image_generator.generate_svg_image(
                     svg_code,
