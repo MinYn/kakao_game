@@ -467,6 +467,21 @@ class GameEngine:
         if not game or not hasattr(game, "game_data"):
             return 0
         return int(game.game_data.get("badge_cycle", 0))
+
+    def get_badge_upgrade_stage(self, user_id: str) -> int:
+        """강화 횟수 기반 배지 업그레이드 단계"""
+        game = self.active_games.get(user_id)
+        if not game or not hasattr(game, "game_data"):
+            return 0
+
+        attempts = int(game.game_data.get("attempts", 0))
+        if attempts >= 20:
+            return 3
+        if attempts >= 10:
+            return 2
+        if attempts >= 5:
+            return 1
+        return 0
     
     def get_hunt_image_data(self, user_id: str, command: str, response: str) -> Optional[Dict[str, Any]]:
         """사냥 이미지 생성에 필요한 데이터 반환

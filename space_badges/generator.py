@@ -66,6 +66,7 @@ def _build_svg(
         upgrade_stage,
     )
     star_random = random.Random(star_seed)
+    upgrade_overlay = _get_upgrade_overlay(badge_id, upgrade_stage)
 
     return f"""
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full">
@@ -74,7 +75,7 @@ def _build_svg(
     <g clip-path="url(#clip_{badge_id})">
         <rect width="512" height="512" fill="url(#bg_{badge_id})" />
         <g fill="#FFF" fill-opacity="0.8">
-            {_generate_stars(star_random, 10)}
+            {_generate_stars(star_random, 10 + max(upgrade_stage, 0) * 2)}
         </g>
         <path d="M-100 450 Q256 {'480' if variant.shape == ShipShape.ROCKET else '350'} 612 450 V512 H-100 Z"
               fill="{_get_atmosphere_color(variant.color)}" fill-opacity="0.2"
@@ -85,6 +86,8 @@ def _build_svg(
        filter="url(#shadow_{badge_id})">
         {ship_path}
     </g>
+
+    {upgrade_overlay}
 
     <g>
         <circle cx="256" cy="256" r="230" fill="none" stroke="url(#frame_{badge_id})" stroke-width="8" />
@@ -163,6 +166,37 @@ def _get_ship_path(
         frame_index=frame_index,
         upgrade_stage=upgrade_stage,
     )
+
+
+def _get_upgrade_overlay(badge_id: str, upgrade_stage: int) -> str:
+    if upgrade_stage <= 0:
+        return ""
+
+    stages = min(upgrade_stage, 3)
+    rings = []
+    if stages >= 1:
+        rings.append(
+            f'<circle cx="256" cy="256" r="120" fill="none" '
+            f'stroke="url(#frame_{badge_id})" stroke-width="3" opacity="0.35" '
+            f'stroke-dasharray="6 8" />'
+        )
+    if stages >= 2:
+        rings.append(
+            f'<circle cx="256" cy="256" r="160" fill="none" '
+            f'stroke="url(#frame_{badge_id})" stroke-width="2" opacity="0.25" '
+            f'stroke-dasharray="2 10" />'
+        )
+    if stages >= 3:
+        rings.append(
+            f'<circle cx="256" cy="256" r="200" fill="none" '
+            f'stroke="url(#frame_{badge_id})" stroke-width="2" opacity="0.2" '
+            f'stroke-dasharray="1 6" />'
+        )
+    return f"""
+<g filter="url(#glow_{badge_id})">
+    {''.join(rings)}
+</g>
+""".strip()
 
 
 def _generate_stars(rng: random.Random, count: int) -> str:

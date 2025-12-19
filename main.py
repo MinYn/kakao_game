@@ -6,6 +6,7 @@ import sys
 from typing import Optional
 from game_engine import GameEngine
 from platforms.discord_adapter import DiscordAdapter
+from platforms.cli_adapter import CLIAdapter
 from config import Config
 from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
@@ -29,24 +30,7 @@ class GameBot:
         if platform_type == 'discord':
             return DiscordAdapter(engine=self.engine, message_queue=self.message_queue)
         elif platform_type == 'cli':
-            from cli import CLIMode
-
-            class CLIPlatformWrapper:
-                """단순 CLI 테스트용 어댑터"""
-
-                def __init__(self, cli_engine):
-                    self.cli_engine = cli_engine
-
-                def set_message_handler(self, handler):
-                    self.handler = handler
-
-                def start(self, *_, **__):
-                    return CLIMode().run()
-
-                def stop(self):
-                    return None
-
-            return CLIPlatformWrapper(self.engine)
+            return CLIAdapter(engine=self.engine)
         raise ValueError(f"지원하지 않는 플랫폼: {platform_type}")
     
     def _handle_message(self, user_id: str, message: str) -> str:
@@ -116,13 +100,6 @@ class GameBot:
 
 def main():
     """메인 함수"""
-    # CLI 모드 체크
-    if len(sys.argv) > 1 and sys.argv[1] in ['cli', 'test', '--cli', '--test']:
-        from cli import CLIMode
-        cli = CLIMode()
-        cli.run()
-        return
-    
     # 설정 유효성 검사
     if not Config.validate():
         print("⚠️ 설정 파일(.env)을 확인해주세요.")
@@ -161,4 +138,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
