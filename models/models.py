@@ -82,3 +82,4 @@ class GameStats(Base):
     
     def __repr__(self):
         return f"<GameStats(user_id='{self.user_id}', total_hunts={self.total_hunts})>"
+

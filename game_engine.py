@@ -460,6 +460,13 @@ class GameEngine:
     def set_platform_adapter(self, adapter):
         """플랫폼 어댑터 설정 (멘션 기능용)"""
         self._platform_adapter = adapter
+
+    def get_badge_offset(self, user_id: str) -> int:
+        """배지 변경 오프셋 조회"""
+        game = self.active_games.get(user_id)
+        if not game or not hasattr(game, "game_data"):
+            return 0
+        return int(game.game_data.get("badge_cycle", 0))
     
     def get_hunt_image_data(self, user_id: str, command: str, response: str) -> Optional[Dict[str, Any]]:
         """사냥 이미지 생성에 필요한 데이터 반환
@@ -556,4 +563,3 @@ class GameEngine:
             'level': level,
             'gold': gold
         }
-

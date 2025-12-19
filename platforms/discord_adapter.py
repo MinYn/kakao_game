@@ -8,6 +8,7 @@ from discord.ui import View, Button, Select
 from platforms.base_platform import ChatPlatform
 from config import Config
 from image_generator import ImageGenerator
+from space_badges import SpaceBadgeService, generate_svg, generate_svg_frames
 from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
 
@@ -374,6 +375,12 @@ class DiscordAdapter(ChatPlatform):
     ) -> None:
         """비동기 메시지 전송"""
         try:
+            if image_path is None:
+                image_path = self._generate_image_if_needed(
+                    user_id,
+                    last_command or "",
+                    message,
+                )
             # 버튼 뷰는 실행 중인 이벤트 루프 내에서 생성해야 함
             view = self._create_button_view(user_id, message, last_command)
             files = self._build_files(image_path)
@@ -423,9 +430,11 @@ class DiscordAdapter(ChatPlatform):
         if self.engine:
             return self.engine.get_ui_buttons(user_id, command, response)
         return [
-            {'label': '💰 골드', 'messageText': '골드'},
-            {'label': '🏆 랭킹', 'messageText': '리더보드'},
-            {'label': '❓ 도움말', 'messageText': '도움말'},
+            {'label': '🔨 강화', 'messageText': '강화'},
+            {'label': '📊 상태', 'messageText': '상태'},
+            {'label': '🛰️ 정찰', 'messageText': '정찰'},
+            {'label': '🧭 탐사', 'messageText': '탐사'},
+            {'label': '🚨 구조', 'messageText': '구조'},
         ]
     
     def _generate_image_if_needed(self, user_id: str, command: str, response: str) -> Optional[str]:
@@ -434,6 +443,12 @@ class DiscordAdapter(ChatPlatform):
             return None
         
         try:
+            if "우주 탐험 로그를 시작합니다!" in response:
+                return self._generate_space_badge_image(user_id)
+
+            if self._should_attach_badge(command, response):
+                return self._generate_space_badge_image(user_id)
+
             # 이미지 생성 필요 여부 확인
             if not self.engine.should_generate_image(user_id, command, response):
                 return None
@@ -473,6 +488,62 @@ class DiscordAdapter(ChatPlatform):
             traceback.print_exc()
 
         return None
+
+    def _should_attach_badge(self, command: str, response: str) -> bool:
+        normalized = (command or "").strip().lower()
+        if normalized in {
+            "강화",
+            "성장",
+            "train",
+            "업그레이드",
+            "상태",
+            "status",
+            "info",
+            "정산",
+            "sell",
+            "판매",
+        }:
+            return True
+
+        if "현재 우주선 강화 레벨" in response or "콜사인" in response:
+            return True
+
+        return False
+
+    def _generate_space_badge_image(self, user_id: str) -> Optional[str]:
+        try:
+            service = SpaceBadgeService()
+            offset = 0
+            if self.engine and hasattr(self.engine, "get_badge_offset"):
+                offset = self.engine.get_badge_offset(user_id)
+            variant = service.get_variant_for_user(user_id, offset=offset)
+            variant_index = service.find_variant_index(variant)
+            star_seed = service.stable_seed(f"{user_id}:{offset}")
+            svg_frames = generate_svg_frames(
+                variant,
+                variant_index,
+                star_seed=star_seed,
+                frame_count=2,
+            )
+            try:
+                return self.image_generator.generate_svg_gif(
+                    svg_frames,
+                    filename_prefix="space_badge",
+                )
+            except Exception as e:
+                print(f"[디스코드] 배지 GIF 생성 오류: {e}")
+                svg_code = generate_svg(
+                    variant,
+                    variant_index,
+                    star_seed=star_seed,
+                )
+                return self.image_generator.generate_svg_image(
+                    svg_code,
+                    filename_prefix="space_badge",
+                )
+        except Exception as e:
+            print(f"[디스코드] 배지 이미지 생성 오류: {e}")
+            return None
 
     async def _send_interaction_message(
         self,
