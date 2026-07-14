@@ -1,6 +1,7 @@
 import random
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from games.adventure import AdventureGame, ExplorerProfile
 from gold_system import GoldSystem
@@ -87,6 +88,52 @@ class AdventureGameTestCase(unittest.TestCase):
             self.assertEqual(records[0]["count"], 2)
             self.assertIsNotNone(records[0]["first_acquired_at"])
             self.assertIsNotNone(records[0]["last_acquired_at"])
+
+    def test_enhancement_near_miss_preserves_level(self):
+        with tempfile.NamedTemporaryFile() as db_file:
+            point_system = GoldSystem(db_file.name)
+            game = AdventureGame(user_id="tester", point_system=point_system)
+            game.start()
+            game.current_level = 2
+            point_system.set_enhancement_level("tester", 2)
+            point_system.set_gold("tester", 1_000)
+
+            success_rate = game._calculate_success_rate()
+            near_miss_roll = (success_rate + 1.0) / 100
+            with patch("games.adventure.random.random", return_value=near_miss_roll):
+                response = game._enhance()
+
+            self.assertIn("아슬아슬하게 버텼습니다", response)
+            self.assertEqual(game.current_level, 2)
+            self.assertEqual(point_system.get_enhancement_level("tester"), 2)
+
+    def test_clutch_success_message_when_roll_barely_passes(self):
+        with tempfile.NamedTemporaryFile() as db_file:
+            point_system = GoldSystem(db_file.name)
+            game = AdventureGame(user_id="tester", point_system=point_system)
+            game.start()
+            point_system.set_gold("tester", 1_000)
+
+            success_rate = game._calculate_success_rate()
+            clutch_roll = (success_rate - 1.0) / 100
+            with patch("games.adventure.random.random", return_value=clutch_roll):
+                response = game._enhance()
+
+            self.assertIn("아슬아슬 턱걸이 성공", response)
+            self.assertEqual(game.current_level, 1)
+
+    def test_loot_reward_roll_returns_gold_drop(self):
+        game = AdventureGame(user_id="tester")
+        game.start()
+
+        with patch("games.adventure.random.random", return_value=0.0), patch(
+            "games.adventure.random.randint", return_value=42
+        ):
+            loot_reward = game._try_roll_loot_reward()
+
+        self.assertIsNotNone(loot_reward)
+        self.assertEqual(loot_reward["loot"].name, "고철 부품 상자")
+        self.assertEqual(loot_reward["amount"], 42)
 
 
 if __name__ == "__main__":
