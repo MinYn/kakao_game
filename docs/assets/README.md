@@ -25,3 +25,13 @@ cairosvg.svg2png(
 print(png_path)
 PY
 ```
+
+## PR preview snippet
+
+Add this snippet to the pull request description to display the SVG preview without committing a binary PNG:
+
+```markdown
+### Example image
+
+![Pixel-art spaceship badge preview](docs/assets/pixel_ship_badge_preview.svg)
+```
