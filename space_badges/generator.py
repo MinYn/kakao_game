@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 import random
 from typing import Optional
 
@@ -49,6 +50,7 @@ def generate_svg_frames(
     ]
 
 
+@lru_cache(maxsize=1024)
 def _build_svg(
     variant: BadgeVariant,
     index: int,
