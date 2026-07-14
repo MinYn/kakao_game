@@ -103,6 +103,22 @@ class PostgreSQLManager:
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
+
+                # 우주선 수집 도감 테이블
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS ship_collection (
+                        user_id VARCHAR(255) NOT NULL,
+                        ship_id VARCHAR(100) NOT NULL,
+                        acquired_count INTEGER NOT NULL DEFAULT 1,
+                        first_acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (user_id, ship_id)
+                    )
+                ''')
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_ship_collection_user_id
+                    ON ship_collection(user_id)
+                ''')
                 
                 conn.commit()
     

@@ -5,7 +5,7 @@
 ## 아키텍처
 - **엔트리 포인트**: `main.py`는 `GameBot`을 생성해 디스코드 어댑터와 게임 엔진을 연결하며 CLI 모드도 지원합니다.
 - **웹 서버**: 카카오 웹훅 서버 코드는 제거되었습니다. `run_server.py`는 단일 프로세스 디스코드 런타임을 실행합니다.
-- **게임 엔진**: `game_engine.py`는 골드 시스템과 우주 탐험 로그 게임(우주선 강화+임무)을 묶는 허브입니다. 메시지 파서를 통해 골드 조회/전송, 리더보드, 게임 시작/종료, 도움말 명령을 처리합니다.
+- **게임 엔진**: `game_engine.py`는 골드 시스템과 우주 탐험 로그 게임(우주선 강화+임무+도감/득템)을 묶는 허브입니다. 메시지 파서를 통해 골드 조회/전송, 리더보드, 게임 시작/종료, 도움말 명령을 처리합니다.
 - **플랫폼 어댑터**: `platforms/discord_adapter.py`가 디스코드 메시지 이벤트를 게임 엔진에 연결합니다. 멘션 문자열 생성 기능을 노출해 게임 엔진이 플랫폼별 멘션을 추가할 수 있습니다.
 - **이벤트/확장성**: Kafka 발행은 선택적(`Config.USE_KAFKA`)이며, 골드/통계 이벤트를 `events.kafka_producer.publish_event`로 내보내도록 훅이 준비돼 있습니다. Discord 어댑터 메시지는 `events.platform_queue.PlatformMessageQueue`를 통해 `platform.incoming`/`platform.outgoing` 토픽으로 라우팅합니다(비활성화 시 인메모리 큐 대체).
 
@@ -54,13 +54,15 @@
 - `boss_tickets(user_id PK, tickets, created_at, updated_at)`
 - `enhancement_levels(user_id PK, level, created_at, updated_at)`
 - `game_stats(user_id PK, enhancement_attempts/successes/failures, hunt_normal/special/boss, total_hunts, total_hunt_reward, created_at, updated_at)`
+- `ship_collection(user_id + ship_id PK, acquired_count, first_acquired_at, last_acquired_at, user_id indexed)`
 
 세션 관리는 `models.database`의 `SessionLocal` 의존성을 통해 FastAPI에서 주입되며, `init_db()`로 테이블을 생성합니다.
 
 ## 실행 흐름 요약
 1. `python main.py [discord|cli]`로 시작. 디스코드 모드는 봇 런타임을 시작하고 CLI 모드는 터미널 상호작용을 제공합니다.
-2. 게임 엔진은 최초 메시지에서 초기 골드를 지급하고, 골드/리더보드/게임 목록/도움말/게임 시작/종료 등의 명령을 처리합니다. 활성 게임이 있을 때는 해당 게임 객체에 명령을 위임하며, 우주 탐험 로그 게임 시 강화/임무/정산/상태 확인 등의 행동을 지원합니다.
-3. Kafka 사용 시 골드·통계 이벤트가 브로커로 발행됩니다.
+2. 게임 엔진은 최초 메시지에서 초기 골드를 지급하고, 골드/리더보드/게임 목록/도움말/게임 시작/종료 등의 명령을 처리합니다. 활성 게임이 있을 때는 해당 게임 객체에 명령을 위임하며, 우주 탐험 로그 게임 시 강화/임무/정산/상태/도감 확인 등의 행동을 지원합니다.
+3. 모험 게임은 강화 성공 판정에 따라 근접 성공 축하 이펙트와 보너스 골드를 지급하고, 임무 성공 시 골드 보상·득템 보너스·우주선 도감 발견을 처리합니다.
+4. Kafka 사용 시 골드·통계 이벤트가 브로커로 발행됩니다.
 
 ### 실행 흐름 다이어그램 (Mermaid)
 

@@ -73,9 +73,84 @@ class GoldSystem:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        # 우주선 수집 도감 테이블
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ship_collection (
+                user_id TEXT NOT NULL,
+                ship_id TEXT NOT NULL,
+                acquired_count INTEGER NOT NULL DEFAULT 1,
+                first_acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, ship_id)
+            )
+        ''')
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS idx_ship_collection_user_id ON ship_collection(user_id)'
+        )
         
         conn.commit()
         conn.close()
+
+    def add_ship_to_collection(self, user_id: str, ship_id: str) -> dict:
+        """우주선 도감에 함선 추가. 중복 획득 시 카운트만 증가."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            'SELECT acquired_count FROM ship_collection WHERE user_id = ? AND ship_id = ?',
+            (user_id, ship_id),
+        )
+        result = cursor.fetchone()
+
+        if result:
+            new_count = result['acquired_count'] + 1
+            cursor.execute(
+                '''
+                UPDATE ship_collection
+                SET acquired_count = ?, last_acquired_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND ship_id = ?
+                ''',
+                (new_count, user_id, ship_id),
+            )
+            is_new = False
+        else:
+            new_count = 1
+            cursor.execute(
+                'INSERT INTO ship_collection (user_id, ship_id, acquired_count) VALUES (?, ?, ?)',
+                (user_id, ship_id, new_count),
+            )
+            is_new = True
+
+        conn.commit()
+        conn.close()
+        return {'ship_id': ship_id, 'is_new': is_new, 'count': new_count}
+
+    def get_ship_collection(self, user_id: str) -> list[dict]:
+        """사용자 우주선 도감 조회"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            '''
+            SELECT ship_id, acquired_count, first_acquired_at, last_acquired_at
+            FROM ship_collection
+            WHERE user_id = ?
+            ORDER BY first_acquired_at ASC
+            ''',
+            (user_id,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                'ship_id': row['ship_id'],
+                'count': row['acquired_count'],
+                'first_acquired_at': row['first_acquired_at'],
+                'last_acquired_at': row['last_acquired_at'],
+            }
+            for row in rows
+        ]
     
     def _get_connection(self) -> sqlite3.Connection:
         """데이터베이스 연결 반환"""

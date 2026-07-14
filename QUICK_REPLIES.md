@@ -119,11 +119,11 @@
 
 **표시되는 버튼**:
 - 🔨 강화 → `강화` 명령 전송
-- 🗡️ 사냥 → `사냥` 명령 전송
+- 🛰️ 정찰 → `정찰` 명령 전송
 - 💰 판매 → `판매` 명령 전송
 - 📊 상태 → `상태` 명령 전송
 - 🏆 랭킹 → `리더보드` 명령 전송
-- 🎫 패스 → `패스` 명령 전송
+- 📚 도감 → `도감` 명령 전송
 
 **사용 시나리오**:
 - 모험 게임이 활성화된 상태
@@ -155,7 +155,7 @@
 1. **모험 진행 중**
    - 첫 메시지 이후 자동으로 탐험이 준비됨
 2. **게임 중 응답 확인**
-   - 🔨 강화, 🗡️ 사냥, 💰 판매 등 게임 관련 버튼이 표시됨
+   - 🔨 강화, 🛰️ 정찰, 🧭 탐사, 🚨 구조, 📚 도감 등 게임 관련 버튼이 표시됨
 
 ---
 
@@ -193,7 +193,7 @@ def _get_space_quick_replies(self) -> list:
         {'action': 'message', 'label': '🛰️ 정찰', 'messageText': '정찰'},
         {'action': 'message', 'label': '🔬 탐사', 'messageText': '탐사'},
         {'action': 'message', 'label': '🚑 구조', 'messageText': '구조'},
-        {'action': 'message', 'label': '🎫 패스', 'messageText': '패스'},
+        {'action': 'message', 'label': '📚 도감', 'messageText': '도감'},
         {'action': 'message', 'label': '📊 상태', 'messageText': '상태'},
         {'action': 'message', 'label': '❓ 도움말', 'messageText': '도움말'},
     ]
@@ -264,7 +264,7 @@ def _get_space_quick_replies(self) -> list:
 
 ✅ **구현 완료**:
 - 기본 Quick Replies 버튼 (골드, 랭킹, 도움말 등)
-- 모험 게임 Quick Replies 버튼 (강화, 사냥, 판매 등)
+- 모험 게임 Quick Replies 버튼 (강화, 정찰, 탐사, 구조, 도감 등)
 - 게임 상태에 따라 자동으로 버튼 변경
 
 ✅ **사용 방법**:
