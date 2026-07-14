@@ -155,6 +155,10 @@ Content-Type: application/json
 }
 ```
 
+### 우주선 도감 저장소
+
+현재 우주선 도감은 게임 명령(`도감`/`collection`)으로 조회하며 별도 HTTP API는 없습니다. 저장소는 SQLite/PostgreSQL 모두 `ship_collection(user_id, ship_id, acquired_count, first_acquired_at, last_acquired_at)` 구조를 사용합니다.
+
 ### 게임 통계 API (`/api/stats`)
 
 #### 1. 통계 조회
