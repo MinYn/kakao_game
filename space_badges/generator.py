@@ -69,12 +69,12 @@ def _build_svg(
     upgrade_overlay = _get_upgrade_overlay(badge_id, upgrade_stage)
 
     return f"""
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full" shape-rendering="crispEdges">
     {defs}
 
     <g clip-path="url(#clip_{badge_id})">
         <rect width="512" height="512" fill="url(#bg_{badge_id})" />
-        <g fill="#FFF" fill-opacity="0.8">
+        <g fill="#FFF" fill-opacity="0.8" shape-rendering="crispEdges">
             {_generate_stars(star_random, 10 + max(upgrade_stage, 0) * 2)}
         </g>
         <path d="M-100 450 Q256 {'480' if variant.shape == ShipShape.ROCKET else '350'} 612 450 V512 H-100 Z"
@@ -137,10 +137,10 @@ def _get_defs(badge_id: str, color: str) -> str:
         <stop offset="100%" stop-color="#aa771c" />
     </linearGradient>
     <filter id="shadow_{badge_id}" x="-50%" y="-50%" width="200%" height="200%">
-        <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.6"/>
+        <feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#000" flood-opacity="0.6"/>
     </filter>
     <filter id="glow_{badge_id}">
-        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feGaussianBlur stdDeviation="1" result="blur"/>
         <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
     <clipPath id="clip_{badge_id}">

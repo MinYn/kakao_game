@@ -16,23 +16,40 @@ class ShipRenderer(ABC):
         raise NotImplementedError
 
 
-class ShuttleShip(ShipRenderer):
+class PixelShipMixin:
+    """Shared SVG helpers for blocky pixel-art ship renderers."""
+
+    @staticmethod
+    def _rect(x: int, y: int, width: int, height: int, fill: str, **attrs: str) -> str:
+        attr_text = " ".join(f'{key.replace("_", "-")}="{value}"' for key, value in attrs.items())
+        if attr_text:
+            attr_text = f" {attr_text}"
+        return f'<rect x="{x}" y="{y}" width="{width}" height="{height}" fill="{fill}"{attr_text}/>'
+
+    @staticmethod
+    def _parts(parts: list[str]) -> str:
+        return "\n    ".join(parts)
+
+
+class ShuttleShip(PixelShipMixin, ShipRenderer):
     def _upgrade_parts(self, badge_id: str, upgrade_stage: int) -> list[str]:
         parts: list[str] = []
         if upgrade_stage >= 1:
-            parts.append(
-                f"""
-    <rect x="-2" y="-175" width="4" height="22" fill="#666" />
-    <circle cx="0" cy="-182" r="5" fill="#0ff" filter="url(#glow_{badge_id})"/>
-    """.strip()
-            )
+            parts.extend([
+                self._rect(-8, -56, 16, 48, "#455", opacity="0.75"),
+                self._rect(-4, -180, 8, 28, "#777"),
+                self._rect(-8, -188, 16, 8, "#0ff", filter=f"url(#glow_{badge_id})"),
+            ])
         if upgrade_stage >= 2:
-            parts.append(
-                """
-    <path d="M-70 35 L-95 70 L-60 80 Z" fill="#444" stroke="#777" stroke-width="0.5"/>
-    <path d="M70 35 L95 70 L60 80 Z" fill="#444" stroke="#777" stroke-width="0.5"/>
-    """.strip()
-            )
+            parts.extend([
+                self._rect(-100, 56, 32, 24, "#445"),
+                self._rect(68, 56, 32, 24, "#445"),
+            ])
+        if upgrade_stage >= 3:
+            parts.extend([
+                self._rect(-60, 60, 20, 52, "#2dd", opacity="0.65"),
+                self._rect(40, 60, 20, 52, "#2dd", opacity="0.65"),
+            ])
         return parts
 
     def render(
@@ -44,209 +61,104 @@ class ShuttleShip(ShipRenderer):
         upgrade_stage: int = 0,
     ) -> str:
         tile_fill = "#222" if color == "black" else "#333"
-        window_fill = "#112244"
-        upgrade_parts = self._upgrade_parts(badge_id, upgrade_stage)
-        flame_frames = [
-            ("M-15 125 L-20 160 L-10 160 Z", "M15 125 L10 160 L20 160 Z"),
-            ("M-15 125 L-22 170 L-8 170 Z", "M15 125 L8 170 L22 170 Z"),
+        flame_height = 40 if frame_index % 2 == 0 else 56
+        parts = [
+            self._rect(-12, -156, 24, 16, tile_fill),
+            self._rect(-24, -140, 48, 36, hull_fill),
+            self._rect(-36, -104, 72, 52, hull_fill),
+            self._rect(-44, -52, 88, 132, hull_fill),
+            self._rect(-32, 80, 64, 36, hull_fill),
+            self._rect(-132, 48, 40, 52, hull_fill),
+            self._rect(-92, 24, 48, 64, hull_fill),
+            self._rect(92, 48, 40, 52, hull_fill),
+            self._rect(44, 24, 48, 64, hull_fill),
+            self._rect(-20, -24, 40, 20, "#112244", stroke="#5af", stroke_width="2"),
+            self._rect(-4, 28, 8, 76, "#dfe7ff", opacity="0.75"),
+            *self._upgrade_parts(badge_id, upgrade_stage),
+            self._rect(-24, 116, 16, flame_height, "#22aaff", opacity="0.75"),
+            self._rect(8, 116, 16, flame_height, "#22aaff", opacity="0.75"),
         ]
-        flame_left, flame_right = flame_frames[frame_index % len(flame_frames)]
-        upgrade_parts: list[str] = []
-        if upgrade_stage >= 1:
-            upgrade_parts.append(
-                '<rect x="-10" y="-40" width="20" height="60" fill="#455" opacity="0.65" />'
-            )
-        if upgrade_stage >= 2:
-            upgrade_parts.append(
-                '<path d="M-8 -150 L0 -170 L8 -150 Z" fill="#ccd" opacity="0.8" />'
-            )
-        if upgrade_stage >= 3:
-            upgrade_parts.append(
-                '<rect x="-55" y="60" width="20" height="50" rx="4" fill="#2dd" opacity="0.6" />'
-            )
-            upgrade_parts.append(
-                '<rect x="35" y="60" width="20" height="50" rx="4" fill="#2dd" opacity="0.6" />'
-            )
-        return f"""
-<g transform="translate(0, -20)">
-    <path d="M-30 -20 L-60 20 L-130 90 L-130 110 L-40 100 L-30 80 Z" fill="{hull_fill}" stroke="#999"
-          stroke-width="1"/>
-    <path d="M30 -20 L60 20 L130 90 L130 110 L40 100 L30 80 Z" fill="{hull_fill}" stroke="#999"
-          stroke-width="1"/>
-    <path d="M-35 -50 L-40 80 C-40 110 -20 125 0 125 C20 125 40 110 40 80 L35 -50 Z" fill="{hull_fill}" />
-    <path d="M-35 -50 C-30 -100 -20 -140 0 -150 C20 -140 30 -100 35 -50 Z" fill="{hull_fill}" />
-    <path d="M-15 -135 C-10 -145 0 -150 0 -150 C0 -150 10 -145 15 -135 L0 -125 Z" fill="{tile_fill}" />
-    {''.join(upgrade_parts)}
-    <path d="M-18 -10 L0 -15 L18 -10 L14 0 L-14 0 Z" fill="{window_fill}" stroke="#555" stroke-width="0.5"/>
-    <path d="M0 40 L-2 100 L2 100 Z" fill="{hull_fill}" stroke="#ccc" />
-    {''.join(upgrade_parts)}
-    <path d="{flame_left}" fill="#0af" opacity="0.6" />
-    <path d="{flame_right}" fill="#0af" opacity="0.6" />
-</g>
-""".strip()
+        return f'<g transform="translate(0, -20)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
 
 
-class RocketShip(ShipRenderer):
+class RocketShip(PixelShipMixin, ShipRenderer):
     def _upgrade_parts(self, badge_id: str, upgrade_stage: int) -> list[str]:
         parts: list[str] = []
         if upgrade_stage >= 1:
-            parts.append(
-                """
-    <path d="M-35 120 L-55 170 L-25 165 Z" fill="#333" stroke="#666" stroke-width="0.6"/>
-    <path d="M35 120 L55 170 L25 165 Z" fill="#333" stroke="#666" stroke-width="0.6"/>
-    """.strip()
-            )
+            parts.extend([self._rect(-48, 24, 12, 84, "#666"), self._rect(36, 24, 12, 84, "#666")])
         if upgrade_stage >= 2:
-            parts.append(
-                f"""
-    <ellipse cx="0" cy="30" rx="32" ry="8" fill="none" stroke="#9cf"
-             stroke-width="2" filter="url(#glow_{badge_id})"/>
-    """.strip()
-            )
+            parts.extend([self._rect(-68, 88, 32, 40, "#444"), self._rect(36, 88, 32, 40, "#444")])
+        if upgrade_stage >= 3:
+            parts.append(self._rect(-20, 28, 40, 32, "#ffd54f", opacity="0.55", filter=f"url(#glow_{badge_id})"))
         return parts
 
-    def render(
-        self,
-        hull_fill: str,
-        badge_id: str,
-        color: str,
-        frame_index: int = 0,
-        upgrade_stage: int = 0,
-    ) -> str:
-        flame_frames = [
-            "M0 180 L-10 230 L10 230 Z",
-            "M0 180 L-12 250 L12 250 Z",
+    def render(self, hull_fill: str, badge_id: str, color: str, frame_index: int = 0, upgrade_stage: int = 0) -> str:
+        flame_height = 52 if frame_index % 2 == 0 else 72
+        parts = [
+            self._rect(-8, -148, 16, 32, "#cfd8dc"),
+            self._rect(-16, -116, 32, 36, hull_fill),
+            self._rect(-28, -80, 56, 188, hull_fill),
+            self._rect(-28, 8, 56, 8, "#222"),
+            self._rect(-28, 80, 56, 8, "#222"),
+            self._rect(-60, 96, 32, 56, hull_fill),
+            self._rect(28, 96, 32, 56, hull_fill),
+            *self._upgrade_parts(badge_id, upgrade_stage),
+            self._rect(-16, 108, 32, 40, "#222"),
+            self._rect(-12, 148, 24, flame_height, "#ff6d00", opacity="0.85"),
+            self._rect(-6, 148, 12, max(24, flame_height - 16), "#ffd54f", opacity="0.9"),
         ]
-        flame_path = flame_frames[frame_index % len(flame_frames)]
-        upgrade_parts: list[str] = []
-        if upgrade_stage >= 1:
-            upgrade_parts.append('<rect x="-40" y="20" width="10" height="80" fill="#666" />')
-            upgrade_parts.append('<rect x="30" y="20" width="10" height="80" fill="#666" />')
-        if upgrade_stage >= 2:
-            upgrade_parts.append('<path d="M-25 40 L-60 110 L-35 120 Z" fill="#444" />')
-            upgrade_parts.append('<path d="M25 40 L60 110 L35 120 Z" fill="#444" />')
-        if upgrade_stage >= 3:
-            upgrade_parts.append(
-                '<circle cx="0" cy="40" r="18" fill="#ffd54f" opacity="0.5" '
-                f'filter="url(#glow_{badge_id})" />'
-            )
-        return f"""
-<g transform="translate(0, -30)">
-    <path d="M-25 100 L-60 160 L-25 150 Z" fill="{hull_fill}" stroke="#555"/>
-    <path d="M25 100 L60 160 L25 150 Z" fill="{hull_fill}" stroke="#555"/>
-    <rect x="-25" y="-50" width="50" height="200" fill="{hull_fill}" rx="2" />
-    <rect x="-25" y="80" width="50" height="5" fill="#222" />
-    <rect x="-25" y="10" width="50" height="5" fill="#222" />
-    <path d="M-25 -50 L-15 -100 L0 -140 L15 -100 L25 -50 Z" fill="{hull_fill}" />
-    {''.join(upgrade_parts)}
-    <rect x="-2" y="-140" width="4" height="30" fill="#999" />
-    <path d="M-15 150 L-20 180 L20 180 L15 150 Z" fill="#222" />
-    {''.join(upgrade_parts)}
-    <path d="{flame_path}" fill="#f50" opacity="0.8" />
-</g>
-""".strip()
+        return f'<g transform="translate(0, -30)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
 
 
-class InterceptorShip(ShipRenderer):
+class InterceptorShip(PixelShipMixin, ShipRenderer):
     def _upgrade_parts(self, badge_id: str, upgrade_stage: int) -> list[str]:
         parts: list[str] = []
         if upgrade_stage >= 1:
-            parts.append(
-                """
-    <path d="M-60 10 L-120 70 L-95 90 L-50 45 Z" fill="#2a2a35" stroke="#666" stroke-width="0.6"/>
-    <path d="M60 10 L120 70 L95 90 L50 45 Z" fill="#2a2a35" stroke="#666" stroke-width="0.6"/>
-    """.strip()
-            )
+            parts.extend([self._rect(-132, 36, 48, 36, "#445"), self._rect(84, 36, 48, 36, "#445")])
         if upgrade_stage >= 2:
-            parts.append(
-                f"""
-    <circle cx="0" cy="-125" r="10" fill="#0ff" opacity="0.7" filter="url(#glow_{badge_id})"/>
-    """.strip()
-            )
+            parts.append(self._rect(-8, -148, 16, 32, "#ccd"))
+        if upgrade_stage >= 3:
+            parts.append(self._rect(-16, -28, 32, 24, "#55f", opacity="0.55", filter=f"url(#glow_{badge_id})"))
         return parts
 
-    def render(
-        self,
-        hull_fill: str,
-        badge_id: str,
-        color: str,
-        frame_index: int = 0,
-        upgrade_stage: int = 0,
-    ) -> str:
-        window_fill = "#112244"
-        upgrade_parts: list[str] = []
-        if upgrade_stage >= 1:
-            upgrade_parts.append('<path d="M-60 -10 L-130 40 L-110 70 L-50 40 Z" fill="#445" />')
-            upgrade_parts.append('<path d="M60 -10 L130 40 L110 70 L50 40 Z" fill="#445" />')
-        if upgrade_stage >= 2:
-            upgrade_parts.append('<rect x="-4" y="-140" width="8" height="30" fill="#ccd" />')
-        if upgrade_stage >= 3:
-            upgrade_parts.append(
-                f'<circle cx="0" cy="-20" r="14" fill="#55f" opacity="0.5" '
-                f'filter="url(#glow_{badge_id})" />'
-            )
-        return f"""
-<g transform="translate(0, 0)">
-    <path d="M-20 -20 L-100 60 L-80 100 L-20 60 Z" fill="{hull_fill}" stroke="#555"/>
-    <path d="M20 -20 L100 60 L80 100 L20 60 Z" fill="{hull_fill}" stroke="#555"/>
-    <path d="M0 -120 L30 100 L0 120 L-30 100 Z" fill="{hull_fill}" />
-    {''.join(upgrade_parts)}
-    <path d="M0 -60 L10 -20 L0 0 L-10 -20 Z" fill="{window_fill}" />
-    {''.join(upgrade_parts)}
-    <circle cx="-30" cy="100" r="5" fill="#0ff" filter="url(#glow_{badge_id})"/>
-    <circle cx="30" cy="100" r="5" fill="#0ff" filter="url(#glow_{badge_id})"/>
-</g>
-""".strip()
+    def render(self, hull_fill: str, badge_id: str, color: str, frame_index: int = 0, upgrade_stage: int = 0) -> str:
+        parts = [
+            self._rect(-12, -124, 24, 48, hull_fill),
+            self._rect(-24, -76, 48, 64, hull_fill),
+            self._rect(-32, -12, 64, 112, hull_fill),
+            self._rect(-104, 28, 72, 40, hull_fill),
+            self._rect(-88, 68, 56, 32, hull_fill),
+            self._rect(32, 28, 72, 40, hull_fill),
+            self._rect(32, 68, 56, 32, hull_fill),
+            *self._upgrade_parts(badge_id, upgrade_stage),
+            self._rect(-12, -56, 24, 48, "#112244", stroke="#5af", stroke_width="2"),
+            self._rect(-36, 100, 12, 16, "#0ff", filter=f"url(#glow_{badge_id})"),
+            self._rect(24, 100, 12, 16, "#0ff", filter=f"url(#glow_{badge_id})"),
+        ]
+        return f'<g transform="translate(0, 0)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
 
 
-class LifterShip(ShipRenderer):
+class LifterShip(PixelShipMixin, ShipRenderer):
     def _upgrade_parts(self, badge_id: str, upgrade_stage: int) -> list[str]:
         parts: list[str] = []
         if upgrade_stage >= 1:
-            parts.append(
-                """
-    <rect x="-22" y="-120" width="44" height="35" rx="4" fill="#cc7755" stroke="#333" />
-    <rect x="-16" y="-112" width="32" height="10" rx="2" fill="#fff" opacity="0.6" />
-    """.strip()
-            )
+            parts.extend([self._rect(-88, -8, 24, 88, "#99f"), self._rect(64, -8, 24, 88, "#99f")])
         if upgrade_stage >= 2:
-            parts.append(
-                f"""
-    <rect x="-40" y="90" width="80" height="16" rx="4" fill="#444"
-          filter="url(#shadow_{badge_id})" opacity="0.7" />
-    """.strip()
-            )
+            parts.append(self._rect(-12, -116, 24, 36, "#ddf"))
+        if upgrade_stage >= 3:
+            parts.append(self._rect(-10, 100, 20, 44, "#0ff", opacity="0.55", filter=f"url(#glow_{badge_id})"))
         return parts
 
-    def render(
-        self,
-        hull_fill: str,
-        badge_id: str,
-        color: str,
-        frame_index: int = 0,
-        upgrade_stage: int = 0,
-    ) -> str:
-        upgrade_parts: list[str] = []
-        if upgrade_stage >= 1:
-            upgrade_parts.append('<rect x="-85" y="-10" width="20" height="90" rx="4" fill="#99f" />')
-            upgrade_parts.append('<rect x="65" y="-10" width="20" height="90" rx="4" fill="#99f" />')
-        if upgrade_stage >= 2:
-            upgrade_parts.append('<rect x="-10" y="-110" width="20" height="30" fill="#ddf" />')
-        if upgrade_stage >= 3:
-            upgrade_parts.append(
-                f'<path d="M-10 100 L0 140 L10 100 Z" fill="#0ff" opacity="0.5" '
-                f'filter="url(#glow_{badge_id})" />'
-            )
-        return f"""
-<g transform="translate(0, -10)">
-    <rect x="-30" y="-80" width="60" height="180" rx="10" fill="#e76" />
-    <rect x="-70" y="-20" width="30" height="140" rx="5" fill="#fff" />
-    <path d="M-70 -20 L-55 -50 L-40 -20 Z" fill="#fff" />
-    <rect x="40" y="-20" width="30" height="140" rx="5" fill="#fff" />
-    <path d="M40 -20 L55 -50 L70 -20 Z" fill="#fff" />
-    {''.join(upgrade_parts)}
-    <path d="M0 -40 L20 20 L20 80 L0 90 L-20 80 L-20 20 Z" fill="{hull_fill}" stroke="#333" />
-    <path d="M0 -40 L15 10 L0 0 L-15 10 Z" fill="#222" />
-    {''.join(upgrade_parts)}
-</g>
-""".strip()
+    def render(self, hull_fill: str, badge_id: str, color: str, frame_index: int = 0, upgrade_stage: int = 0) -> str:
+        parts = [
+            self._rect(-32, -84, 64, 184, "#e76"),
+            self._rect(-72, -20, 32, 140, "#fff"),
+            self._rect(-64, -52, 16, 32, "#fff"),
+            self._rect(40, -20, 32, 140, "#fff"),
+            self._rect(48, -52, 16, 32, "#fff"),
+            *self._upgrade_parts(badge_id, upgrade_stage),
+            self._rect(-20, -44, 40, 24, "#222"),
+            self._rect(-24, -20, 48, 100, hull_fill, stroke="#333", stroke_width="2"),
+            self._rect(-12, 80, 24, 20, hull_fill),
+        ]
+        return f'<g transform="translate(0, -10)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
