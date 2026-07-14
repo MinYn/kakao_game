@@ -17,7 +17,7 @@ class ShipRenderer(ABC):
 
 
 class PixelShipMixin:
-    """Shared SVG helpers for blocky pixel-art ship renderers."""
+    """Shared SVG helpers for cute side-view pixel-art ship renderers."""
 
     @staticmethod
     def _rect(x: int, y: int, width: int, height: int, fill: str, **attrs: str) -> str:
@@ -30,28 +30,87 @@ class PixelShipMixin:
     def _parts(parts: list[str]) -> str:
         return "\n    ".join(parts)
 
-
-class ShuttleShip(PixelShipMixin, ShipRenderer):
-    def _upgrade_parts(self, badge_id: str, upgrade_stage: int) -> list[str]:
-        parts: list[str] = []
+    def _cute_ship_parts(
+        self,
+        *,
+        hull_fill: str,
+        badge_id: str,
+        accent_fill: str,
+        window_fill: str,
+        frame_index: int,
+        upgrade_stage: int,
+        cargo: bool = False,
+    ) -> list[str]:
+        flame_width = 28 if frame_index % 2 == 0 else 40
+        parts = [
+            # chunky black pixel outline, side-view silhouette
+            self._rect(-124, -56, 132, 16, "#050505"),
+            self._rect(-148, -40, 204, 16, "#050505"),
+            self._rect(-164, -24, 244, 48, "#050505"),
+            self._rect(-148, 24, 204, 16, "#050505"),
+            self._rect(-116, 40, 132, 16, "#050505"),
+            self._rect(80, -8, 24, 16, "#050505"),
+            self._rect(-188, -8, 24, 16, "#050505"),
+            # soft, toy-like white body
+            self._rect(-116, -40, 120, 16, hull_fill),
+            self._rect(-140, -24, 188, 48, hull_fill),
+            self._rect(-116, 24, 120, 16, hull_fill),
+            self._rect(48, -8, 32, 16, hull_fill),
+            # red/candy accent fins and nose, inspired by the reference image
+            self._rect(-164, -56, 56, 32, accent_fill),
+            self._rect(-172, -48, 16, 16, "#050505"),
+            self._rect(-164, 24, 56, 32, accent_fill),
+            self._rect(-172, 40, 16, 16, "#050505"),
+            self._rect(-188, -8, 52, 24, accent_fill),
+            self._rect(80, -16, 32, 32, accent_fill),
+            self._rect(112, -8, 16, 16, "#050505"),
+            # cute oversized cockpit and two portholes
+            self._rect(-36, -56, 76, 16, "#050505"),
+            self._rect(-52, -40, 108, 16, "#050505"),
+            self._rect(-52, -24, 124, 32, "#050505"),
+            self._rect(-36, 8, 92, 16, "#050505"),
+            self._rect(-28, -40, 60, 16, window_fill),
+            self._rect(-44, -24, 100, 32, window_fill),
+            self._rect(-28, 8, 68, 8, window_fill),
+            self._rect(16, -32, 16, 16, "#b8d8ff", opacity="0.9"),
+            self._rect(32, -16, 16, 16, "#b8d8ff", opacity="0.75"),
+            self._rect(-72, 8, 24, 24, "#2f7fd8"),
+            self._rect(-64, 0, 24, 24, "#050505"),
+            self._rect(-60, 4, 16, 16, "#2f7fd8"),
+            self._rect(-28, 8, 24, 24, "#2f7fd8"),
+            self._rect(-20, 0, 24, 24, "#050505"),
+            self._rect(-16, 4, 16, 16, "#2f7fd8"),
+            # small smiling highlight / shine pixels
+            self._rect(-148, -36, 20, 8, "#ff8080", opacity="0.8"),
+            self._rect(-132, 32, 20, 8, "#ff8080", opacity="0.7"),
+            self._rect(58, -4, 12, 8, "#ffd6d6", opacity="0.75"),
+            self._rect(-216, -4, flame_width, 8, "#ff6d00", opacity="0.9"),
+            self._rect(-216, 8, max(16, flame_width - 12), 8, "#ffd54f", opacity="0.95"),
+        ]
+        if cargo:
+            parts.extend([
+                self._rect(-96, 32, 56, 16, "#b0bec5"),
+                self._rect(-96, 48, 40, 8, "#eceff1"),
+            ])
         if upgrade_stage >= 1:
             parts.extend([
-                self._rect(-8, -56, 16, 48, "#455", opacity="0.75"),
-                self._rect(-4, -180, 8, 28, "#777"),
-                self._rect(-8, -188, 16, 8, "#0ff", filter=f"url(#glow_{badge_id})"),
+                self._rect(-92, -64, 16, 24, "#40e0d0", filter=f"url(#glow_{badge_id})"),
+                self._rect(-100, -72, 32, 8, "#050505"),
             ])
         if upgrade_stage >= 2:
             parts.extend([
-                self._rect(-100, 56, 32, 24, "#445"),
-                self._rect(68, 56, 32, 24, "#445"),
+                self._rect(-88, 40, 24, 32, "#40e0d0", opacity="0.8"),
+                self._rect(-32, 40, 24, 32, "#40e0d0", opacity="0.8"),
             ])
         if upgrade_stage >= 3:
             parts.extend([
-                self._rect(-60, 60, 20, 52, "#2dd", opacity="0.65"),
-                self._rect(40, 60, 20, 52, "#2dd", opacity="0.65"),
+                self._rect(0, -76, 32, 16, "#ffd54f", filter=f"url(#glow_{badge_id})"),
+                self._rect(8, -84, 16, 8, "#fff59d"),
             ])
         return parts
 
+
+class ShuttleShip(PixelShipMixin, ShipRenderer):
     def render(
         self,
         hull_fill: str,
@@ -60,105 +119,55 @@ class ShuttleShip(PixelShipMixin, ShipRenderer):
         frame_index: int = 0,
         upgrade_stage: int = 0,
     ) -> str:
-        tile_fill = "#222" if color == "black" else "#333"
-        flame_height = 40 if frame_index % 2 == 0 else 56
-        parts = [
-            self._rect(-12, -156, 24, 16, tile_fill),
-            self._rect(-24, -140, 48, 36, hull_fill),
-            self._rect(-36, -104, 72, 52, hull_fill),
-            self._rect(-44, -52, 88, 132, hull_fill),
-            self._rect(-32, 80, 64, 36, hull_fill),
-            self._rect(-132, 48, 40, 52, hull_fill),
-            self._rect(-92, 24, 48, 64, hull_fill),
-            self._rect(92, 48, 40, 52, hull_fill),
-            self._rect(44, 24, 48, 64, hull_fill),
-            self._rect(-20, -24, 40, 20, "#112244", stroke="#5af", stroke_width="2"),
-            self._rect(-4, 28, 8, 76, "#dfe7ff", opacity="0.75"),
-            *self._upgrade_parts(badge_id, upgrade_stage),
-            self._rect(-24, 116, 16, flame_height, "#22aaff", opacity="0.75"),
-            self._rect(8, 116, 16, flame_height, "#22aaff", opacity="0.75"),
-        ]
-        return f'<g transform="translate(0, -20)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
+        parts = self._cute_ship_parts(
+            hull_fill="#fff7ef" if color != "black" else "#303038",
+            badge_id=badge_id,
+            accent_fill="#d62839",
+            window_fill="#8fb7ff",
+            frame_index=frame_index,
+            upgrade_stage=upgrade_stage,
+        )
+        return f'<g transform="translate(26, -4)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
 
 
 class RocketShip(PixelShipMixin, ShipRenderer):
-    def _upgrade_parts(self, badge_id: str, upgrade_stage: int) -> list[str]:
-        parts: list[str] = []
-        if upgrade_stage >= 1:
-            parts.extend([self._rect(-48, 24, 12, 84, "#666"), self._rect(36, 24, 12, 84, "#666")])
-        if upgrade_stage >= 2:
-            parts.extend([self._rect(-68, 88, 32, 40, "#444"), self._rect(36, 88, 32, 40, "#444")])
-        if upgrade_stage >= 3:
-            parts.append(self._rect(-20, 28, 40, 32, "#ffd54f", opacity="0.55", filter=f"url(#glow_{badge_id})"))
-        return parts
-
     def render(self, hull_fill: str, badge_id: str, color: str, frame_index: int = 0, upgrade_stage: int = 0) -> str:
-        flame_height = 52 if frame_index % 2 == 0 else 72
-        parts = [
-            self._rect(-8, -148, 16, 32, "#cfd8dc"),
-            self._rect(-16, -116, 32, 36, hull_fill),
-            self._rect(-28, -80, 56, 188, hull_fill),
-            self._rect(-28, 8, 56, 8, "#222"),
-            self._rect(-28, 80, 56, 8, "#222"),
-            self._rect(-60, 96, 32, 56, hull_fill),
-            self._rect(28, 96, 32, 56, hull_fill),
-            *self._upgrade_parts(badge_id, upgrade_stage),
-            self._rect(-16, 108, 32, 40, "#222"),
-            self._rect(-12, 148, 24, flame_height, "#ff6d00", opacity="0.85"),
-            self._rect(-6, 148, 12, max(24, flame_height - 16), "#ffd54f", opacity="0.9"),
-        ]
-        return f'<g transform="translate(0, -30)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
+        parts = self._cute_ship_parts(
+            hull_fill="#fffaf2" if color != "black" else "#303038",
+            badge_id=badge_id,
+            accent_fill="#ff7043",
+            window_fill="#93c5fd",
+            frame_index=frame_index,
+            upgrade_stage=upgrade_stage,
+        )
+        parts.extend([self._rect(-168, -72, 40, 16, "#ff7043"), self._rect(-168, 56, 40, 16, "#ff7043")])
+        return f'<g transform="translate(34, -2)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
 
 
 class InterceptorShip(PixelShipMixin, ShipRenderer):
-    def _upgrade_parts(self, badge_id: str, upgrade_stage: int) -> list[str]:
-        parts: list[str] = []
-        if upgrade_stage >= 1:
-            parts.extend([self._rect(-132, 36, 48, 36, "#445"), self._rect(84, 36, 48, 36, "#445")])
-        if upgrade_stage >= 2:
-            parts.append(self._rect(-8, -148, 16, 32, "#ccd"))
-        if upgrade_stage >= 3:
-            parts.append(self._rect(-16, -28, 32, 24, "#55f", opacity="0.55", filter=f"url(#glow_{badge_id})"))
-        return parts
-
     def render(self, hull_fill: str, badge_id: str, color: str, frame_index: int = 0, upgrade_stage: int = 0) -> str:
-        parts = [
-            self._rect(-12, -124, 24, 48, hull_fill),
-            self._rect(-24, -76, 48, 64, hull_fill),
-            self._rect(-32, -12, 64, 112, hull_fill),
-            self._rect(-104, 28, 72, 40, hull_fill),
-            self._rect(-88, 68, 56, 32, hull_fill),
-            self._rect(32, 28, 72, 40, hull_fill),
-            self._rect(32, 68, 56, 32, hull_fill),
-            *self._upgrade_parts(badge_id, upgrade_stage),
-            self._rect(-12, -56, 24, 48, "#112244", stroke="#5af", stroke_width="2"),
-            self._rect(-36, 100, 12, 16, "#0ff", filter=f"url(#glow_{badge_id})"),
-            self._rect(24, 100, 12, 16, "#0ff", filter=f"url(#glow_{badge_id})"),
-        ]
-        return f'<g transform="translate(0, 0)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
+        parts = self._cute_ship_parts(
+            hull_fill="#f5f3ff" if color != "black" else "#27272a",
+            badge_id=badge_id,
+            accent_fill="#7c3aed",
+            window_fill="#a5b4fc",
+            frame_index=frame_index,
+            upgrade_stage=upgrade_stage,
+        )
+        parts.extend([self._rect(-132, -72, 88, 16, "#7c3aed"), self._rect(-132, 56, 88, 16, "#7c3aed")])
+        return f'<g transform="translate(34, -2)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
 
 
 class LifterShip(PixelShipMixin, ShipRenderer):
-    def _upgrade_parts(self, badge_id: str, upgrade_stage: int) -> list[str]:
-        parts: list[str] = []
-        if upgrade_stage >= 1:
-            parts.extend([self._rect(-88, -8, 24, 88, "#99f"), self._rect(64, -8, 24, 88, "#99f")])
-        if upgrade_stage >= 2:
-            parts.append(self._rect(-12, -116, 24, 36, "#ddf"))
-        if upgrade_stage >= 3:
-            parts.append(self._rect(-10, 100, 20, 44, "#0ff", opacity="0.55", filter=f"url(#glow_{badge_id})"))
-        return parts
-
     def render(self, hull_fill: str, badge_id: str, color: str, frame_index: int = 0, upgrade_stage: int = 0) -> str:
-        parts = [
-            self._rect(-32, -84, 64, 184, "#e76"),
-            self._rect(-72, -20, 32, 140, "#fff"),
-            self._rect(-64, -52, 16, 32, "#fff"),
-            self._rect(40, -20, 32, 140, "#fff"),
-            self._rect(48, -52, 16, 32, "#fff"),
-            *self._upgrade_parts(badge_id, upgrade_stage),
-            self._rect(-20, -44, 40, 24, "#222"),
-            self._rect(-24, -20, 48, 100, hull_fill, stroke="#333", stroke_width="2"),
-            self._rect(-12, 80, 24, 20, hull_fill),
-        ]
-        return f'<g transform="translate(0, -10)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'
+        parts = self._cute_ship_parts(
+            hull_fill="#fff7ed",
+            badge_id=badge_id,
+            accent_fill="#f97316",
+            window_fill="#7dd3fc",
+            frame_index=frame_index,
+            upgrade_stage=upgrade_stage,
+            cargo=True,
+        )
+        parts.extend([self._rect(-172, -72, 32, 16, "#f97316"), self._rect(-172, 56, 32, 16, "#f97316")])
+        return f'<g transform="translate(34, -2)" shape-rendering="crispEdges">\n    {self._parts(parts)}\n</g>'

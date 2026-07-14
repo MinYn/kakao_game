@@ -53,27 +53,51 @@
 
     <g transform="translate(256, 256) scale(1.1)"
        filter="url(#shadow_badge_0)">
-        <g transform="translate(0, -20)" shape-rendering="crispEdges">
-    <rect x="-12" y="-156" width="24" height="16" fill="#333"/>
-    <rect x="-24" y="-140" width="48" height="36" fill="url(#hull_badge_0)"/>
-    <rect x="-36" y="-104" width="72" height="52" fill="url(#hull_badge_0)"/>
-    <rect x="-44" y="-52" width="88" height="132" fill="url(#hull_badge_0)"/>
-    <rect x="-32" y="80" width="64" height="36" fill="url(#hull_badge_0)"/>
-    <rect x="-132" y="48" width="40" height="52" fill="url(#hull_badge_0)"/>
-    <rect x="-92" y="24" width="48" height="64" fill="url(#hull_badge_0)"/>
-    <rect x="92" y="48" width="40" height="52" fill="url(#hull_badge_0)"/>
-    <rect x="44" y="24" width="48" height="64" fill="url(#hull_badge_0)"/>
-    <rect x="-20" y="-24" width="40" height="20" fill="#112244" stroke="#5af" stroke-width="2"/>
-    <rect x="-4" y="28" width="8" height="76" fill="#dfe7ff" opacity="0.75"/>
-    <rect x="-8" y="-56" width="16" height="48" fill="#455" opacity="0.75"/>
-    <rect x="-4" y="-180" width="8" height="28" fill="#777"/>
-    <rect x="-8" y="-188" width="16" height="8" fill="#0ff" filter="url(#glow_badge_0)"/>
-    <rect x="-100" y="56" width="32" height="24" fill="#445"/>
-    <rect x="68" y="56" width="32" height="24" fill="#445"/>
-    <rect x="-60" y="60" width="20" height="52" fill="#2dd" opacity="0.65"/>
-    <rect x="40" y="60" width="20" height="52" fill="#2dd" opacity="0.65"/>
-    <rect x="-24" y="116" width="16" height="40" fill="#22aaff" opacity="0.75"/>
-    <rect x="8" y="116" width="16" height="40" fill="#22aaff" opacity="0.75"/>
+        <g transform="translate(26, -4)" shape-rendering="crispEdges">
+    <rect x="-124" y="-56" width="132" height="16" fill="#050505"/>
+    <rect x="-148" y="-40" width="204" height="16" fill="#050505"/>
+    <rect x="-164" y="-24" width="244" height="48" fill="#050505"/>
+    <rect x="-148" y="24" width="204" height="16" fill="#050505"/>
+    <rect x="-116" y="40" width="132" height="16" fill="#050505"/>
+    <rect x="80" y="-8" width="24" height="16" fill="#050505"/>
+    <rect x="-188" y="-8" width="24" height="16" fill="#050505"/>
+    <rect x="-116" y="-40" width="120" height="16" fill="#fff7ef"/>
+    <rect x="-140" y="-24" width="188" height="48" fill="#fff7ef"/>
+    <rect x="-116" y="24" width="120" height="16" fill="#fff7ef"/>
+    <rect x="48" y="-8" width="32" height="16" fill="#fff7ef"/>
+    <rect x="-164" y="-56" width="56" height="32" fill="#d62839"/>
+    <rect x="-172" y="-48" width="16" height="16" fill="#050505"/>
+    <rect x="-164" y="24" width="56" height="32" fill="#d62839"/>
+    <rect x="-172" y="40" width="16" height="16" fill="#050505"/>
+    <rect x="-188" y="-8" width="52" height="24" fill="#d62839"/>
+    <rect x="80" y="-16" width="32" height="32" fill="#d62839"/>
+    <rect x="112" y="-8" width="16" height="16" fill="#050505"/>
+    <rect x="-36" y="-56" width="76" height="16" fill="#050505"/>
+    <rect x="-52" y="-40" width="108" height="16" fill="#050505"/>
+    <rect x="-52" y="-24" width="124" height="32" fill="#050505"/>
+    <rect x="-36" y="8" width="92" height="16" fill="#050505"/>
+    <rect x="-28" y="-40" width="60" height="16" fill="#8fb7ff"/>
+    <rect x="-44" y="-24" width="100" height="32" fill="#8fb7ff"/>
+    <rect x="-28" y="8" width="68" height="8" fill="#8fb7ff"/>
+    <rect x="16" y="-32" width="16" height="16" fill="#b8d8ff" opacity="0.9"/>
+    <rect x="32" y="-16" width="16" height="16" fill="#b8d8ff" opacity="0.75"/>
+    <rect x="-72" y="8" width="24" height="24" fill="#2f7fd8"/>
+    <rect x="-64" y="0" width="24" height="24" fill="#050505"/>
+    <rect x="-60" y="4" width="16" height="16" fill="#2f7fd8"/>
+    <rect x="-28" y="8" width="24" height="24" fill="#2f7fd8"/>
+    <rect x="-20" y="0" width="24" height="24" fill="#050505"/>
+    <rect x="-16" y="4" width="16" height="16" fill="#2f7fd8"/>
+    <rect x="-148" y="-36" width="20" height="8" fill="#ff8080" opacity="0.8"/>
+    <rect x="-132" y="32" width="20" height="8" fill="#ff8080" opacity="0.7"/>
+    <rect x="58" y="-4" width="12" height="8" fill="#ffd6d6" opacity="0.75"/>
+    <rect x="-216" y="-4" width="28" height="8" fill="#ff6d00" opacity="0.9"/>
+    <rect x="-216" y="8" width="16" height="8" fill="#ffd54f" opacity="0.95"/>
+    <rect x="-92" y="-64" width="16" height="24" fill="#40e0d0" filter="url(#glow_badge_0)"/>
+    <rect x="-100" y="-72" width="32" height="8" fill="#050505"/>
+    <rect x="-88" y="40" width="24" height="32" fill="#40e0d0" opacity="0.8"/>
+    <rect x="-32" y="40" width="24" height="32" fill="#40e0d0" opacity="0.8"/>
+    <rect x="0" y="-76" width="32" height="16" fill="#ffd54f" filter="url(#glow_badge_0)"/>
+    <rect x="8" y="-84" width="16" height="8" fill="#fff59d"/>
 </g>
     </g>
 
