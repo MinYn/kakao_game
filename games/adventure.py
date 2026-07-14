@@ -21,6 +21,19 @@ class ActivityType:
     fail_messages: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class ShipGrade:
+    """우주선 등급별 보너스와 표시 정보"""
+
+    name: str
+    icon: str
+    min_level: int
+    reward_bonus: float
+    success_bonus: float
+    jackpot_chance: float
+    description: str
+
+
 @dataclass
 class ExplorerProfile:
     """사용자별 고유 탐사대 프로필 (로컬 결정적 생성)"""
@@ -75,6 +88,7 @@ class AdventureGame(Game):
         self.enhancement_cost_multiplier = Config.ENHANCEMENT_COST_MULTIPLIER
         self.sell_multiplier = Config.ENHANCEMENT_SELL_MULTIPLIER
         self.level_bonus = Config.ENHANCEMENT_LEVEL_BONUS
+        self.ship_grades = self._init_ship_grades()
 
         self.activities = self._init_activities()
         self.activity_stats: Dict[str, int] = {a.name: 0 for a in self.activities}
@@ -83,6 +97,31 @@ class AdventureGame(Game):
         self.explorer_profile: Optional[ExplorerProfile] = None
         self.command_definitions = self._init_command_definitions()
         self._build_command_index()
+
+    def _init_ship_grades(self) -> list[ShipGrade]:
+        """레벨 기반 우주선 등급 테이블"""
+        return [
+            ShipGrade("C급 셔틀", "🟦", 0, 0.00, 0.0, 0.015, "기본형 탐사 셔틀"),
+            ShipGrade("B급 프리깃", "🟩", 3, 0.08, 1.0, 0.025, "안정적인 항로 보정 장착"),
+            ShipGrade("A급 코르벳", "🟨", 6, 0.18, 2.0, 0.040, "고출력 스캐너로 보상 탐지 강화"),
+            ShipGrade("S급 크루저", "🟧", 10, 0.32, 3.5, 0.065, "심우주 작전에 특화된 정예함"),
+            ShipGrade("SS급 스타레일", "🟥", 15, 0.50, 5.0, 0.100, "전설급 워프 코어 탑재"),
+        ]
+
+    def _get_ship_grade(self, level: Optional[int] = None) -> ShipGrade:
+        """현재 강화 레벨에 맞는 가장 높은 우주선 등급 반환"""
+        target_level = self.current_level if level is None else level
+        return max(
+            (grade for grade in self.ship_grades if target_level >= grade.min_level),
+            key=lambda grade: grade.min_level,
+        )
+
+    def _get_next_ship_grade(self) -> Optional[ShipGrade]:
+        current_grade = self._get_ship_grade()
+        for grade in self.ship_grades:
+            if grade.min_level > current_grade.min_level:
+                return grade
+        return None
 
     def _init_activities(self) -> list:
         """활동 타입 초기화"""
@@ -165,6 +204,12 @@ class AdventureGame(Game):
                 "button": {"label": "📊 상태", "messageText": "상태"},
             },
             {
+                "key": "grade",
+                "triggers": ["등급", "grade", "ship", "우주선", "티어"],
+                "handler": self._show_ship_grade,
+                "button": {"label": "🚀 등급", "messageText": "등급"},
+            },
+            {
                 "key": "passes",
                 "triggers": ["패스", "ticket", "tickets", "t"],
                 "handler": self._show_passes,
@@ -199,6 +244,7 @@ class AdventureGame(Game):
             "rescue",
             "sell",
             "status",
+            "grade",
             "passes",
         ]
 
@@ -284,11 +330,13 @@ class AdventureGame(Game):
             "🛰️ 우주 탐험 로그를 시작합니다!\n\n"
             f"{pilot_card}\n\n"
             f"현재 우주선 강화 레벨: +{self.current_level}\n"
+            f"현재 우주선 등급: {self._get_ship_grade().icon} {self._get_ship_grade().name}\n"
             f"구조 임무 패스: {challenge_passes}장\n\n"
             "명령어:\n"
             "✨ 강화: '성장'/'train'/'강화'/'업그레이드' (골드 사용)\n"
             "💾 정산: '정산'/'sell' (강화 단계 초기화 후 보상)\n"
-            "📊 상태보기: '상태'/'status'\n\n"
+            "📊 상태보기: '상태'/'status'\n"
+            "🚀 등급보기: '등급'/'grade'\n\n"
             "🎯 활동:\n"
             "- '정찰'/'scout': 기본 센서 임무\n"
             "- '탐사'/'survey': 샘플 채취 (패스 드랍 가능)\n"
@@ -308,7 +356,7 @@ class AdventureGame(Game):
 
         fallback = (
             "알 수 없는 명령입니다.\n"
-            "사용 가능한 명령: 성장, 정산, 정찰, 탐사, 구조, 패스, 상태"
+            "사용 가능한 명령: 성장, 정산, 정찰, 탐사, 구조, 패스, 상태, 등급"
         )
         if start_message:
             return f"{start_message}\n\n{fallback}"
@@ -327,7 +375,8 @@ class AdventureGame(Game):
     def _calculate_success_rate(self, activity: Optional[ActivityType] = None) -> float:
         """성공 확률 계산"""
         base_rate = activity.success_rate if activity else 80.0
-        boosted = min(base_rate + (self.current_level * 2), 98.0)
+        grade_bonus = self._get_ship_grade().success_bonus
+        boosted = min(base_rate + (self.current_level * 2) + grade_bonus, 98.0)
         return max(boosted, 25.0)
 
     def _calculate_sell_price(self) -> int:
@@ -381,12 +430,21 @@ class AdventureGame(Game):
                 self.point_system.update_game_stats(user_id=self.user_id, enhancement_successes=1)
 
             next_cost = self._calculate_cost()
+            grade = self._get_ship_grade()
+            next_grade = self._get_next_ship_grade()
+            grade_hint = (
+                f"다음 등급까지: +{next_grade.min_level} ({next_grade.icon} {next_grade.name})"
+                if next_grade
+                else "최고 등급 달성!"
+            )
             return (
                 "✅ 강화 성공!\n\n"
                 f"현재 우주선 강화 레벨: +{self.current_level}\n"
+                f"우주선 등급: {grade.icon} {grade.name}\n"
+                f"{grade_hint}\n"
                 f"다음 강화 필요 골드: {next_cost}G\n"
                 f"현재 골드: {self.get_user_points()}G\n\n"
-                "💡 강화 레벨이 오르면 임무 보상이 커집니다."
+                "💡 등급이 오르면 임무 보상/성공률/잭팟 확률이 함께 커집니다."
             )
 
         self.game_data["failures"] = self.game_data.get("failures", 0) + 1
@@ -448,11 +506,21 @@ class AdventureGame(Game):
         return None
 
     def _calculate_activity_reward(self, activity: ActivityType) -> int:
-        reward_multiplier = 1.0 + (
-            self.current_level * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER)
+        grade = self._get_ship_grade()
+        reward_multiplier = (
+            1.0
+            + (self.current_level * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER))
+            + grade.reward_bonus
         )
         base_reward = random.randint(*activity.reward_range)
-        return int((activity.base_reward + base_reward) * reward_multiplier)
+        reward = int((activity.base_reward + base_reward) * reward_multiplier)
+
+        # 짧은 보상 피크를 만드는 랜덤 보너스: 일반 크리티컬 + 등급별 잭팟
+        if random.random() < 0.08:
+            reward = int(reward * random.choice((1.5, 1.75, 2.0)))
+        if random.random() < grade.jackpot_chance:
+            reward = int(reward * random.choice((2.5, 3.0, 5.0)))
+        return reward
 
     def _perform_activity(self, activity_name: str) -> str:
         activity = self._get_activity_type(activity_name)
@@ -503,6 +571,7 @@ class AdventureGame(Game):
                 "",
                 description,
                 f"💰 리워드 +{reward}G (성장 레벨 +{self.current_level}, 배율 {reward_multiplier:.1f}%)",
+                f"🚀 등급 보너스: {self._get_ship_grade().icon} {self._get_ship_grade().name} (+{self._get_ship_grade().reward_bonus * 100:.0f}% 보상)",
                 "",
             ]
 
@@ -534,6 +603,35 @@ class AdventureGame(Game):
             f"\n\n현재 성공 확률: {success_rate:.1f}%"
         )
 
+    def _show_ship_grade(self) -> str:
+        """우주선 등급/랜덤 보너스 안내"""
+        current_grade = self._get_ship_grade()
+        next_grade = self._get_next_ship_grade()
+        lines = [
+            "🚀 우주선 등급 현황",
+            "",
+            f"현재: {current_grade.icon} {current_grade.name} (+{self.current_level})",
+            f"효과: 보상 +{current_grade.reward_bonus * 100:.0f}%, 성공률 +{current_grade.success_bonus:.1f}%p, 잭팟 {current_grade.jackpot_chance * 100:.1f}%",
+            f"설명: {current_grade.description}",
+            "",
+            "🎲 랜덤 보너스",
+            "- 모든 성공 임무: 8% 확률로 1.5~2.0배 크리티컬 보상",
+            "- 높은 등급일수록: 2.5~5.0배 잭팟 확률 증가",
+        ]
+
+        if next_grade:
+            lines.extend(
+                [
+                    "",
+                    f"다음 목표: +{next_grade.min_level} {next_grade.icon} {next_grade.name}",
+                    f"다음 효과: 보상 +{next_grade.reward_bonus * 100:.0f}%, 성공률 +{next_grade.success_bonus:.1f}%p, 잭팟 {next_grade.jackpot_chance * 100:.1f}%",
+                ]
+            )
+        else:
+            lines.extend(["", "🏆 최고 등급입니다. 정산으로 다시 성장 루프를 돌릴 수 있어요!"])
+
+        return "\n".join(lines)
+
     def _show_passes(self) -> str:
         passes = self._get_challenge_passes()
         drop_rate_percent = Config.BOSS_TICKET_DROP_RATE * 100
@@ -555,6 +653,7 @@ class AdventureGame(Game):
             "",
             "✨ 우주선 강화:",
             f"- 강화 레벨: +{self.current_level}",
+            f"- 우주선 등급: {self._get_ship_grade().icon} {self._get_ship_grade().name}",
             f"- 다음 강화 비용: {cost}G",
             f"- 강화 성공률: {success_rate:.1f}%",
             f"- 정산 예상 보상: {sell_price}G",
