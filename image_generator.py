@@ -3,9 +3,11 @@
 강화 및 사냥 결과를 PNG 이미지로 생성
 """
 from typing import Optional
+import hashlib
 import io
 import importlib.util
 import os
+import threading
 import tempfile
 
 try:
@@ -29,6 +31,9 @@ class ImageGenerator:
     def __init__(self, output_dir: Optional[str] = None, icons_dir: Optional[str] = None):
         self.output_dir = output_dir or tempfile.gettempdir()
         os.makedirs(self.output_dir, exist_ok=True)
+        self._cache_dir = os.path.join(self.output_dir, "image_cache")
+        os.makedirs(self._cache_dir, exist_ok=True)
+        self._cache_lock = threading.RLock()
         # 아이콘 디렉토리 (기본값: 프로젝트 루트의 icons 폴더)
         self.icons_dir = icons_dir or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icons')
         os.makedirs(self.icons_dir, exist_ok=True)
@@ -199,11 +204,18 @@ class ImageGenerator:
         if not svg_code:
             raise ValueError("SVG 코드가 필요합니다.")
 
+        cached_png = self._cached_path("png", filename_prefix, svg_code)
+        if os.path.exists(cached_png):
+            return cached_png
+
         if self._has_cairosvg():
-            try:
-                return self._write_svg_as_png(svg_code, filename_prefix)
-            except Exception as e:
-                print(f"⚠️ SVG PNG 변환 실패: {e}")
+            with self._cache_lock:
+                if os.path.exists(cached_png):
+                    return cached_png
+                try:
+                    return self._write_svg_as_png(svg_code, cached_png)
+                except Exception as e:
+                    print(f"⚠️ SVG PNG 변환 실패: {e}")
 
         if HAS_PIL:
             return self._write_placeholder_png(filename_prefix)
@@ -219,40 +231,50 @@ class ImageGenerator:
         if not svg_frames:
             raise ValueError("SVG 프레임이 필요합니다.")
 
+        cache_key_source = "\n---frame---\n".join(svg_frames) + f":duration={duration_ms}"
+        cached_gif = self._cached_path("gif", filename_prefix, cache_key_source)
+        if os.path.exists(cached_gif):
+            return cached_gif
+
         if not self._has_cairosvg() or not HAS_PIL:
             return self.generate_svg_image(svg_frames[0], filename_prefix=filename_prefix)
 
         import cairosvg
 
-        images = []
-        for frame in svg_frames:
-            png_bytes = cairosvg.svg2png(bytestring=frame.encode("utf-8"))
-            images.append(Image.open(io.BytesIO(png_bytes)).convert("RGBA"))
+        with self._cache_lock:
+            if os.path.exists(cached_gif):
+                return cached_gif
+            images = []
+            for frame in svg_frames:
+                png_bytes = cairosvg.svg2png(bytestring=frame.encode("utf-8"))
+                images.append(Image.open(io.BytesIO(png_bytes)).convert("RGBA"))
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".gif", prefix=f"{filename_prefix}_", dir=self.output_dir, delete=False
-        ) as temp_file:
             images[0].save(
-                temp_file.name,
+                cached_gif,
                 save_all=True,
                 append_images=images[1:],
                 duration=duration_ms,
                 loop=0,
                 disposal=2,
             )
-            return temp_file.name
+            return cached_gif
 
     def _has_cairosvg(self) -> bool:
         return importlib.util.find_spec("cairosvg") is not None
 
-    def _write_svg_as_png(self, svg_code: str, filename_prefix: str) -> str:
+    def _cached_path(self, extension: str, filename_prefix: str, content: str) -> str:
+        safe_prefix = "".join(
+            character if character.isalnum() or character in {"-", "_"} else "_"
+            for character in filename_prefix
+        )
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:24]
+        return os.path.join(self._cache_dir, f"{safe_prefix}_{digest}.{extension}")
+
+    def _write_svg_as_png(self, svg_code: str, output_path: str) -> str:
         import cairosvg
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".png", prefix=f"{filename_prefix}_", dir=self.output_dir, delete=False
-        ) as temp_file:
-            cairosvg.svg2png(bytestring=svg_code.encode("utf-8"), write_to=temp_file.name)
-            return temp_file.name
+        cairosvg.svg2png(bytestring=svg_code.encode("utf-8"), write_to=output_path)
+        return output_path
 
     def _write_svg(self, svg_code: str, filename_prefix: str) -> str:
         with tempfile.NamedTemporaryFile(

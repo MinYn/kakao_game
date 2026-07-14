@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 import random
 from typing import Optional
 
@@ -49,6 +50,7 @@ def generate_svg_frames(
     ]
 
 
+@lru_cache(maxsize=1024)
 def _build_svg(
     variant: BadgeVariant,
     index: int,
@@ -69,17 +71,19 @@ def _build_svg(
     upgrade_overlay = _get_upgrade_overlay(badge_id, upgrade_stage)
 
     return f"""
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full" shape-rendering="crispEdges">
     {defs}
 
     <g clip-path="url(#clip_{badge_id})">
         <rect width="512" height="512" fill="url(#bg_{badge_id})" />
-        <g fill="#FFF" fill-opacity="0.8">
-            {_generate_stars(star_random, 10 + max(upgrade_stage, 0) * 2)}
+        <g fill="#ffffff" fill-opacity="0.95" shape-rendering="crispEdges">
+            {_generate_stars(star_random, 14 + max(upgrade_stage, 0) * 2)}
         </g>
-        <path d="M-100 450 Q256 {'480' if variant.shape == ShipShape.ROCKET else '350'} 612 450 V512 H-100 Z"
-              fill="{_get_atmosphere_color(variant.color)}" fill-opacity="0.2"
-              filter="url(#glow_{badge_id})" />
+        <g opacity="0.55" shape-rendering="crispEdges">
+            {_generate_pixel_clouds(badge_id)}
+        </g>
+        <path d="M-100 438 Q256 {'462' if variant.shape == ShipShape.ROCKET else '374'} 612 438 V512 H-100 Z"
+              fill="{_get_atmosphere_color(variant.color)}" fill-opacity="0.32" />
     </g>
 
     <g transform="translate(256, 256) scale({'0.9' if variant.shape == ShipShape.ROCKET else '1.1'})"
@@ -89,21 +93,26 @@ def _build_svg(
 
     {upgrade_overlay}
 
-    <g>
-        <circle cx="256" cy="256" r="230" fill="none" stroke="url(#frame_{badge_id})" stroke-width="8" />
-        <path d="M256 26 V46 M476 256 H456 M256 486 V466 M36 256 H56"
-              stroke="#000" stroke-width="4" opacity="0.5" />
+    <g shape-rendering="crispEdges">
+        <circle cx="256" cy="256" r="238" fill="none" stroke="#ff8fab" stroke-width="12" />
+        <circle cx="256" cy="256" r="226" fill="none" stroke="#fff0f6" stroke-width="10" />
+        <circle cx="256" cy="256" r="214" fill="none" stroke="#ff5d8f"
+                stroke-width="8" stroke-dasharray="12 10" />
+        <path d="M256 24 V48 M488 256 H464 M256 488 V464 M24 256 H48"
+              stroke="#3b1d2f" stroke-width="8" opacity="0.45" />
 
-        <path d="M156 80 A 180 180 0 0 1 356 80" id="curve_{badge_id}" fill="none" />
-        <text font-family="sans-serif" font-size="14" font-weight="bold" fill="url(#frame_{badge_id})"
+        <path d="M144 78 A 190 190 0 0 1 368 78" id="curve_{badge_id}" fill="none" />
+        <text font-family="Galmuri11, monospace" font-size="18" font-weight="bold"
+              fill="#ff5d8f" stroke="#3b1d2f" stroke-width="1" paint-order="stroke"
               letter-spacing="2" text-anchor="middle">
             <textPath href="#curve_{badge_id}" startOffset="50%">{variant.name}</textPath>
         </text>
 
-        <path d="M196 460 L216 430 H296 L316 460 H196 Z"
-              fill="url(#frame_{badge_id})" filter="url(#shadow_{badge_id})" />
-        <text x="256" y="452" font-family="sans-serif" font-size="14" font-weight="bold"
-              fill="#3e2b00" text-anchor="middle" letter-spacing="1">{variant.sub}</text>
+        <rect x="178" y="426" width="156" height="42" fill="#3b1d2f" />
+        <rect x="190" y="414" width="132" height="54" fill="#ffd166" />
+        <rect x="206" y="406" width="100" height="8" fill="#fff3b0" />
+        <text x="256" y="451" font-family="Galmuri11, monospace" font-size="16" font-weight="bold"
+              fill="#3b1d2f" text-anchor="middle" letter-spacing="2">{variant.sub}</text>
     </g>
 </svg>
 """.strip()
@@ -123,8 +132,9 @@ def _get_defs(badge_id: str, color: str) -> str:
     return f"""
 <defs>
     <linearGradient id="bg_{badge_id}" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#050510" />
-        <stop offset="100%" stop-color="#101020" />
+        <stop offset="0%" stop-color="#6d5dfc" />
+        <stop offset="55%" stop-color="#9b5de5" />
+        <stop offset="100%" stop-color="#f15bb5" />
     </linearGradient>
     <linearGradient id="hull_{badge_id}" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stop-color="{hull_colors[0]}" />
@@ -132,15 +142,15 @@ def _get_defs(badge_id: str, color: str) -> str:
         <stop offset="100%" stop-color="{hull_colors[2]}" />
     </linearGradient>
     <linearGradient id="frame_{badge_id}" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#bf953f" />
-        <stop offset="50%" stop-color="#fcf6ba" />
-        <stop offset="100%" stop-color="#aa771c" />
+        <stop offset="0%" stop-color="#ff8fab" />
+        <stop offset="50%" stop-color="#ffd166" />
+        <stop offset="100%" stop-color="#80ed99" />
     </linearGradient>
     <filter id="shadow_{badge_id}" x="-50%" y="-50%" width="200%" height="200%">
-        <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.6"/>
+        <feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#000" flood-opacity="0.6"/>
     </filter>
     <filter id="glow_{badge_id}">
-        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feGaussianBlur stdDeviation="1" result="blur"/>
         <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
     <clipPath id="clip_{badge_id}">
@@ -202,16 +212,38 @@ def _get_upgrade_overlay(badge_id: str, upgrade_stage: int) -> str:
 def _generate_stars(rng: random.Random, count: int) -> str:
     stars: list[str] = []
     for _ in range(count):
-        cx = rng.random() * 512
-        cy = rng.random() * 512
-        radius = rng.random() * 1.5 + 0.5
-        stars.append(f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{radius:.2f}" />')
+        x = int(rng.random() * 480) + 16
+        y = int(rng.random() * 360) + 40
+        size = 4 if rng.random() < 0.7 else 6
+        stars.append(f'<rect x="{x}" y="{y}" width="{size}" height="{size}" />')
     return "\n".join(stars)
+
+
+def _generate_pixel_clouds(badge_id: str) -> str:
+    return f"""
+<g fill="#ffc8dd">
+    <rect x="70" y="116" width="44" height="16" />
+    <rect x="86" y="100" width="54" height="16" />
+    <rect x="376" y="146" width="48" height="16" />
+    <rect x="352" y="162" width="72" height="16" />
+</g>
+<g fill="#cdb4db">
+    <rect x="64" y="336" width="56" height="16" />
+    <rect x="392" y="314" width="48" height="16" />
+</g>
+<g fill="url(#frame_{badge_id})" opacity="0.45">
+    <rect x="142" y="74" width="8" height="8" />
+    <rect x="362" y="92" width="8" height="8" />
+    <rect x="118" y="270" width="8" height="8" />
+</g>
+""".strip()
 
 
 def _get_atmosphere_color(color: str) -> str:
     if color == "orange":
-        return "#ff4400"
+        return "#ffb703"
     if color == "gold":
-        return "#ffd700"
-    return "#0066ff"
+        return "#ffe066"
+    if color in {"blue", "dark", "black"}:
+        return "#80ed99"
+    return "#8ecae6"
