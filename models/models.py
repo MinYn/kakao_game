@@ -83,3 +83,23 @@ class GameStats(Base):
     def __repr__(self):
         return f"<GameStats(user_id='{self.user_id}', total_hunts={self.total_hunts})>"
 
+
+class ShipCollection(Base):
+    """우주선 수집 도감 테이블 모델"""
+    __tablename__ = "ship_collection"
+
+    user_id = Column(String(255), primary_key=True)
+    ship_id = Column(String(100), primary_key=True)
+    acquired_count = Column(Integer, nullable=False, default=1)
+    first_acquired_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_acquired_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index('idx_ship_collection_user_id', 'user_id'),
+    )
+
+    def __repr__(self):
+        return (
+            f"<ShipCollection(user_id='{self.user_id}', "
+            f"ship_id='{self.ship_id}', acquired_count={self.acquired_count})>"
+        )

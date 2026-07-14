@@ -277,6 +277,50 @@ class GoldSystemPostgres:
                     }
                     for row in results
                 ]
+
+    def add_ship_to_collection(self, user_id: str, ship_id: str) -> dict:
+        """우주선 도감에 함선 추가. 중복 획득 시 카운트만 증가."""
+        with PostgreSQLManager.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    '''
+                    INSERT INTO ship_collection (user_id, ship_id, acquired_count)
+                    VALUES (%s, %s, 1)
+                    ON CONFLICT (user_id, ship_id)
+                    DO UPDATE SET
+                        acquired_count = ship_collection.acquired_count + 1,
+                        last_acquired_at = CURRENT_TIMESTAMP
+                    RETURNING acquired_count
+                    ''',
+                    (user_id, ship_id),
+                )
+                new_count = cursor.fetchone()[0]
+                conn.commit()
+                return {'ship_id': ship_id, 'is_new': new_count == 1, 'count': new_count}
+
+    def get_ship_collection(self, user_id: str) -> list[dict]:
+        """사용자 우주선 도감 조회"""
+        with PostgreSQLManager.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    '''
+                    SELECT ship_id, acquired_count, first_acquired_at, last_acquired_at
+                    FROM ship_collection
+                    WHERE user_id = %s
+                    ORDER BY first_acquired_at ASC
+                    ''',
+                    (user_id,),
+                )
+                rows = cursor.fetchall()
+                return [
+                    {
+                        'ship_id': row[0],
+                        'count': row[1],
+                        'first_acquired_at': row[2],
+                        'last_acquired_at': row[3],
+                    }
+                    for row in rows
+                ]
     
     def get_boss_tickets(self, user_id: str) -> int:
         """보스몹 입장권 조회"""

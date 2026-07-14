@@ -22,16 +22,22 @@ class ActivityType:
 
 
 @dataclass(frozen=True)
-class ShipGrade:
-    """우주선 등급별 보너스와 표시 정보"""
+class ShipRarity:
+    """수집용 우주선 희귀도 정보 (전투/보상 스탯과 분리)"""
 
     name: str
     icon: str
-    min_level: int
-    reward_bonus: float
-    success_bonus: float
-    jackpot_chance: float
-    description: str
+    weight: int
+
+
+@dataclass(frozen=True)
+class CollectibleShip:
+    """도감에 등록되는 수집형 우주선"""
+
+    ship_id: str
+    name: str
+    rarity: str
+    flavor: str
 
 
 @dataclass
@@ -88,7 +94,8 @@ class AdventureGame(Game):
         self.enhancement_cost_multiplier = Config.ENHANCEMENT_COST_MULTIPLIER
         self.sell_multiplier = Config.ENHANCEMENT_SELL_MULTIPLIER
         self.level_bonus = Config.ENHANCEMENT_LEVEL_BONUS
-        self.ship_grades = self._init_ship_grades()
+        self.ship_rarities = self._init_ship_rarities()
+        self.ship_catalog = self._init_ship_catalog()
 
         self.activities = self._init_activities()
         self.activity_stats: Dict[str, int] = {a.name: 0 for a in self.activities}
@@ -98,30 +105,56 @@ class AdventureGame(Game):
         self.command_definitions = self._init_command_definitions()
         self._build_command_index()
 
-    def _init_ship_grades(self) -> list[ShipGrade]:
-        """레벨 기반 우주선 등급 테이블"""
+    def _init_ship_rarities(self) -> dict[str, ShipRarity]:
+        """수집/도감용 희귀도 테이블: 밸런스 수치와 분리해 변경이 쉽도록 유지"""
+        return {
+            "common": ShipRarity("일반", "⚪", 60),
+            "rare": ShipRarity("희귀", "🔵", 25),
+            "epic": ShipRarity("영웅", "🟣", 10),
+            "legendary": ShipRarity("전설", "🟡", 4),
+            "mythic": ShipRarity("신화", "🔴", 1),
+        }
+
+    def _init_ship_catalog(self) -> list[CollectibleShip]:
+        """우주선 도감 카탈로그. 새 우주선/희귀도 변경은 이 목록만 수정하면 됨."""
         return [
-            ShipGrade("C급 셔틀", "🟦", 0, 0.00, 0.0, 0.015, "기본형 탐사 셔틀"),
-            ShipGrade("B급 프리깃", "🟩", 3, 0.08, 1.0, 0.025, "안정적인 항로 보정 장착"),
-            ShipGrade("A급 코르벳", "🟨", 6, 0.18, 2.0, 0.040, "고출력 스캐너로 보상 탐지 강화"),
-            ShipGrade("S급 크루저", "🟧", 10, 0.32, 3.5, 0.065, "심우주 작전에 특화된 정예함"),
-            ShipGrade("SS급 스타레일", "🟥", 15, 0.50, 5.0, 0.100, "전설급 워프 코어 탑재"),
+            CollectibleShip("comet_scout", "코멧 스카우트", "common", "근거리 정찰에 최적화된 입문형 기체"),
+            CollectibleShip("cargo_mule", "카고 뮬", "common", "잔해 지대에서 부품을 안정적으로 회수하는 수송선"),
+            CollectibleShip("lunar_moth", "루나 모스", "common", "달빛 반사 도장으로 초보 조종사에게 인기"),
+            CollectibleShip("ion_falcon", "아이온 팔콘", "rare", "이온 항로를 빠르게 가로지르는 민첩한 프리깃"),
+            CollectibleShip("nebula_ray", "네뷸라 레이", "rare", "성운 속 신호 탐지에 강한 센서함"),
+            CollectibleShip("aurora_clip", "오로라 클립", "rare", "극광 입자를 연료로 쓰는 실험기"),
+            CollectibleShip("quantum_fox", "퀀텀 폭스", "epic", "짧은 양자 도약으로 위기 상황을 벗어나는 고급 기체"),
+            CollectibleShip("void_manta", "보이드 만타", "epic", "암흑 물질 표면 코팅을 두른 심우주 탐사선"),
+            CollectibleShip("solar_dragon", "솔라 드래곤", "legendary", "항성풍을 타고 날아가는 전설급 순양함"),
+            CollectibleShip("event_horizon", "이벤트 호라이즌", "mythic", "블랙홀 경계에서 회수된 신화급 함선"),
         ]
 
-    def _get_ship_grade(self, level: Optional[int] = None) -> ShipGrade:
-        """현재 강화 레벨에 맞는 가장 높은 우주선 등급 반환"""
-        target_level = self.current_level if level is None else level
-        return max(
-            (grade for grade in self.ship_grades if target_level >= grade.min_level),
-            key=lambda grade: grade.min_level,
-        )
+    def _get_ship_by_id(self, ship_id: str) -> Optional[CollectibleShip]:
+        return next((ship for ship in self.ship_catalog if ship.ship_id == ship_id), None)
 
-    def _get_next_ship_grade(self) -> Optional[ShipGrade]:
-        current_grade = self._get_ship_grade()
-        for grade in self.ship_grades:
-            if grade.min_level > current_grade.min_level:
-                return grade
-        return None
+    def _roll_collectible_ship(self) -> CollectibleShip:
+        """희귀도 가중치 → 해당 희귀도 내 균등 선택"""
+        rarity_keys = list(self.ship_rarities.keys())
+        weights = [self.ship_rarities[key].weight for key in rarity_keys]
+        selected_rarity = random.choices(rarity_keys, weights=weights, k=1)[0]
+        candidates = [ship for ship in self.ship_catalog if ship.rarity == selected_rarity]
+        return random.choice(candidates)
+
+    def _get_collection_records(self) -> dict[str, int]:
+        if self.point_system and hasattr(self.point_system, "get_ship_collection"):
+            records = self.point_system.get_ship_collection(self.user_id)
+            return {record["ship_id"]: record.get("count", 1) for record in records}
+        return self.game_data.setdefault("ship_collection", {})
+
+    def _grant_ship_to_collection(self, ship: CollectibleShip) -> dict:
+        if self.point_system and hasattr(self.point_system, "add_ship_to_collection"):
+            return self.point_system.add_ship_to_collection(self.user_id, ship.ship_id)
+
+        collection = self._get_collection_records()
+        old_count = collection.get(ship.ship_id, 0)
+        collection[ship.ship_id] = old_count + 1
+        return {"ship_id": ship.ship_id, "is_new": old_count == 0, "count": collection[ship.ship_id]}
 
     def _init_activities(self) -> list:
         """활동 타입 초기화"""
@@ -204,10 +237,10 @@ class AdventureGame(Game):
                 "button": {"label": "📊 상태", "messageText": "상태"},
             },
             {
-                "key": "grade",
-                "triggers": ["등급", "grade", "ship", "우주선", "티어"],
-                "handler": self._show_ship_grade,
-                "button": {"label": "🚀 등급", "messageText": "등급"},
+                "key": "codex",
+                "triggers": ["도감", "collection", "codex", "수집", "ships"],
+                "handler": self._show_ship_codex,
+                "button": {"label": "📚 도감", "messageText": "도감"},
             },
             {
                 "key": "passes",
@@ -242,9 +275,9 @@ class AdventureGame(Game):
             "scout",
             "survey",
             "rescue",
+            "codex",
             "sell",
             "status",
-            "grade",
             "passes",
         ]
 
@@ -330,13 +363,13 @@ class AdventureGame(Game):
             "🛰️ 우주 탐험 로그를 시작합니다!\n\n"
             f"{pilot_card}\n\n"
             f"현재 우주선 강화 레벨: +{self.current_level}\n"
-            f"현재 우주선 등급: {self._get_ship_grade().icon} {self._get_ship_grade().name}\n"
+            f"우주선 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종 수집\n"
             f"구조 임무 패스: {challenge_passes}장\n\n"
             "명령어:\n"
             "✨ 강화: '성장'/'train'/'강화'/'업그레이드' (골드 사용)\n"
             "💾 정산: '정산'/'sell' (강화 단계 초기화 후 보상)\n"
             "📊 상태보기: '상태'/'status'\n"
-            "🚀 등급보기: '등급'/'grade'\n\n"
+            "📚 도감보기: '도감'/'collection'\n\n"
             "🎯 활동:\n"
             "- '정찰'/'scout': 기본 센서 임무\n"
             "- '탐사'/'survey': 샘플 채취 (패스 드랍 가능)\n"
@@ -356,7 +389,7 @@ class AdventureGame(Game):
 
         fallback = (
             "알 수 없는 명령입니다.\n"
-            "사용 가능한 명령: 성장, 정산, 정찰, 탐사, 구조, 패스, 상태, 등급"
+            "사용 가능한 명령: 성장, 정산, 정찰, 탐사, 구조, 패스, 상태, 도감"
         )
         if start_message:
             return f"{start_message}\n\n{fallback}"
@@ -375,8 +408,7 @@ class AdventureGame(Game):
     def _calculate_success_rate(self, activity: Optional[ActivityType] = None) -> float:
         """성공 확률 계산"""
         base_rate = activity.success_rate if activity else 80.0
-        grade_bonus = self._get_ship_grade().success_bonus
-        boosted = min(base_rate + (self.current_level * 2) + grade_bonus, 98.0)
+        boosted = min(base_rate + (self.current_level * 2), 98.0)
         return max(boosted, 25.0)
 
     def _calculate_sell_price(self) -> int:
@@ -430,21 +462,12 @@ class AdventureGame(Game):
                 self.point_system.update_game_stats(user_id=self.user_id, enhancement_successes=1)
 
             next_cost = self._calculate_cost()
-            grade = self._get_ship_grade()
-            next_grade = self._get_next_ship_grade()
-            grade_hint = (
-                f"다음 등급까지: +{next_grade.min_level} ({next_grade.icon} {next_grade.name})"
-                if next_grade
-                else "최고 등급 달성!"
-            )
             return (
                 "✅ 강화 성공!\n\n"
                 f"현재 우주선 강화 레벨: +{self.current_level}\n"
-                f"우주선 등급: {grade.icon} {grade.name}\n"
-                f"{grade_hint}\n"
                 f"다음 강화 필요 골드: {next_cost}G\n"
                 f"현재 골드: {self.get_user_points()}G\n\n"
-                "💡 등급이 오르면 임무 보상/성공률/잭팟 확률이 함께 커집니다."
+                "💡 강화 레벨은 임무 보상에만 영향을 주고, 우주선 희귀도는 도감 수집용입니다."
             )
 
         self.game_data["failures"] = self.game_data.get("failures", 0) + 1
@@ -506,21 +529,23 @@ class AdventureGame(Game):
         return None
 
     def _calculate_activity_reward(self, activity: ActivityType) -> int:
-        grade = self._get_ship_grade()
-        reward_multiplier = (
-            1.0
-            + (self.current_level * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER))
-            + grade.reward_bonus
+        reward_multiplier = 1.0 + (
+            self.current_level * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER)
         )
         base_reward = random.randint(*activity.reward_range)
         reward = int((activity.base_reward + base_reward) * reward_multiplier)
 
-        # 짧은 보상 피크를 만드는 랜덤 보너스: 일반 크리티컬 + 등급별 잭팟
+        # 보상 피크는 등급과 분리: 모든 함선 수집 희귀도는 경제 밸런스에 영향을 주지 않음
         if random.random() < 0.08:
             reward = int(reward * random.choice((1.5, 1.75, 2.0)))
-        if random.random() < grade.jackpot_chance:
-            reward = int(reward * random.choice((2.5, 3.0, 5.0)))
         return reward
+
+    def _try_discover_ship(self, activity: ActivityType) -> Optional[tuple[CollectibleShip, dict]]:
+        discovery_chance = {"정찰": 0.08, "탐사": 0.18, "구조": 0.35}.get(activity.name, 0.10)
+        if random.random() >= discovery_chance:
+            return None
+        ship = self._roll_collectible_ship()
+        return ship, self._grant_ship_to_collection(ship)
 
     def _perform_activity(self, activity_name: str) -> str:
         activity = self._get_activity_type(activity_name)
@@ -571,9 +596,17 @@ class AdventureGame(Game):
                 "",
                 description,
                 f"💰 리워드 +{reward}G (성장 레벨 +{self.current_level}, 배율 {reward_multiplier:.1f}%)",
-                f"🚀 등급 보너스: {self._get_ship_grade().icon} {self._get_ship_grade().name} (+{self._get_ship_grade().reward_bonus * 100:.0f}% 보상)",
                 "",
             ]
+
+            discovery = self._try_discover_ship(activity)
+            if discovery:
+                ship, collection_result = discovery
+                rarity = self.ship_rarities[ship.rarity]
+                new_badge = "NEW!" if collection_result.get("is_new") else f"중복 x{collection_result.get('count', 1)}"
+                result_lines.append(f"🚀 우주선 발견: {rarity.icon} {rarity.name} [{ship.name}] ({new_badge})")
+                result_lines.append(f"📚 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종")
+                result_lines.append("")
 
             if activity.name == "탐사":
                 if random.random() < Config.BOSS_TICKET_DROP_RATE:
@@ -603,34 +636,34 @@ class AdventureGame(Game):
             f"\n\n현재 성공 확률: {success_rate:.1f}%"
         )
 
-    def _show_ship_grade(self) -> str:
-        """우주선 등급/랜덤 보너스 안내"""
-        current_grade = self._get_ship_grade()
-        next_grade = self._get_next_ship_grade()
+    def _show_ship_codex(self) -> str:
+        """수집한 우주선 도감 표시"""
+        collection = self._get_collection_records()
+        total = len(self.ship_catalog)
+        owned = len(collection)
         lines = [
-            "🚀 우주선 등급 현황",
+            "📚 우주선 도감",
             "",
-            f"현재: {current_grade.icon} {current_grade.name} (+{self.current_level})",
-            f"효과: 보상 +{current_grade.reward_bonus * 100:.0f}%, 성공률 +{current_grade.success_bonus:.1f}%p, 잭팟 {current_grade.jackpot_chance * 100:.1f}%",
-            f"설명: {current_grade.description}",
+            f"수집 현황: {owned}/{total}종 ({owned / total * 100:.0f}%)",
+            "희귀도는 수집 가치만 나타내며 보상/성공률에 영향을 주지 않습니다.",
             "",
-            "🎲 랜덤 보너스",
-            "- 모든 성공 임무: 8% 확률로 1.5~2.0배 크리티컬 보상",
-            "- 높은 등급일수록: 2.5~5.0배 잭팟 확률 증가",
         ]
 
-        if next_grade:
-            lines.extend(
-                [
-                    "",
-                    f"다음 목표: +{next_grade.min_level} {next_grade.icon} {next_grade.name}",
-                    f"다음 효과: 보상 +{next_grade.reward_bonus * 100:.0f}%, 성공률 +{next_grade.success_bonus:.1f}%p, 잭팟 {next_grade.jackpot_chance * 100:.1f}%",
-                ]
-            )
-        else:
-            lines.extend(["", "🏆 최고 등급입니다. 정산으로 다시 성장 루프를 돌릴 수 있어요!"])
+        for rarity_key, rarity in self.ship_rarities.items():
+            ships = [ship for ship in self.ship_catalog if ship.rarity == rarity_key]
+            owned_count = sum(1 for ship in ships if ship.ship_id in collection)
+            lines.append(f"{rarity.icon} {rarity.name} {owned_count}/{len(ships)}")
+            for ship in ships:
+                count = collection.get(ship.ship_id, 0)
+                if count:
+                    duplicate_text = f" x{count}" if count > 1 else ""
+                    lines.append(f"- {ship.name}{duplicate_text}: {ship.flavor}")
+                else:
+                    lines.append("- ???")
+            lines.append("")
 
-        return "\n".join(lines)
+        lines.append("💡 임무 성공 시 정찰 8% / 탐사 18% / 구조 35% 확률로 우주선을 발견합니다.")
+        return "\n".join(lines).rstrip()
 
     def _show_passes(self) -> str:
         passes = self._get_challenge_passes()
@@ -653,7 +686,7 @@ class AdventureGame(Game):
             "",
             "✨ 우주선 강화:",
             f"- 강화 레벨: +{self.current_level}",
-            f"- 우주선 등급: {self._get_ship_grade().icon} {self._get_ship_grade().name}",
+            f"- 우주선 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종",
             f"- 다음 강화 비용: {cost}G",
             f"- 강화 성공률: {success_rate:.1f}%",
             f"- 정산 예상 보상: {sell_price}G",
