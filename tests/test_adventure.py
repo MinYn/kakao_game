@@ -107,7 +107,7 @@ class AdventureGameTestCase(unittest.TestCase):
             self.assertEqual(game.current_level, 2)
             self.assertEqual(point_system.get_enhancement_level("tester"), 2)
 
-    def test_clutch_success_message_when_roll_barely_passes(self):
+    def test_close_success_gets_celebration_bonus(self):
         with tempfile.NamedTemporaryFile() as db_file:
             point_system = GoldSystem(db_file.name)
             game = AdventureGame(user_id="tester", point_system=point_system)
@@ -119,8 +119,22 @@ class AdventureGameTestCase(unittest.TestCase):
             with patch("games.adventure.random.random", return_value=clutch_roll):
                 response = game._enhance()
 
-            self.assertIn("아슬아슬 턱걸이 성공", response)
+            self.assertIn("플라즈마 오버드라이브 축하 이펙트", response)
+            self.assertIn("보너스 +", response)
             self.assertEqual(game.current_level, 1)
+
+    def test_closer_success_gets_better_celebration(self):
+        game = AdventureGame(user_id="tester")
+        game.start()
+
+        success_rate = game._calculate_success_rate()
+        best = game._get_enhancement_celebration(success_rate - 0.2, success_rate)
+        normal = game._get_enhancement_celebration(success_rate - 2.5, success_rate)
+
+        self.assertIsNotNone(best)
+        self.assertIsNotNone(normal)
+        self.assertEqual(best.name, "초신성 점화")
+        self.assertGreater(best.gold_multiplier, normal.gold_multiplier)
 
     def test_loot_reward_roll_returns_gold_drop(self):
         game = AdventureGame(user_id="tester")

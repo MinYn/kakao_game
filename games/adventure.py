@@ -51,6 +51,17 @@ class LootDrop:
     message: str
 
 
+@dataclass(frozen=True)
+class EnhancementCelebration:
+    """강화 성공선에 가까울수록 커지는 축하 이펙트"""
+
+    name: str
+    icon: str
+    max_margin: float
+    gold_multiplier: float
+    message: str
+
+
 @dataclass
 class ExplorerProfile:
     """사용자별 고유 탐사대 프로필 (로컬 결정적 생성)"""
@@ -108,6 +119,7 @@ class AdventureGame(Game):
         self.ship_rarities = self._init_ship_rarities()
         self.ship_catalog = self._init_ship_catalog()
         self.loot_table = self._init_loot_table()
+        self.enhancement_celebrations = self._init_enhancement_celebrations()
 
         self.activities = self._init_activities()
         self.activity_stats: Dict[str, int] = {a.name: 0 for a in self.activities}
@@ -148,6 +160,14 @@ class AdventureGame(Game):
             LootDrop("고철 부품 상자", "📦", 0.12, (25, 60), "버려진 부품 상자를 회수했습니다."),
             LootDrop("희귀 연료 셀", "💎", 0.045, (90, 180), "푸른빛 연료 셀이 스캐너에 잡혔습니다!"),
             LootDrop("고대 항법 코어", "🌌", 0.012, (300, 650), "고대 항법 코어가 깨어났습니다. 오늘 운이 미쳤어요!"),
+        ]
+
+    def _init_enhancement_celebrations(self) -> list[EnhancementCelebration]:
+        """성공선에 가까울수록 더 큰 이펙트/보너스 제공"""
+        return [
+            EnhancementCelebration("초신성 점화", "🌠", 0.5, 0.50, "성공선 바로 위에서 코어가 폭발적으로 점화됐습니다!"),
+            EnhancementCelebration("플라즈마 오버드라이브", "⚡", 1.5, 0.30, "거의 미끄러질 뻔한 순간 출력이 치솟았습니다!"),
+            EnhancementCelebration("스파크 세리머니", "✨", 3.0, 0.15, "아슬아슬한 성공에 정비 드론들이 불꽃을 터뜨립니다!"),
         ]
 
     def _get_ship_by_id(self, ship_id: str) -> Optional[CollectibleShip]:
@@ -431,9 +451,19 @@ class AdventureGame(Game):
         boosted = min(base_rate + (self.current_level * 2), 98.0)
         return max(boosted, 25.0)
 
-    def _is_enhancement_clutch_success(self, roll: float, success_rate: float) -> bool:
-        """성공권 안에서 턱걸이한 경우 별도 연출"""
-        return 0 <= success_rate - roll <= 3.0
+    def _get_enhancement_celebration(
+        self,
+        roll: float,
+        success_rate: float,
+    ) -> Optional[EnhancementCelebration]:
+        """성공선에 가까운 성공일수록 더 높은 축하 이펙트 반환"""
+        margin = success_rate - roll
+        if margin < 0:
+            return None
+        for celebration in self.enhancement_celebrations:
+            if margin <= celebration.max_margin:
+                return celebration
+        return None
 
     def _is_enhancement_near_miss(self, roll: float, success_rate: float) -> bool:
         """실패 직후 5% 구간은 단계 하락을 막아 아슬아슬한 재미 제공"""
@@ -491,14 +521,29 @@ class AdventureGame(Game):
                 self.point_system.update_game_stats(user_id=self.user_id, enhancement_successes=1)
 
             next_cost = self._calculate_cost()
-            return (
-                "✅ 강화 성공!\n\n"
-                f"현재 우주선 강화 레벨: +{self.current_level}\n"
-                f"다음 강화 필요 골드: {next_cost}G\n"
-                f"현재 골드: {self.get_user_points()}G\n\n"
-                f"{'🔥 아슬아슬 턱걸이 성공! ' if self._is_enhancement_clutch_success(roll, success_rate) else ''}"
-                "💡 강화 레벨은 임무 보상에만 영향을 주고, 우주선 희귀도는 도감 수집용입니다."
-            )
+            celebration = self._get_enhancement_celebration(roll, success_rate)
+            celebration_lines: list[str] = []
+            if celebration:
+                bonus = max(int(cost * celebration.gold_multiplier), 10)
+                self.award_gold(bonus, f"강화 축하 이펙트: {celebration.name}")
+                celebration_lines = [
+                    f"{celebration.icon} {celebration.name} 축하 이펙트!",
+                    f"판정 차이 {success_rate - roll:.1f}%p — {celebration.message}",
+                    f"보너스 +{bonus}G",
+                    "",
+                ]
+
+            result_lines = [
+                "✅ 강화 성공!",
+                "",
+                f"현재 우주선 강화 레벨: +{self.current_level}",
+                f"다음 강화 필요 골드: {next_cost}G",
+                f"현재 골드: {self.get_user_points()}G",
+                "",
+            ]
+            result_lines.extend(celebration_lines)
+            result_lines.append("💡 강화 레벨은 임무 보상에만 영향을 주고, 우주선 희귀도는 도감 수집용입니다.")
+            return "\n".join(result_lines)
 
         self.game_data["failures"] = self.game_data.get("failures", 0) + 1
         if self.point_system:
@@ -830,6 +875,7 @@ class AdventureGame(Game):
             "우주 탐험 로그 도움말:\n\n"
             "✨ 우주선 강화:\n"
             "- 강화: '성장', 'train', '업그레이드'\n"
+            "- 성공선에 가까울수록 더 큰 축하 이펙트/보너스가 터져요.\n"
             "- 실패 직후 5% 구간은 보호막이 단계 하락을 막아줄 수 있어요.\n"
             "- 정산: '정산' 또는 'sell' (강화 리셋 후 보상)\n"
             "- 상태: '상태' 또는 'status'\n\n"
