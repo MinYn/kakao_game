@@ -24,3 +24,6 @@ sqlalchemy>=2.0.0
 
 # Pydantic (스키마 검증)
 pydantic>=2.0.0
+
+# Redis (캐시/rate limit/idempotency/leaderboard)
+redis>=5.0.0

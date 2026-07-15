@@ -15,9 +15,68 @@ from api.schemas import (
 from events.kafka_producer import publish_event
 from events.event_types import EventType, EventTopics, create_gold_event
 from config import Config
+from events.redis_runtime import RedisRuntime
+import logging
+
+logger = logging.getLogger(__name__)
+_redis_runtime: RedisRuntime | None = None
+
+
+def get_redis_runtime() -> RedisRuntime:
+    global _redis_runtime
+    if _redis_runtime is None:
+        _redis_runtime = RedisRuntime()
+    return _redis_runtime
+
+
+def sync_gold_leaderboard(user_id: str, gold: int) -> None:
+    if not Config.USE_REDIS:
+        return
+    try:
+        get_redis_runtime().update_leaderboard(board="gold", user_id=user_id, score=gold)
+    except Exception as exc:
+        logger.warning("Redis leaderboard sync failed: user_id=%s error=%s", user_id, exc)
+
 
 router = APIRouter(prefix="/api/gold", tags=["gold"])
 
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
+def get_leaderboard(
+    limit: int = Query(10, ge=1, le=100, description="조회 개수"),
+    db: Session = Depends(get_db)
+):
+    """리더보드 조회. Redis Sorted Set을 우선 사용하고 장애/미스 시 DB로 대체한다."""
+    total = db.query(Gold).count()
+
+    if Config.USE_REDIS:
+        try:
+            cached_entries = get_redis_runtime().get_leaderboard(board="gold", limit=limit)
+            if cached_entries:
+                return LeaderboardResponse(
+                    entries=[
+                        LeaderboardEntry(user_id=entry.user_id, gold=entry.score, rank=entry.rank)
+                        for entry in cached_entries
+                    ],
+                    total=total,
+                )
+        except Exception as exc:
+            logger.warning("Redis leaderboard read failed; falling back to DB: %s", exc)
+
+    golds = db.query(Gold)\
+        .order_by(Gold.gold.desc())\
+        .limit(limit)\
+        .all()
+
+    entries = [
+        LeaderboardEntry(user_id=g.user_id, gold=g.gold, rank=idx + 1)
+        for idx, g in enumerate(golds)
+    ]
+
+    for entry in entries:
+        sync_gold_leaderboard(entry.user_id, entry.gold)
+
+    return LeaderboardResponse(entries=entries, total=total)
 
 @router.get("/{user_id}", response_model=GoldResponse)
 def get_gold(user_id: str, db: Session = Depends(get_db)):
@@ -55,6 +114,7 @@ def add_gold(
     
     db.commit()
     db.refresh(gold)
+    sync_gold_leaderboard(user_id, gold.gold)
     
     # Kafka 이벤트 발행
     if Config.USE_KAFKA:
@@ -92,6 +152,7 @@ def deduct_gold(
     
     db.commit()
     db.refresh(gold)
+    sync_gold_leaderboard(user_id, gold.gold)
     
     # Kafka 이벤트 발행
     if Config.USE_KAFKA:
@@ -124,6 +185,7 @@ def set_gold(
     
     db.commit()
     db.refresh(gold)
+    sync_gold_leaderboard(user_id, gold.gold)
     return gold
 
 
@@ -170,6 +232,8 @@ def transfer_gold(
     db.commit()
     db.refresh(from_gold)
     db.refresh(to_gold)
+    sync_gold_leaderboard(transfer.from_user, from_gold.gold)
+    sync_gold_leaderboard(transfer.to_user, to_gold.gold)
     
     # Kafka 이벤트 발행
     if Config.USE_KAFKA:
@@ -209,22 +273,3 @@ def get_gold_history(
     return history
 
 
-@router.get("/leaderboard", response_model=LeaderboardResponse)
-def get_leaderboard(
-    limit: int = Query(10, ge=1, le=100, description="조회 개수"),
-    db: Session = Depends(get_db)
-):
-    """리더보드 조회"""
-    golds = db.query(Gold)\
-        .order_by(Gold.gold.desc())\
-        .limit(limit)\
-        .all()
-    
-    entries = [
-        LeaderboardEntry(user_id=g.user_id, gold=g.gold, rank=idx + 1)
-        for idx, g in enumerate(golds)
-    ]
-    
-    total = db.query(Gold).count()
-    
-    return LeaderboardResponse(entries=entries, total=total)
