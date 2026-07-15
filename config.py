@@ -30,6 +30,13 @@ class Config:
     POSTGRES_USER: str = os.getenv('POSTGRES_USER', 'postgres')
     POSTGRES_PASSWORD: str = os.getenv('POSTGRES_PASSWORD', 'postgres')
     
+
+    # Redis 설정 (캐시/rate limit/idempotency/leaderboard)
+    REDIS_URL: str = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    USE_REDIS: bool = os.getenv('USE_REDIS', 'true').lower() == 'true'
+    REDIS_RATE_LIMIT_PER_MINUTE: int = int(os.getenv('REDIS_RATE_LIMIT_PER_MINUTE', '120'))
+    REDIS_IDEMPOTENCY_TTL_SECONDS: int = int(os.getenv('REDIS_IDEMPOTENCY_TTL_SECONDS', '86400'))
+    REDIS_SOCKET_TIMEOUT_SECONDS: float = float(os.getenv('REDIS_SOCKET_TIMEOUT_SECONDS', '1.0'))
     # Kafka 설정
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
     USE_KAFKA: bool = os.getenv('USE_KAFKA', 'true').lower() == 'true'

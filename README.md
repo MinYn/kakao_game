@@ -120,6 +120,13 @@ python cli.py
 
 골드는 PostgreSQL 데이터베이스에 저장되며, 모든 트랜잭션이 Kafka를 통해 이벤트로 발행됩니다.
 
+### 10k RPS 대비 Redis/Kafka 역할 분리
+
+- PostgreSQL: 골드/아이템/결제처럼 정합성이 필요한 최종 저장소입니다.
+- Redis: 리더보드, rate limit, idempotency key처럼 초저지연으로 처리해야 하는 상태를 담당합니다.
+- Kafka: 골드 변동/게임 통계/플랫폼 메시지처럼 비동기 소비와 재처리가 필요한 이벤트 스트림을 담당합니다.
+- Docker Compose는 Redis, Kafka, PostgreSQL을 함께 기동하며 `REDIS_URL`, `USE_REDIS`, `REDIS_RATE_LIMIT_PER_MINUTE`로 Redis 런타임을 제어합니다.
+
 ## 게임 추가하기
 
 1. `games/` 폴더에 새 게임 파일 생성
