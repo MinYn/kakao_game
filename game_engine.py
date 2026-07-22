@@ -491,6 +491,15 @@ class GameEngine:
         if game and hasattr(game, "ship_progress"):
             return game.ship_progress.grade.value
         return "F"
+
+    def get_badge_body_enhance(self, user_id: str) -> int:
+        """활성 기체 본체 +N — 배지 하단 숫자 스타일용."""
+        game = self.active_games.get(user_id)
+        if game and hasattr(game, "ship_progress"):
+            return int(game.ship_progress.body_enhance)
+        if game and hasattr(game, "current_level"):
+            return int(game.current_level)
+        return 0
     
     def get_hunt_image_data(self, user_id: str, command: str, response: str) -> Optional[Dict[str, Any]]:
         """사냥 이미지 생성에 필요한 데이터 반환
