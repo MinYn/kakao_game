@@ -1,0 +1,35 @@
+# master 브랜치에 push(머지 포함)되면 NAS self-hosted runner 에서 자동 배포
+name: Deploy to NAS
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch: # 수동 배포
+
+concurrency:
+  group: deploy-nas-master
+  cancel-in-progress: false # 진행 중 배포 중단하지 않음
+
+jobs:
+  deploy:
+    name: Deploy on NAS
+    runs-on: [self-hosted, Linux, X64, nas]
+    timeout-minutes: 30
+
+    steps:
+      - name: Deploy (pull, build, restart)
+        run: |
+          set -euo pipefail
+          DEPLOY_DIR="${DEPLOY_DIR:-/home/miny/github/kakao_game}"
+          SCRIPT="${DEPLOY_DIR}/scripts/deploy_nas.sh"
+
+          # 배포 스크립트가 아직 없는 첫 배포를 위해 저장소에서 한 번 pull 시도
+          if [[ ! -x "$SCRIPT" ]]; then
+            echo "배포 스크립트가 없어 origin/master 를 먼저 동기화합니다..."
+            git -C "$DEPLOY_DIR" fetch --prune origin
+            git -C "$DEPLOY_DIR" checkout master
+            git -C "$DEPLOY_DIR" reset --hard origin/master
+          fi
+
+          bash "$SCRIPT"
