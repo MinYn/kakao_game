@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full" shape-rendering="crispEdges">
+    <defs>
+    <linearGradient id="bg_badge_406" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6d5dfc" />
+        <stop offset="55%" stop-color="#9b5de5" />
+        <stop offset="100%" stop-color="#f15bb5" />
+    </linearGradient>
+    <linearGradient id="hull_badge_406" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#1a1a1a" />
+        <stop offset="50%" stop-color="#333333" />
+        <stop offset="100%" stop-color="#000000" />
+    </linearGradient>
+    <linearGradient id="frame_badge_406" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff8fab" />
+        <stop offset="50%" stop-color="#ffd166" />
+        <stop offset="100%" stop-color="#80ed99" />
+    </linearGradient>
+    <filter id="shadow_badge_406" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="glow_badge_406">
+        <feGaussianBlur stdDeviation="1" result="blur"/>
+        <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <clipPath id="clip_badge_406">
+        <circle cx="256" cy="256" r="240" />
+    </clipPath>
+</defs>
+
+    <g clip-path="url(#clip_badge_406)">
+        <rect width="512" height="512" fill="url(#bg_badge_406)" />
+        <g fill="#ffffff" fill-opacity="0.95" shape-rendering="crispEdges">
+            <rect x="182" y="122" width="4" height="4" />
+<rect x="462" y="156" width="4" height="4" />
+<rect x="116" y="226" width="6" height="6" />
+<rect x="164" y="94" width="4" height="4" />
+<rect x="434" y="150" width="4" height="4" />
+<rect x="488" y="305" width="6" height="6" />
+<rect x="368" y="54" width="6" height="6" />
+<rect x="490" y="395" width="4" height="4" />
+<rect x="312" y="364" width="6" height="6" />
+<rect x="197" y="167" width="4" height="4" />
+<rect x="267" y="187" width="4" height="4" />
+<rect x="325" y="298" width="4" height="4" />
+<rect x="470" y="237" width="4" height="4" />
+<rect x="494" y="340" width="4" height="4" />
+<rect x="269" y="398" width="4" height="4" />
+<rect x="95" y="169" width="4" height="4" />
+<rect x="418" y="386" width="4" height="4" />
+<rect x="45" y="213" width="6" height="6" />
+<rect x="287" y="91" width="6" height="6" />
+<rect x="204" y="56" width="4" height="4" />
+        </g>
+        <g opacity="0.55" shape-rendering="crispEdges">
+            <g fill="#ffc8dd">
+    <rect x="70" y="116" width="44" height="16" />
+    <rect x="86" y="100" width="54" height="16" />
+    <rect x="376" y="146" width="48" height="16" />
+    <rect x="352" y="162" width="72" height="16" />
+</g>
+<g fill="#cdb4db">
+    <rect x="64" y="336" width="56" height="16" />
+    <rect x="392" y="314" width="48" height="16" />
+</g>
+<g fill="url(#frame_badge_406)" opacity="0.45">
+    <rect x="142" y="74" width="8" height="8" />
+    <rect x="362" y="92" width="8" height="8" />
+    <rect x="118" y="270" width="8" height="8" />
+</g>
+        </g>
+        <path d="M-100 438 Q256 374 612 438 V512 H-100 Z"
+              fill="#80ed99" fill-opacity="0.32" />
+    </g>
+
+    <g transform="translate(256, 256) scale(1.1)"
+       filter="url(#shadow_badge_406)">
+        <g transform="translate(26, -4)" shape-rendering="crispEdges">
+    <rect x="-124" y="-56" width="132" height="16" fill="#050505"/>
+    <rect x="-148" y="-40" width="204" height="16" fill="#050505"/>
+    <rect x="-164" y="-24" width="244" height="48" fill="#050505"/>
+    <rect x="-148" y="24" width="204" height="16" fill="#050505"/>
+    <rect x="-116" y="40" width="132" height="16" fill="#050505"/>
+    <rect x="80" y="-8" width="24" height="16" fill="#050505"/>
+    <rect x="-188" y="-8" width="24" height="16" fill="#050505"/>
+    <rect x="-116" y="-40" width="120" height="16" fill="#303038"/>
+    <rect x="-140" y="-24" width="188" height="48" fill="#303038"/>
+    <rect x="-116" y="24" width="120" height="16" fill="#303038"/>
+    <rect x="48" y="-8" width="32" height="16" fill="#303038"/>
+    <rect x="-164" y="-56" width="56" height="32" fill="#d62839"/>
+    <rect x="-172" y="-48" width="16" height="16" fill="#050505"/>
+    <rect x="-164" y="24" width="56" height="32" fill="#d62839"/>
+    <rect x="-172" y="40" width="16" height="16" fill="#050505"/>
+    <rect x="-188" y="-8" width="52" height="24" fill="#d62839"/>
+    <rect x="80" y="-16" width="32" height="32" fill="#d62839"/>
+    <rect x="112" y="-8" width="16" height="16" fill="#050505"/>
+    <rect x="-36" y="-56" width="76" height="16" fill="#050505"/>
+    <rect x="-52" y="-40" width="108" height="16" fill="#050505"/>
+    <rect x="-52" y="-24" width="124" height="32" fill="#050505"/>
+    <rect x="-36" y="8" width="92" height="16" fill="#050505"/>
+    <rect x="-28" y="-40" width="60" height="16" fill="#8fb7ff"/>
+    <rect x="-44" y="-24" width="100" height="32" fill="#8fb7ff"/>
+    <rect x="-28" y="8" width="68" height="8" fill="#8fb7ff"/>
+    <rect x="16" y="-32" width="16" height="16" fill="#b8d8ff" opacity="0.9"/>
+    <rect x="32" y="-16" width="16" height="16" fill="#b8d8ff" opacity="0.75"/>
+    <rect x="-72" y="8" width="24" height="24" fill="#2f7fd8"/>
+    <rect x="-64" y="0" width="24" height="24" fill="#050505"/>
+    <rect x="-60" y="4" width="16" height="16" fill="#2f7fd8"/>
+    <rect x="-28" y="8" width="24" height="24" fill="#2f7fd8"/>
+    <rect x="-20" y="0" width="24" height="24" fill="#050505"/>
+    <rect x="-16" y="4" width="16" height="16" fill="#2f7fd8"/>
+    <rect x="-148" y="-36" width="20" height="8" fill="#ff8080" opacity="0.8"/>
+    <rect x="-132" y="32" width="20" height="8" fill="#ff8080" opacity="0.7"/>
+    <rect x="58" y="-4" width="12" height="8" fill="#ffd6d6" opacity="0.75"/>
+    <rect x="-216" y="-4" width="28" height="8" fill="#ff6d00" opacity="0.9"/>
+    <rect x="-216" y="8" width="16" height="8" fill="#ffd54f" opacity="0.95"/>
+    <rect x="-92" y="-64" width="16" height="24" fill="#40e0d0" filter="url(#glow_badge_406)"/>
+    <rect x="-100" y="-72" width="32" height="8" fill="#050505"/>
+    <rect x="-88" y="40" width="24" height="32" fill="#40e0d0" opacity="0.8"/>
+    <rect x="-32" y="40" width="24" height="32" fill="#40e0d0" opacity="0.8"/>
+    <rect x="0" y="-76" width="32" height="16" fill="#ffd54f" filter="url(#glow_badge_406)"/>
+    <rect x="8" y="-84" width="16" height="8" fill="#fff59d"/>
+</g>
+    </g>
+
+    <g filter="url(#glow_badge_406)">
+    <circle cx="256" cy="256" r="120" fill="none" stroke="url(#frame_badge_406)" stroke-width="3" opacity="0.35" stroke-dasharray="6 8" /><circle cx="256" cy="256" r="160" fill="none" stroke="url(#frame_badge_406)" stroke-width="2" opacity="0.25" stroke-dasharray="2 10" /><circle cx="256" cy="256" r="200" fill="none" stroke="url(#frame_badge_406)" stroke-width="2" opacity="0.2" stroke-dasharray="1 6" />
+</g>
+    <g shape-rendering="crispEdges">
+  <rect x="48" y="48" width="56" height="40" fill="#3b1d2f" opacity="0.85"/>
+  <rect x="52" y="52" width="48" height="32" fill="#ff8a80"/>
+  <text x="76" y="76" font-family="Galmuri11, monospace" font-size="22" font-weight="bold"
+        fill="#3b1d2f" text-anchor="middle">S</text>
+</g>
+
+    <g shape-rendering="crispEdges">
+        <circle cx="256" cy="256" r="238" fill="none" stroke="#ff8fab" stroke-width="12" />
+        <circle cx="256" cy="256" r="226" fill="none" stroke="#fff0f6" stroke-width="10" />
+        <circle cx="256" cy="256" r="214" fill="none" stroke="#ff5d8f"
+                stroke-width="8" stroke-dasharray="12 10" />
+        <path d="M256 24 V48 M488 256 H464 M256 488 V464 M24 256 H48"
+              stroke="#3b1d2f" stroke-width="8" opacity="0.45" />
+
+        <path d="M144 78 A 190 190 0 0 1 368 78" id="curve_badge_406" fill="none" />
+        <text font-family="Galmuri11, monospace" font-size="18" font-weight="bold"
+              fill="#ff5d8f" stroke="#3b1d2f" stroke-width="1" paint-order="stroke"
+              letter-spacing="2" text-anchor="middle">
+            <textPath href="#curve_badge_406" startOffset="50%">HORIZON</textPath>
+        </text>
+
+        <rect x="178" y="426" width="156" height="42" fill="#3b1d2f" />
+        <rect x="190" y="414" width="132" height="54" fill="#ffd166" />
+        <rect x="206" y="406" width="100" height="8" fill="#fff3b0" />
+        <text x="256" y="451" font-family="Galmuri11, monospace" font-size="16" font-weight="bold"
+              fill="#3b1d2f" text-anchor="middle" letter-spacing="2">+35</text>
+    </g>
+</svg>

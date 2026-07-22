@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full" shape-rendering="crispEdges">
+    <defs>
+    <linearGradient id="bg_badge_102" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6d5dfc" />
+        <stop offset="55%" stop-color="#9b5de5" />
+        <stop offset="100%" stop-color="#f15bb5" />
+    </linearGradient>
+    <linearGradient id="hull_badge_102" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#2a2a35" />
+        <stop offset="50%" stop-color="#3a3a45" />
+        <stop offset="100%" stop-color="#1a1a25" />
+    </linearGradient>
+    <linearGradient id="frame_badge_102" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff8fab" />
+        <stop offset="50%" stop-color="#ffd166" />
+        <stop offset="100%" stop-color="#80ed99" />
+    </linearGradient>
+    <filter id="shadow_badge_102" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="glow_badge_102">
+        <feGaussianBlur stdDeviation="1" result="blur"/>
+        <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <clipPath id="clip_badge_102">
+        <circle cx="256" cy="256" r="240" />
+    </clipPath>
+</defs>
+
+    <g clip-path="url(#clip_badge_102)">
+        <rect width="512" height="512" fill="url(#bg_badge_102)" />
+        <g fill="#ffffff" fill-opacity="0.95" shape-rendering="crispEdges">
+            <rect x="212" y="235" width="6" height="6" />
+<rect x="100" y="121" width="4" height="4" />
+<rect x="71" y="43" width="4" height="4" />
+<rect x="262" y="396" width="4" height="4" />
+<rect x="197" y="185" width="4" height="4" />
+<rect x="172" y="66" width="6" height="6" />
+<rect x="312" y="80" width="4" height="4" />
+<rect x="61" y="385" width="4" height="4" />
+<rect x="316" y="389" width="4" height="4" />
+<rect x="201" y="211" width="6" height="6" />
+<rect x="106" y="133" width="4" height="4" />
+<rect x="39" y="282" width="6" height="6" />
+<rect x="225" y="53" width="6" height="6" />
+<rect x="369" y="275" width="4" height="4" />
+        </g>
+        <g opacity="0.55" shape-rendering="crispEdges">
+            <g fill="#ffc8dd">
+    <rect x="70" y="116" width="44" height="16" />
+    <rect x="86" y="100" width="54" height="16" />
+    <rect x="376" y="146" width="48" height="16" />
+    <rect x="352" y="162" width="72" height="16" />
+</g>
+<g fill="#cdb4db">
+    <rect x="64" y="336" width="56" height="16" />
+    <rect x="392" y="314" width="48" height="16" />
+</g>
+<g fill="url(#frame_badge_102)" opacity="0.45">
+    <rect x="142" y="74" width="8" height="8" />
+    <rect x="362" y="92" width="8" height="8" />
+    <rect x="118" y="270" width="8" height="8" />
+</g>
+        </g>
+        <path d="M-100 438 Q256 374 612 438 V512 H-100 Z"
+              fill="#80ed99" fill-opacity="0.32" />
+    </g>
+
+    <g transform="translate(256, 256) scale(1.1)"
+       filter="url(#shadow_badge_102)">
+        <g transform="translate(34, -2)" shape-rendering="crispEdges">
+    <rect x="-124" y="-56" width="132" height="16" fill="#050505"/>
+    <rect x="-148" y="-40" width="204" height="16" fill="#050505"/>
+    <rect x="-164" y="-24" width="244" height="48" fill="#050505"/>
+    <rect x="-148" y="24" width="204" height="16" fill="#050505"/>
+    <rect x="-116" y="40" width="132" height="16" fill="#050505"/>
+    <rect x="80" y="-8" width="24" height="16" fill="#050505"/>
+    <rect x="-188" y="-8" width="24" height="16" fill="#050505"/>
+    <rect x="-116" y="-40" width="120" height="16" fill="#f5f3ff"/>
+    <rect x="-140" y="-24" width="188" height="48" fill="#f5f3ff"/>
+    <rect x="-116" y="24" width="120" height="16" fill="#f5f3ff"/>
+    <rect x="48" y="-8" width="32" height="16" fill="#f5f3ff"/>
+    <rect x="-164" y="-56" width="56" height="32" fill="#7c3aed"/>
+    <rect x="-172" y="-48" width="16" height="16" fill="#050505"/>
+    <rect x="-164" y="24" width="56" height="32" fill="#7c3aed"/>
+    <rect x="-172" y="40" width="16" height="16" fill="#050505"/>
+    <rect x="-188" y="-8" width="52" height="24" fill="#7c3aed"/>
+    <rect x="80" y="-16" width="32" height="32" fill="#7c3aed"/>
+    <rect x="112" y="-8" width="16" height="16" fill="#050505"/>
+    <rect x="-36" y="-56" width="76" height="16" fill="#050505"/>
+    <rect x="-52" y="-40" width="108" height="16" fill="#050505"/>
+    <rect x="-52" y="-24" width="124" height="32" fill="#050505"/>
+    <rect x="-36" y="8" width="92" height="16" fill="#050505"/>
+    <rect x="-28" y="-40" width="60" height="16" fill="#a5b4fc"/>
+    <rect x="-44" y="-24" width="100" height="32" fill="#a5b4fc"/>
+    <rect x="-28" y="8" width="68" height="8" fill="#a5b4fc"/>
+    <rect x="16" y="-32" width="16" height="16" fill="#b8d8ff" opacity="0.9"/>
+    <rect x="32" y="-16" width="16" height="16" fill="#b8d8ff" opacity="0.75"/>
+    <rect x="-72" y="8" width="24" height="24" fill="#2f7fd8"/>
+    <rect x="-64" y="0" width="24" height="24" fill="#050505"/>
+    <rect x="-60" y="4" width="16" height="16" fill="#2f7fd8"/>
+    <rect x="-28" y="8" width="24" height="24" fill="#2f7fd8"/>
+    <rect x="-20" y="0" width="24" height="24" fill="#050505"/>
+    <rect x="-16" y="4" width="16" height="16" fill="#2f7fd8"/>
+    <rect x="-148" y="-36" width="20" height="8" fill="#ff8080" opacity="0.8"/>
+    <rect x="-132" y="32" width="20" height="8" fill="#ff8080" opacity="0.7"/>
+    <rect x="58" y="-4" width="12" height="8" fill="#ffd6d6" opacity="0.75"/>
+    <rect x="-216" y="-4" width="28" height="8" fill="#ff6d00" opacity="0.9"/>
+    <rect x="-216" y="8" width="16" height="8" fill="#ffd54f" opacity="0.95"/>
+    <rect x="-132" y="-72" width="88" height="16" fill="#7c3aed"/>
+    <rect x="-132" y="56" width="88" height="16" fill="#7c3aed"/>
+</g>
+    </g>
+
+    
+    <g shape-rendering="crispEdges">
+  <rect x="48" y="48" width="56" height="40" fill="#3b1d2f" opacity="0.85"/>
+  <rect x="52" y="52" width="48" height="32" fill="#cfd8dc"/>
+  <text x="76" y="76" font-family="Galmuri11, monospace" font-size="22" font-weight="bold"
+        fill="#3b1d2f" text-anchor="middle">F</text>
+</g>
+
+    <g shape-rendering="crispEdges">
+        <circle cx="256" cy="256" r="238" fill="none" stroke="#ff8fab" stroke-width="12" />
+        <circle cx="256" cy="256" r="226" fill="none" stroke="#fff0f6" stroke-width="10" />
+        <circle cx="256" cy="256" r="214" fill="none" stroke="#ff5d8f"
+                stroke-width="8" stroke-dasharray="12 10" />
+        <path d="M256 24 V48 M488 256 H464 M256 488 V464 M24 256 H48"
+              stroke="#3b1d2f" stroke-width="8" opacity="0.45" />
+
+        <path d="M144 78 A 190 190 0 0 1 368 78" id="curve_badge_102" fill="none" />
+        <text font-family="Galmuri11, monospace" font-size="18" font-weight="bold"
+              fill="#ff5d8f" stroke="#3b1d2f" stroke-width="1" paint-order="stroke"
+              letter-spacing="2" text-anchor="middle">
+            <textPath href="#curve_badge_102" startOffset="50%">INTERCEPT</textPath>
+        </text>
+
+        <rect x="178" y="426" width="156" height="42" fill="#3b1d2f" />
+        <rect x="190" y="414" width="132" height="54" fill="#ffd166" />
+        <rect x="206" y="406" width="100" height="8" fill="#fff3b0" />
+        <text x="256" y="451" font-family="Galmuri11, monospace" font-size="16" font-weight="bold"
+              fill="#3b1d2f" text-anchor="middle" letter-spacing="2">F</text>
+    </g>
+</svg>
