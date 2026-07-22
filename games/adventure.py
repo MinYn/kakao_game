@@ -4,6 +4,16 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 from games.base_game import Game
+from games.ship_system import (
+    GRADE_TONES,
+    PART_CATALOG,
+    ShipGrade,
+    ShipProgress,
+    body_enhance_to_upgrade_stage,
+    format_grade_mark,
+    is_higher_grade,
+    parse_grade,
+)
 from config import Config
 
 
@@ -35,12 +45,21 @@ class ShipRarity:
 
 @dataclass(frozen=True)
 class CollectibleShip:
-    """도감에 등록되는 수집형 우주선"""
+    """도감에 등록되는 수집형 우주선.
+
+    grade(F~S)는 기체 자체 등급. rarity는 드랍 가중치/수집 표시용 레거시 키.
+    파츠 등급은 없다.
+    """
 
     ship_id: str
     name: str
     rarity: str
     flavor: str
+    grade: str = "F"
+
+    @property
+    def ship_grade(self) -> ShipGrade:
+        return parse_grade(self.grade)
 
 
 @dataclass(frozen=True)
@@ -114,7 +133,8 @@ class AdventureGame(Game):
     def __init__(self, user_id: str, point_system=None):
         super().__init__(user_id, point_system)
         self.max_level = None  # 최대 레벨 제한 없음
-        self.current_level = 0
+        self.current_level = 0  # body_enhance 별칭 (하위 호환)
+        self.ship_progress = ShipProgress()
         self.enhancement_cost_base = Config.ENHANCEMENT_BASE_COST
         self.enhancement_cost_multiplier = Config.ENHANCEMENT_COST_MULTIPLIER
         self.sell_multiplier = Config.ENHANCEMENT_SELL_MULTIPLIER
@@ -133,7 +153,7 @@ class AdventureGame(Game):
         self._build_command_index()
 
     def _init_ship_rarities(self) -> dict[str, ShipRarity]:
-        """수집/도감용 희귀도 테이블: 밸런스 수치와 분리해 변경이 쉽도록 유지"""
+        """수집/드랍 가중치용 레거시 희귀도. 기체 스탯은 grade(F~S)가 담당."""
         return {
             "common": ShipRarity("일반", "⚪", 60),
             "rare": ShipRarity("희귀", "🔵", 25),
@@ -143,18 +163,18 @@ class AdventureGame(Game):
         }
 
     def _init_ship_catalog(self) -> list[CollectibleShip]:
-        """우주선 도감 카탈로그. 새 우주선/희귀도 변경은 이 목록만 수정하면 됨."""
+        """우주선 도감 카탈로그. grade(F~S) + 수집 희귀도 키를 함께 둔다."""
         return [
-            CollectibleShip("comet_scout", "코멧 스카우트", "common", "근거리 정찰에 최적화된 입문형 기체"),
-            CollectibleShip("cargo_mule", "카고 뮬", "common", "잔해 지대에서 부품을 안정적으로 회수하는 수송선"),
-            CollectibleShip("lunar_moth", "루나 모스", "common", "달빛 반사 도장으로 초보 조종사에게 인기"),
-            CollectibleShip("ion_falcon", "아이온 팔콘", "rare", "이온 항로를 빠르게 가로지르는 민첩한 프리깃"),
-            CollectibleShip("nebula_ray", "네뷸라 레이", "rare", "성운 속 신호 탐지에 강한 센서함"),
-            CollectibleShip("aurora_clip", "오로라 클립", "rare", "극광 입자를 연료로 쓰는 실험기"),
-            CollectibleShip("quantum_fox", "퀀텀 폭스", "epic", "짧은 양자 도약으로 위기 상황을 벗어나는 고급 기체"),
-            CollectibleShip("void_manta", "보이드 만타", "epic", "암흑 물질 표면 코팅을 두른 심우주 탐사선"),
-            CollectibleShip("solar_dragon", "솔라 드래곤", "legendary", "항성풍을 타고 날아가는 전설급 순양함"),
-            CollectibleShip("event_horizon", "이벤트 호라이즌", "mythic", "블랙홀 경계에서 회수된 신화급 함선"),
+            CollectibleShip("comet_scout", "코멧 스카우트", "common", "근거리 정찰에 최적화된 입문형 기체", "F"),
+            CollectibleShip("cargo_mule", "카고 뮬", "common", "잔해 지대에서 부품을 안정적으로 회수하는 수송선", "F"),
+            CollectibleShip("lunar_moth", "루나 모스", "common", "달빛 반사 도장으로 초보 조종사에게 인기", "E"),
+            CollectibleShip("ion_falcon", "아이온 팔콘", "rare", "이온 항로를 빠르게 가로지르는 민첩한 프리깃", "D"),
+            CollectibleShip("nebula_ray", "네뷸라 레이", "rare", "성운 속 신호 탐지에 강한 센서함", "D"),
+            CollectibleShip("aurora_clip", "오로라 클립", "rare", "극광 입자를 연료로 쓰는 실험기", "C"),
+            CollectibleShip("quantum_fox", "퀀텀 폭스", "epic", "짧은 양자 도약으로 위기 상황을 벗어나는 고급 기체", "B"),
+            CollectibleShip("void_manta", "보이드 만타", "epic", "암흑 물질 표면 코팅을 두른 심우주 탐사선", "B"),
+            CollectibleShip("solar_dragon", "솔라 드래곤", "legendary", "항성풍을 타고 날아가는 전설급 순양함", "A"),
+            CollectibleShip("event_horizon", "이벤트 호라이즌", "mythic", "블랙홀 경계에서 회수된 신화급 함선", "S"),
         ]
 
     def _init_loot_table(self) -> list[LootDrop]:
@@ -175,6 +195,42 @@ class AdventureGame(Game):
 
     def _get_ship_by_id(self, ship_id: str) -> Optional[CollectibleShip]:
         return next((ship for ship in self.ship_catalog if ship.ship_id == ship_id), None)
+
+    def _equipped_ship(self) -> Optional[CollectibleShip]:
+        if self.ship_progress.equipped_ship_id:
+            return self._get_ship_by_id(self.ship_progress.equipped_ship_id)
+        return None
+
+    def _equipped_ship_name(self) -> str:
+        ship = self._equipped_ship()
+        if ship:
+            return ship.name
+        if self.explorer_profile:
+            return self.explorer_profile.ship_class
+        return "기본 셔틀"
+
+    def _sync_level_from_progress(self) -> None:
+        self.current_level = self.ship_progress.body_enhance
+        self.game_data["level"] = self.current_level
+        self.game_data["ship_grade"] = self.ship_progress.grade.value
+        self.game_data["body_enhance"] = self.ship_progress.body_enhance
+        self.game_data["equipped_ship_id"] = self.ship_progress.equipped_ship_id
+        self.game_data["parts"] = dict(self.ship_progress.parts)
+
+    def _persist_ship_progress(self) -> None:
+        self._sync_level_from_progress()
+        if self.point_system and hasattr(self.point_system, "set_ship_progress"):
+            self.point_system.set_ship_progress(self.user_id, self.ship_progress)
+        elif self.point_system:
+            self.point_system.set_enhancement_level(self.user_id, self.ship_progress.body_enhance)
+
+    def _load_ship_progress(self) -> ShipProgress:
+        if self.point_system and hasattr(self.point_system, "get_ship_progress"):
+            return self.point_system.get_ship_progress(self.user_id)
+        if self.point_system:
+            level = self.point_system.get_enhancement_level(self.user_id)
+            return ShipProgress(grade=ShipGrade.F, body_enhance=level)
+        return ShipProgress()
 
     def _roll_collectible_ship(self) -> CollectibleShip:
         """희귀도 가중치 → 해당 희귀도 내 균등 선택"""
@@ -198,6 +254,43 @@ class AdventureGame(Game):
         old_count = collection.get(ship.ship_id, 0)
         collection[ship.ship_id] = old_count + 1
         return {"ship_id": ship.ship_id, "is_new": old_count == 0, "count": collection[ship.ship_id]}
+
+    def _maybe_equip_discovered_ship(self, ship: CollectibleShip) -> Optional[str]:
+        """상위 등급 기체 발견 시 장착 + 본체 +N 등가 계승. 파츠 +N은 유지."""
+        current = self.ship_progress
+        if current.equipped_ship_id is None:
+            self.ship_progress = ShipProgress(
+                grade=ship.ship_grade,
+                body_enhance=current.body_enhance,
+                equipped_ship_id=ship.ship_id,
+                parts=dict(current.parts),
+            )
+            self._persist_ship_progress()
+            return (
+                f"🛠️ 주력 기체 장착: {ship.name} {format_grade_mark(ship.grade)} "
+                f"+{self.ship_progress.body_enhance}강"
+            )
+
+        if not is_higher_grade(ship.grade, current.grade):
+            return None
+
+        prev_title = current.format_title(self._equipped_ship_name())
+        next_progress, new_n = current.equip_ship(ship.ship_id, ship.grade, inherit=True)
+        self.ship_progress = next_progress
+        self._persist_ship_progress()
+        return (
+            f"⬆️ 상위 등급 기체 계승!\n"
+            f"  {prev_title}\n"
+            f"  → {next_progress.format_title(ship.name)}\n"
+            f"  (본체 +N 등가 환산, 파츠 강화 유지 · {GRADE_TONES[next_progress.grade]})"
+        )
+
+    def get_badge_upgrade_stage(self) -> int:
+        """배지 디테일 단계: 본체 +N 기반 (attempts 기반 폐기)."""
+        return body_enhance_to_upgrade_stage(self.ship_progress.body_enhance)
+
+    def get_ship_grade_value(self) -> str:
+        return self.ship_progress.grade.value
 
     def _init_activities(self) -> list:
         """활동 타입 초기화.
@@ -370,8 +463,10 @@ class AdventureGame(Game):
     def _load_stats(self) -> Dict[str, int]:
         if self.point_system:
             stats = self.point_system.get_game_stats(self.user_id)
+            progress = self._load_ship_progress()
             return {
-                "level": self.point_system.get_enhancement_level(self.user_id),
+                "level": progress.body_enhance,
+                "ship_progress": progress,
                 "activity_count": stats.get("total_hunts", 0),
                 "total_reward": stats.get("total_hunt_reward", 0),
                 "activity_stats": {
@@ -386,6 +481,7 @@ class AdventureGame(Game):
 
         return {
             "level": 0,
+            "ship_progress": ShipProgress(),
             "activity_count": 0,
             "total_reward": 0,
             "activity_stats": {"정찰": 0, "탐사": 0, "구조": 0},
@@ -401,12 +497,17 @@ class AdventureGame(Game):
         self.explorer_profile = ExplorerProfile.from_user_id(self.user_id)
         stats = self._load_stats()
 
-        self.current_level = stats["level"]
+        self.ship_progress = stats.get("ship_progress") or ShipProgress()
+        self.current_level = self.ship_progress.body_enhance
         self.activity_count = stats["activity_count"]
         self.total_reward = stats["total_reward"]
         self.activity_stats = stats["activity_stats"].copy()
         self.game_data = {
             "level": self.current_level,
+            "ship_grade": self.ship_progress.grade.value,
+            "body_enhance": self.ship_progress.body_enhance,
+            "equipped_ship_id": self.ship_progress.equipped_ship_id,
+            "parts": dict(self.ship_progress.parts),
             "attempts": stats["attempts"],
             "successes": stats["successes"],
             "failures": stats["failures"],
@@ -417,28 +518,32 @@ class AdventureGame(Game):
         }
 
         challenge_passes = self._get_challenge_passes()
+        ship_title = self.ship_progress.format_title(self._equipped_ship_name())
         pilot_card = (
             f"{self.explorer_profile.badge}\n"
             f"콜사인: {self.explorer_profile.call_sign}\n"
             f"역할: {self.explorer_profile.role}\n"
-            f"기체: {self.explorer_profile.ship_class} ({self.explorer_profile.module})\n"
+            f"기체: {ship_title}\n"
+            f"모듈: {self.explorer_profile.module}\n"
             f"기질: {self.explorer_profile.temperament}"
         )
 
         return (
             "🛰️ 우주 탐험 로그를 시작합니다!\n\n"
             f"{pilot_card}\n\n"
-            f"현재 우주선 강화 레벨: +{self.current_level}\n"
+            f"현재 우주선: {ship_title}\n"
+            f"파츠: {self.ship_progress.format_parts_summary()}\n"
             f"우주선 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종 수집\n"
             f"구조 임무 패스: {challenge_passes}장\n\n"
             "명령어:\n"
-            "✨ 강화: '성장'/'train'/'강화'/'업그레이드' (골드 사용)\n"
-            "💾 정산: '정산'/'sell' (강화 단계 초기화 후 보상)\n"
+            "✨ 강화: '성장'/'train'/'강화'/'업그레이드' (본체 +N강, 골드 사용)\n"
+            "💾 정산: '정산'/'sell' (본체 강화 초기화 후 보상)\n"
             "📊 상태보기: '상태'/'status'\n"
             "📚 도감보기: '도감'/'collection'\n\n"
             "🎯 활동:\n"
             "- '출동'/'mission': 랜덤 이벤트(정찰·탐사·구조) 임무 진행\n"
             "- '패스'/'ticket': 보유 구조 패스 확인\n"
+            "💡 상위 등급 기체 발견 시 본체 +N이 등가 환산으로 계승됩니다.\n"
             "💡 기존 '정찰'/'탐사'/'구조' 입력도 출동으로 연결됩니다."
         )
 
@@ -463,17 +568,22 @@ class AdventureGame(Game):
     # ========== 성장 관련 메서드 ==========
 
     def _calculate_cost(self) -> int:
-        """우주선 강화 비용 계산"""
+        """본체 +N 강화 비용 계산"""
         cost = int(
             self.enhancement_cost_base
-            * (self.enhancement_cost_multiplier ** self.current_level)
+            * (self.enhancement_cost_multiplier ** self.ship_progress.body_enhance)
         )
         return max(cost, 10)
 
     def _calculate_success_rate(self, activity: Optional[ActivityType] = None) -> float:
-        """성공 확률 계산"""
+        """성공 확률 계산. 본체 +N + 센서 파츠 패시브."""
         base_rate = activity.success_rate if activity else 80.0
-        boosted = min(base_rate + (self.current_level * 2), 98.0)
+        body_boost = self.ship_progress.body_enhance * 2
+        sensor_boost = self.ship_progress.part("sensor").passive_value()
+        if activity and activity.name != "정찰":
+            # 센서 패시브는 정찰에 더 크게, 그 외 활동은 절반 반영
+            sensor_boost *= 0.5
+        boosted = min(base_rate + body_boost + sensor_boost, 98.0)
         return max(boosted, 25.0)
 
     def _get_enhancement_celebration(
@@ -518,16 +628,19 @@ class AdventureGame(Game):
         return max(sell_price, 10)
 
     def _enhance(self) -> str:
-        """우주선 강화"""
+        """기체 본체 +N 강화 (파츠 등급 없음)."""
         cost = self._calculate_cost()
+        before = self.ship_progress.body_enhance
+        ship_title = self.ship_progress.format_title(self._equipped_ship_name())
 
         if not self.point_system or not self.point_system.has_gold(self.user_id, cost):
             return (
                 "❌ 우주선 강화를 위한 골드가 부족합니다.\n"
-                f"필요 골드: {cost}G\n현재 골드: {self.get_user_points()}G"
+                f"필요 골드: {cost}G\n현재 골드: {self.get_user_points()}G\n"
+                f"대상: {ship_title}"
             )
 
-        self.deduct_gold(cost, f"우주선 강화 시도 (+{self.current_level} → +{self.current_level + 1})")
+        self.deduct_gold(cost, f"본체 강화 시도 ({ship_title} +{before} → +{before + 1})")
 
         self.game_data["attempts"] = self.game_data.get("attempts", 0) + 1
         if self.point_system:
@@ -538,11 +651,14 @@ class AdventureGame(Game):
         is_success = roll < success_rate
 
         if is_success:
-            self.current_level += 1
-            self.game_data["level"] = self.current_level
+            self.ship_progress = self.ship_progress.with_body_enhance(before + 1)
+            # 성공 시 랜덤 파츠 +1 (패시브 성장)
+            part_id = random.choice(list(PART_CATALOG.keys()))
+            part_before = self.ship_progress.parts.get(part_id, 0)
+            self.ship_progress = self.ship_progress.with_part_enhance(part_id, part_before + 1)
+            self._persist_ship_progress()
             self.game_data["successes"] = self.game_data.get("successes", 0) + 1
             if self.point_system:
-                self.point_system.set_enhancement_level(self.user_id, self.current_level)
                 self.point_system.update_game_stats(user_id=self.user_id, enhancement_successes=1)
 
             next_cost = self._calculate_cost()
@@ -558,75 +674,83 @@ class AdventureGame(Game):
                     "",
                 ]
 
+            part_def = PART_CATALOG[part_id]
             result_lines = [
                 "✅ 강화 성공!",
                 "",
-                f"현재 우주선 강화 레벨: +{self.current_level}",
-                f"다음 강화 필요 골드: {next_cost}G",
+                f"기체: {self.ship_progress.format_title(self._equipped_ship_name())}",
+                f"파츠 성장: {part_def.name} +{part_before + 1}강",
+                f"다음 본체 강화 필요 골드: {next_cost}G",
                 f"현재 골드: {self.get_user_points()}G",
                 "",
             ]
             result_lines.extend(celebration_lines)
-            result_lines.append("💡 강화 레벨은 임무 보상에만 영향을 주고, 우주선 희귀도는 도감 수집용입니다.")
+            result_lines.append(
+                "💡 기체 등급(F~S) · 본체 +N · 파츠 +N 을 구분해 보세요. 파츠에는 등급이 없습니다."
+            )
             return "\n".join(result_lines)
 
         self.game_data["failures"] = self.game_data.get("failures", 0) + 1
         if self.point_system:
             self.point_system.update_game_stats(user_id=self.user_id, enhancement_failures=1)
 
-        if self.current_level > 0 and self._is_enhancement_near_miss(roll, success_rate):
+        armor_save = self.ship_progress.part("armor").passive_value()
+        if self.ship_progress.body_enhance > 0 and (
+            self._is_enhancement_near_miss(roll, success_rate)
+            or (armor_save > 0 and random.random() * 100 < min(armor_save, 25))
+        ):
             return (
                 "🛡️ 아슬아슬하게 버텼습니다!\n\n"
                 f"성공률 {success_rate:.1f}% / 판정 {roll:.1f}%\n"
-                "보호막이 간신히 버텨 강화 단계가 내려가지 않았어요.\n"
-                f"현재 우주선 강화 레벨: +{self.current_level}\n"
+                "보호막/장갑이 간신히 버텨 본체 강화가 내려가지 않았어요.\n"
+                f"기체: {self.ship_progress.format_title(self._equipped_ship_name())}\n"
                 f"현재 골드: {self.get_user_points()}G\n\n"
                 "방금 거의 붙을 뻔했습니다. 한 번 더?"
             )
 
-        if self.current_level > 0:
-            self.current_level -= 1
-            self.game_data["level"] = self.current_level
-            if self.point_system:
-                self.point_system.set_enhancement_level(self.user_id, self.current_level)
+        if self.ship_progress.body_enhance > 0:
+            self.ship_progress = self.ship_progress.with_body_enhance(
+                self.ship_progress.body_enhance - 1
+            )
+            self._persist_ship_progress()
             return (
-                "❌ 강화 단계가 한 단계 내려갔어요.\n\n"
-                f"현재 우주선 강화 레벨: +{self.current_level}\n"
+                "❌ 본체 강화가 한 단계 내려갔어요.\n\n"
+                f"기체: {self.ship_progress.format_title(self._equipped_ship_name())}\n"
                 f"현재 골드: {self.get_user_points()}G\n\n"
                 "다시 시도해볼까요?"
             )
 
         return (
             "❌ 강화 실패...\n\n"
-            f"현재 우주선 강화 레벨: +{self.current_level}\n"
+            f"기체: {self.ship_progress.format_title(self._equipped_ship_name())}\n"
             f"현재 골드: {self.get_user_points()}G\n\n"
             "다시 한 번 시도해보세요!"
         )
 
     def _sell(self) -> str:
-        """강화 단계 정산"""
-        if self.current_level == 0:
-            return "❌ 정산할 강화 단계가 없습니다. 강화 후 정산해 주세요."
+        """본체 강화 정산 (등급/파츠/장착 기체는 유지)."""
+        if self.ship_progress.body_enhance == 0:
+            return "❌ 정산할 본체 강화가 없습니다. 강화 후 정산해 주세요."
 
         sell_price = self._calculate_sell_price()
-        sold_level = self.current_level
+        sold_level = self.ship_progress.body_enhance
+        sold_title = self.ship_progress.format_title(self._equipped_ship_name())
 
         if self.point_system:
-            self.award_gold(sell_price, f"우주선 강화 정산 (+{sold_level})")
+            self.award_gold(sell_price, f"본체 강화 정산 ({sold_title})")
 
-        self.current_level = 0
-        self.game_data["level"] = 0
+        self.ship_progress = self.ship_progress.with_body_enhance(0)
         self.game_data["badge_cycle"] = self.game_data.get("badge_cycle", 0) + 1
-        if self.point_system:
-            self.point_system.set_enhancement_level(self.user_id, 0)
+        self._persist_ship_progress()
 
         return (
-            "💾 강화 단계를 정산했습니다!\n\n"
-            f"정산한 강화 단계: +{sold_level}\n"
+            "💾 본체 강화를 정산했습니다!\n\n"
+            f"정산 대상: {sold_title}\n"
+            f"정산한 본체 강화: +{sold_level}\n"
             f"정산 보상: {sell_price}G\n"
             f"현재 골드: {self.get_user_points()}G\n\n"
-            "새로운 모듈로 다시 업그레이드해봐요!\n"
-            "🚀 정산 후 우주선 기종이 업데이트되었습니다."
+            f"유지: 등급 {self.ship_progress.grade.value} · 파츠 {self.ship_progress.format_parts_summary()}\n"
+            "본체 +N만 초기화됩니다. 다시 업그레이드해봐요!"
         )
 
     # ========== 활동 관련 메서드 ==========
@@ -672,16 +796,24 @@ class AdventureGame(Game):
         return self._perform_activity(activity)
 
     def _calculate_activity_reward(self, activity: ActivityType) -> int:
+        body = self.ship_progress.body_enhance
         reward_multiplier = 1.0 + (
-            self.current_level * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER)
+            body * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER)
         )
         base_reward = random.randint(*activity.reward_range)
         reward = int((activity.base_reward + base_reward) * reward_multiplier)
 
-        # 보상 피크는 등급과 분리: 모든 함선 수집 희귀도는 경제 밸런스에 영향을 주지 않음
+        # 주 엔진 파츠: 탐사 보상 +x% (탐사에 풀 적용, 그 외 절반)
+        engine_bonus = self.ship_progress.part("engine").passive_value()
+        if activity.name != "탐사":
+            engine_bonus *= 0.5
+        if engine_bonus > 0:
+            reward = int(reward * (1.0 + engine_bonus / 100.0))
+
+        # 수집 희귀도(common~mythic)는 경제에 영향 없음. 기체 grade 스탯은 별도 표시용.
         if random.random() < 0.08:
             reward = int(reward * random.choice((1.5, 1.75, 2.0)))
-        return reward
+        return max(reward, 1)
 
     def _try_roll_loot_reward(self) -> Optional[dict]:
         """낮은 확률의 즉시 득템 보상. 도감 희귀도와 독립된 경제 보상."""
@@ -751,12 +883,14 @@ class AdventureGame(Game):
             ) * 100
             description = random.choice(activity.success_messages).format(pilot=pilot_name)
 
+            ship_title = self.ship_progress.format_title(self._equipped_ship_name())
             result_lines = [
                 f"✅ {activity.name} 성공!",
                 event_header,
                 "",
                 description,
-                f"💰 리워드 +{reward}G (성장 레벨 +{self.current_level}, 배율 {reward_multiplier:.1f}%)",
+                f"💰 리워드 +{reward}G (본체 +{self.ship_progress.body_enhance}강, 배율 {reward_multiplier:.1f}%)",
+                f"🚀 현재 기체: {ship_title}",
                 "",
             ]
 
@@ -765,7 +899,13 @@ class AdventureGame(Game):
                 ship, collection_result = discovery
                 rarity = self.ship_rarities[ship.rarity]
                 new_badge = "NEW!" if collection_result.get("is_new") else f"중복 x{collection_result.get('count', 1)}"
-                result_lines.append(f"🚀 우주선 발견: {rarity.icon} {rarity.name} [{ship.name}] ({new_badge})")
+                result_lines.append(
+                    f"🚀 우주선 발견: {format_grade_mark(ship.grade)} [{ship.name}] "
+                    f"({rarity.icon} 수집 {rarity.name}, {new_badge})"
+                )
+                equip_msg = self._maybe_equip_discovered_ship(ship)
+                if equip_msg:
+                    result_lines.append(equip_msg)
                 result_lines.append(f"📚 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종")
                 result_lines.append("")
 
@@ -811,27 +951,39 @@ class AdventureGame(Game):
         )
 
     def _show_ship_codex(self) -> str:
-        """수집한 우주선 도감 표시"""
+        """수집한 우주선 도감 표시 (기체 등급 F~S 중심)."""
         collection = self._get_collection_records()
         total = len(self.ship_catalog)
         owned = len(collection)
+        active = self.ship_progress.format_title(self._equipped_ship_name())
         lines = [
             "📚 우주선 도감",
             "",
             f"수집 현황: {owned}/{total}종 ({owned / total * 100:.0f}%)",
-            "희귀도는 수집 가치만 나타내며 보상/성공률에 영향을 주지 않습니다.",
+            f"주력 기체: {active}",
+            "기체 등급(F~S)은 본체 티어, 수집 아이콘은 드랍 가중치 표시입니다.",
+            "파츠에는 등급이 없고 패시브·+N강만 있습니다.",
             "",
         ]
 
-        for rarity_key, rarity in self.ship_rarities.items():
-            ships = [ship for ship in self.ship_catalog if ship.rarity == rarity_key]
+        for grade in ShipGrade:
+            ships = [ship for ship in self.ship_catalog if ship.grade == grade.value]
+            if not ships:
+                continue
             owned_count = sum(1 for ship in ships if ship.ship_id in collection)
-            lines.append(f"{rarity.icon} {rarity.name} {owned_count}/{len(ships)}")
+            lines.append(
+                f"{format_grade_mark(grade)} {GRADE_TONES[grade]} {owned_count}/{len(ships)}"
+            )
             for ship in ships:
                 count = collection.get(ship.ship_id, 0)
+                rarity = self.ship_rarities[ship.rarity]
                 if count:
                     duplicate_text = f" x{count}" if count > 1 else ""
-                    lines.append(f"- {ship.name}{duplicate_text}: {ship.flavor}")
+                    equipped = " ★주력" if ship.ship_id == self.ship_progress.equipped_ship_id else ""
+                    lines.append(
+                        f"- {ship.name}{duplicate_text}{equipped} "
+                        f"({rarity.icon}): {ship.flavor}"
+                    )
                 else:
                     lines.append("- ???")
             lines.append("")
@@ -839,6 +991,7 @@ class AdventureGame(Game):
         lines.append(
             "💡 '출동' 성공 시 이벤트에 따라 정찰 8% / 탐사 18% / 구조 35% 확률로 우주선을 발견합니다."
         )
+        lines.append("💡 상위 등급 발견 시 본체 +N이 등가 환산으로 계승됩니다 (예: F+100 → E+1).")
         return "\n".join(lines).rstrip()
 
     def _show_passes(self) -> str:
@@ -857,19 +1010,20 @@ class AdventureGame(Game):
         success_rate = self._calculate_success_rate()
         sell_price = self._calculate_sell_price()
         passes = self._get_challenge_passes()
+        body = self.ship_progress.body_enhance
 
         status_lines = [
             "📊 현재 상태",
             "",
-            "✨ 우주선 강화:",
-            f"- 강화 레벨: +{self.current_level}",
+            "✨ 기체 체계:",
+            *self.ship_progress.format_status_block(self._equipped_ship_name()),
             f"- 우주선 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종",
-            f"- 다음 강화 비용: {cost}G",
+            f"- 다음 본체 강화 비용: {cost}G",
             f"- 강화 성공률: {success_rate:.1f}%",
             f"- 정산 예상 보상: {sell_price}G",
             "",
             "🎯 임무 정보:",
-            f"- 보상 배율: {1.0 + (self.current_level * Config.MONSTER_HUNT_REWARD_MULTIPLIER):.2f}배",
+            f"- 보상 배율: {1.0 + (body * Config.MONSTER_HUNT_REWARD_MULTIPLIER):.2f}배",
             f"- 구조 패스: {passes}장",
             "",
             "📈 통계:",
@@ -891,7 +1045,7 @@ class AdventureGame(Game):
                     "🛰️ 탐사대 프로필:",
                     f"- 콜사인: {self.explorer_profile.call_sign}",
                     f"- 역할: {self.explorer_profile.role}",
-                    f"- 기체: {self.explorer_profile.ship_class} ({self.explorer_profile.module})",
+                    f"- 모듈: {self.explorer_profile.module}",
                     f"- 기질: {self.explorer_profile.temperament}",
                 ]
             )
@@ -899,7 +1053,7 @@ class AdventureGame(Game):
         return "\n".join(status_lines)
 
     def end(self) -> str:
-        level = self.current_level
+        title = self.ship_progress.format_title(self._equipped_ship_name())
         attempts = self.game_data.get("attempts", 0)
         successes = self.game_data.get("successes", 0)
         failures = self.game_data.get("failures", 0)
@@ -919,14 +1073,16 @@ class AdventureGame(Game):
                 total_hunts=activity_count,
                 total_hunt_reward=reward,
             )
+            self._persist_ship_progress()
 
         self.is_active = False
         self.game_data.clear()
 
         return (
             "게임이 종료되었습니다.\n\n"
-            "✨ 우주선 강화 요약:\n"
-            f"- 최종 강화 레벨: +{level}\n"
+            "✨ 기체 요약:\n"
+            f"- 최종 기체: {title}\n"
+            f"- 파츠: {self.ship_progress.format_parts_summary()}\n"
             f"- 총 시도: {attempts}회 (성공 {successes}회 / 실패 {failures}회)\n\n"
             "🎯 임무 기록:\n"
             f"- 정찰: {stats.get('정찰', 0)}회\n"
@@ -940,11 +1096,13 @@ class AdventureGame(Game):
         drop_rate = Config.BOSS_TICKET_DROP_RATE * 100
         return (
             "우주 탐험 로그 도움말:\n\n"
-            "✨ 우주선 강화:\n"
-            "- 강화: '성장', 'train', '업그레이드'\n"
+            "✨ 기체 체계 (F~S 등급 · 본체 +N · 파츠 +N):\n"
+            "- 강화: '성장', 'train', '업그레이드' → 본체 +N (+ 랜덤 파츠 +1)\n"
+            "- 파츠에는 등급이 없고 패시브·강화만 있습니다 (엔진/센서/장갑).\n"
+            "- 상위 등급 기체 발견 시 본체 +N이 등가 환산됩니다 (F+100 ≈ E+1).\n"
             "- 성공선에 가까울수록 더 큰 축하 이펙트/보너스가 터져요.\n"
-            "- 실패 직후 5% 구간은 보호막이 단계 하락을 막아줄 수 있어요.\n"
-            "- 정산: '정산' 또는 'sell' (강화 리셋 후 보상)\n"
+            "- 실패 직후 5% 구간·장갑 패시브가 단계 하락을 막을 수 있어요.\n"
+            "- 정산: '정산' 또는 'sell' (본체 +N 리셋 후 보상, 등급/파츠 유지)\n"
             "- 상태: '상태' 또는 'status'\n\n"
             "🎯 임무 (통합 출동):\n"
             "- 출동: '출동', 'mission', '탐험', 'go' (정찰·탐사·구조 중 랜덤 이벤트)\n"

@@ -3,10 +3,14 @@
 """
 import os
 from typing import Optional
-from dotenv import load_dotenv
 
-# .env 파일 로드
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    # 테스트/최소 환경에서 python-dotenv 없이도 동작
+    pass
 
 
 class Config:

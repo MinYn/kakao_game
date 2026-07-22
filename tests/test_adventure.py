@@ -82,7 +82,8 @@ class AdventureGameTestCase(unittest.TestCase):
         game = AdventureGame(user_id="tester")
         game.start()
         base_cost = game._calculate_cost()
-        game.current_level = 2
+        game.ship_progress = game.ship_progress.with_body_enhance(2)
+        game._sync_level_from_progress()
         next_cost = game._calculate_cost()
         self.assertGreaterEqual(next_cost, base_cost)
 
@@ -104,7 +105,23 @@ class AdventureGameTestCase(unittest.TestCase):
         response = game.process_command("도감")
         self.assertIn("우주선 도감", response)
         self.assertIn("코멧 스카우트 x2", response)
-        self.assertIn("보상/성공률에 영향을 주지 않습니다", response)
+        self.assertIn("★F", response)
+        self.assertIn("파츠에는 등급이 없고", response)
+
+    def test_higher_grade_ship_inherits_body_enhance(self):
+        game = AdventureGame(user_id="tester")
+        game.start()
+        game.ship_progress = game.ship_progress.with_body_enhance(100)
+        game.ship_progress.equipped_ship_id = "comet_scout"
+        game._sync_level_from_progress()
+
+        higher = game._get_ship_by_id("lunar_moth")  # E
+        self.assertIsNotNone(higher)
+        msg = game._maybe_equip_discovered_ship(higher)
+        self.assertIsNotNone(msg)
+        self.assertIn("계승", msg)
+        self.assertEqual(game.ship_progress.grade.value, "E")
+        self.assertEqual(game.ship_progress.body_enhance, 1)
 
     def test_collection_rarity_does_not_change_success_rate(self):
         game = AdventureGame(user_id="tester")
@@ -112,12 +129,12 @@ class AdventureGameTestCase(unittest.TestCase):
         activity = game._get_activity_type("정찰")
         self.assertIsNotNone(activity)
 
-        game.current_level = 0
+        game.ship_progress = game.ship_progress.with_body_enhance(0)
         base_rate = game._calculate_success_rate(activity)
         ship = game._get_ship_by_id("event_horizon")
         self.assertIsNotNone(ship)
         game._grant_ship_to_collection(ship)
-
+        # 도감 수집 자체는 성공률에 영향 없음 (장착·계승 전)
         self.assertEqual(game._calculate_success_rate(activity), base_rate)
 
     def test_ship_collection_persists_in_gold_system(self):
@@ -146,8 +163,8 @@ class AdventureGameTestCase(unittest.TestCase):
             point_system = GoldSystem(db_file.name)
             game = AdventureGame(user_id="tester", point_system=point_system)
             game.start()
-            game.current_level = 2
-            point_system.set_enhancement_level("tester", 2)
+            game.ship_progress = game.ship_progress.with_body_enhance(2)
+            game._persist_ship_progress()
             point_system.set_gold("tester", 1_000)
 
             success_rate = game._calculate_success_rate()
@@ -157,6 +174,7 @@ class AdventureGameTestCase(unittest.TestCase):
 
             self.assertIn("아슬아슬하게 버텼습니다", response)
             self.assertEqual(game.current_level, 2)
+            self.assertEqual(game.ship_progress.body_enhance, 2)
             self.assertEqual(point_system.get_enhancement_level("tester"), 2)
 
     def test_close_success_gets_celebration_bonus(self):
@@ -174,6 +192,9 @@ class AdventureGameTestCase(unittest.TestCase):
             self.assertIn("플라즈마 오버드라이브 축하 이펙트", response)
             self.assertIn("보너스 +", response)
             self.assertEqual(game.current_level, 1)
+            self.assertEqual(game.ship_progress.body_enhance, 1)
+            # 성공 시 파츠 중 하나가 +1
+            self.assertEqual(sum(game.ship_progress.parts.values()), 1)
 
     def test_closer_success_gets_better_celebration(self):
         game = AdventureGame(user_id="tester")

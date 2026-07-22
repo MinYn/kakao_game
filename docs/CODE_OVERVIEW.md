@@ -52,7 +52,9 @@
 - `gold(user_id PK, gold, created_at, updated_at)`
 - `gold_history(id PK, user_id indexed, amount, reason, created_at indexed)`
 - `boss_tickets(user_id PK, tickets, created_at, updated_at)`
-- `enhancement_levels(user_id PK, level, created_at, updated_at)`
+- `enhancement_levels(user_id PK, level, ship_grade, body_enhance, equipped_ship_id, part_engine, part_sensor, part_armor, created_at, updated_at)`
+  - `level` 은 `body_enhance` 와 동기화되는 하위 호환 필드
+  - 기체 등급 `ship_grade` (F~S), 본체 `body_enhance` (+N), 파츠별 +N (파츠에 등급 없음)
 - `game_stats(user_id PK, enhancement_attempts/successes/failures, hunt_normal/special/boss, total_hunts, total_hunt_reward, created_at, updated_at)`
 - `ship_collection(user_id + ship_id PK, acquired_count, first_acquired_at, last_acquired_at, user_id indexed)`
 
@@ -61,7 +63,7 @@
 ## 실행 흐름 요약
 1. `python main.py [discord|cli]`로 시작. 디스코드 모드는 봇 런타임을 시작하고 CLI 모드는 터미널 상호작용을 제공합니다.
 2. 게임 엔진은 최초 메시지에서 초기 골드를 지급하고, 골드/리더보드/게임 목록/도움말/게임 시작/종료 등의 명령을 처리합니다. 활성 게임이 있을 때는 해당 게임 객체에 명령을 위임하며, 우주 탐험 로그 게임 시 강화/임무/정산/상태/도감 확인 등의 행동을 지원합니다.
-3. 모험 게임은 강화 성공 판정에 따라 근접 성공 축하 이펙트와 보너스 골드를 지급하고, 임무 성공 시 골드 보상·득템 보너스·우주선 도감 발견을 처리합니다.
+3. 모험 게임은 기체 등급(F~S)·본체 +N·파츠 +N 체계로 강화하며, 상위 등급 기체 발견 시 본체 +N을 등가 환산 계승합니다. 강화 성공 시 근접 축하 이펙트·파츠 성장을 처리하고, 임무 성공 시 골드·득템·도감 발견을 처리합니다.
 4. Kafka 사용 시 골드·통계 이벤트가 브로커로 발행됩니다.
 
 ### 실행 흐름 다이어그램 (Mermaid)

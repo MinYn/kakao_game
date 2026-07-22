@@ -77,15 +77,22 @@ class PostgreSQLManager:
                     )
                 ''')
                 
-                # 강화 레벨 테이블
+                # 강화 레벨 테이블 (기체 등급/본체+N/파츠+N)
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS enhancement_levels (
                         user_id VARCHAR(255) PRIMARY KEY,
                         level INTEGER NOT NULL DEFAULT 0,
+                        ship_grade VARCHAR(8) NOT NULL DEFAULT 'F',
+                        body_enhance INTEGER NOT NULL DEFAULT 0,
+                        equipped_ship_id VARCHAR(100),
+                        part_engine INTEGER NOT NULL DEFAULT 0,
+                        part_sensor INTEGER NOT NULL DEFAULT 0,
+                        part_armor INTEGER NOT NULL DEFAULT 0,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
+                cls._ensure_enhancement_columns(cursor)
                 
                 # 게임 통계 테이블
                 cursor.execute('''
@@ -121,6 +128,46 @@ class PostgreSQLManager:
                 ''')
                 
                 conn.commit()
+
+    @classmethod
+    def _ensure_enhancement_columns(cls, cursor) -> None:
+        """기존 enhancement_levels 에 신규 컬럼 추가 및 level 마이그레이션."""
+        columns = {
+            "ship_grade": "VARCHAR(8) NOT NULL DEFAULT 'F'",
+            "body_enhance": "INTEGER NOT NULL DEFAULT 0",
+            "equipped_ship_id": "VARCHAR(100)",
+            "part_engine": "INTEGER NOT NULL DEFAULT 0",
+            "part_sensor": "INTEGER NOT NULL DEFAULT 0",
+            "part_armor": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for column, definition in columns.items():
+            cursor.execute(
+                '''
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'enhancement_levels' AND column_name = %s
+                ''',
+                (column,),
+            )
+            if cursor.fetchone() is None:
+                cursor.execute(
+                    f"ALTER TABLE enhancement_levels ADD COLUMN {column} {definition}"
+                )
+        cursor.execute(
+            '''
+            UPDATE enhancement_levels
+            SET body_enhance = level,
+                ship_grade = COALESCE(NULLIF(ship_grade, ''), 'F')
+            WHERE COALESCE(body_enhance, 0) = 0 AND COALESCE(level, 0) > 0
+            '''
+        )
+        cursor.execute(
+            '''
+            UPDATE enhancement_levels
+            SET level = body_enhance
+            WHERE COALESCE(level, 0) <> COALESCE(body_enhance, 0)
+              AND COALESCE(body_enhance, 0) > 0
+            '''
+        )
     
     @classmethod
     @contextmanager

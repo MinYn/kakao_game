@@ -21,6 +21,7 @@ def generate_svg(
     index: int,
     star_seed: Optional[int] = None,
     upgrade_stage: int = 0,
+    grade: str = "F",
 ) -> str:
     return _build_svg(
         variant,
@@ -28,6 +29,7 @@ def generate_svg(
         star_seed=star_seed,
         frame_index=0,
         upgrade_stage=upgrade_stage,
+        grade=grade,
     )
 
 
@@ -37,6 +39,7 @@ def generate_svg_frames(
     star_seed: Optional[int] = None,
     frame_count: int = 2,
     upgrade_stage: int = 0,
+    grade: str = "F",
 ) -> list[str]:
     return [
         _build_svg(
@@ -45,6 +48,7 @@ def generate_svg_frames(
             star_seed=star_seed,
             frame_index=frame,
             upgrade_stage=upgrade_stage,
+            grade=grade,
         )
         for frame in range(frame_count)
     ]
@@ -57,6 +61,7 @@ def _build_svg(
     star_seed: Optional[int],
     frame_index: int,
     upgrade_stage: int,
+    grade: str = "F",
 ) -> str:
     badge_id = f"badge_{index}"
     defs = _get_defs(badge_id, variant.color)
@@ -69,6 +74,7 @@ def _build_svg(
     )
     star_random = random.Random(star_seed)
     upgrade_overlay = _get_upgrade_overlay(badge_id, upgrade_stage)
+    grade_mark = _get_grade_mark(badge_id, grade)
 
     return f"""
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full" shape-rendering="crispEdges">
@@ -92,6 +98,7 @@ def _build_svg(
     </g>
 
     {upgrade_overlay}
+    {grade_mark}
 
     <g shape-rendering="crispEdges">
         <circle cx="256" cy="256" r="238" fill="none" stroke="#ff8fab" stroke-width="12" />
@@ -205,6 +212,31 @@ def _get_upgrade_overlay(badge_id: str, upgrade_stage: int) -> str:
     return f"""
 <g filter="url(#glow_{badge_id})">
     {''.join(rings)}
+</g>
+""".strip()
+
+
+def _get_grade_mark(badge_id: str, grade: str) -> str:
+    """기체 등급(F~S) 마크. 파츠 등급이 아닌 본체 티어 표시."""
+    from games.ship_system import parse_grade
+
+    letter = parse_grade(grade).value
+    colors = {
+        "F": "#cfd8dc",
+        "E": "#a5d6a7",
+        "D": "#81d4fa",
+        "C": "#ce93d8",
+        "B": "#ffcc80",
+        "A": "#ffd54f",
+        "S": "#ff8a80",
+    }
+    fill = colors.get(letter, "#fff0f6")
+    return f"""
+<g shape-rendering="crispEdges">
+  <rect x="48" y="48" width="56" height="40" fill="#3b1d2f" opacity="0.85"/>
+  <rect x="52" y="52" width="48" height="32" fill="{fill}"/>
+  <text x="76" y="76" font-family="Galmuri11, monospace" font-size="22" font-weight="bold"
+        fill="#3b1d2f" text-anchor="middle">{letter}</text>
 </g>
 """.strip()
 

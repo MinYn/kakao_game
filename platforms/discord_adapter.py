@@ -529,7 +529,12 @@ class DiscordAdapter(ChatPlatform):
         }:
             return True
 
-        if "현재 우주선 강화 레벨" in response or "콜사인" in response:
+        if (
+            "현재 우주선 강화 레벨" in response
+            or "현재 우주선:" in response
+            or "콜사인" in response
+            or "★" in response and "강" in response
+        ):
             return True
 
         return False
@@ -539,10 +544,13 @@ class DiscordAdapter(ChatPlatform):
             service = SpaceBadgeService()
             offset = 0
             upgrade_stage = 0
+            grade = "F"
             if self.engine and hasattr(self.engine, "get_badge_offset"):
                 offset = self.engine.get_badge_offset(user_id)
             if self.engine and hasattr(self.engine, "get_badge_upgrade_stage"):
                 upgrade_stage = self.engine.get_badge_upgrade_stage(user_id)
+            if self.engine and hasattr(self.engine, "get_badge_ship_grade"):
+                grade = self.engine.get_badge_ship_grade(user_id)
             variant = service.get_variant_for_user(user_id, offset=offset)
             variant_index = service.find_variant_index(variant)
             star_seed = service.stable_seed(f"{user_id}:{offset}")
@@ -552,6 +560,7 @@ class DiscordAdapter(ChatPlatform):
                 star_seed=star_seed,
                 frame_count=2,
                 upgrade_stage=upgrade_stage,
+                grade=grade,
             )
             try:
                 return self.image_generator.generate_svg_gif(
@@ -565,6 +574,7 @@ class DiscordAdapter(ChatPlatform):
                     variant_index,
                     star_seed=star_seed,
                     upgrade_stage=upgrade_stage,
+                    grade=grade,
                 )
                 return self.image_generator.generate_svg_image(
                     svg_code,
