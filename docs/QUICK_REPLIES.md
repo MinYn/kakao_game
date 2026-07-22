@@ -116,7 +116,7 @@
 
 **표시되는 버튼**:
 - 🔨 강화 → `강화` 명령 전송
-- 🛰️ 정찰 → `정찰` 명령 전송
+- 🚀 출동 → `출동` 명령 전송 (정찰·탐사·구조 랜덤 이벤트)
 - 💰 판매 → `판매` 명령 전송
 - 📊 상태 → `상태` 명령 전송
 - 🏆 랭킹 → `리더보드` 명령 전송
@@ -152,7 +152,7 @@
 1. **모험 게임 시작**
    - `게임시작 모험` 또는 `@게임봇 게임시작 모험`
 2. **게임 중 응답 확인**
-   - 🔨 강화, 🛰️ 정찰, 🧭 탐사, 🚨 구조, 📚 도감 등 게임 관련 버튼이 표시됨
+   - 🔨 강화, 🚀 출동, 📚 도감 등 게임 관련 버튼이 표시됨
 
 ---
 
@@ -187,9 +187,7 @@ def _get_space_quick_replies(self) -> list:
     """우주 탐험 임무 Quick Replies"""
     return [
         {'action': 'message', 'label': '✨ 강화', 'messageText': '성장'},
-        {'action': 'message', 'label': '🛰️ 정찰', 'messageText': '정찰'},
-        {'action': 'message', 'label': '🔬 탐사', 'messageText': '탐사'},
-        {'action': 'message', 'label': '🚑 구조', 'messageText': '구조'},
+        {'action': 'message', 'label': '🚀 출동', 'messageText': '출동'},
         {'action': 'message', 'label': '📚 도감', 'messageText': '도감'},
         {'action': 'message', 'label': '📊 상태', 'messageText': '상태'},
         {'action': 'message', 'label': '❌ 종료', 'messageText': '게임종료'},
@@ -261,7 +259,7 @@ def _get_space_quick_replies(self) -> list:
 
 ✅ **구현 완료**:
 - 기본 Quick Replies 버튼 (골드, 게임시작, 랭킹 등)
-- 모험 게임 Quick Replies 버튼 (강화, 정찰, 탐사, 구조, 도감 등)
+- 모험 게임 Quick Replies 버튼 (강화, 출동, 도감 등)
 - 게임 상태에 따라 자동으로 버튼 변경
 
 ✅ **사용 방법**:
