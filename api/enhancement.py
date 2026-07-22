@@ -30,15 +30,26 @@ def set_enhancement_level(
     level_update: EnhancementLevelUpdate,
     db: Session = Depends(get_db)
 ):
-    """강화 레벨 설정"""
+    """본체 +N 설정. level 과 body_enhance 를 동기화 (레거시 API 호환)."""
+    body = max(0, level_update.level)
     level = db.query(EnhancementLevel).filter(EnhancementLevel.user_id == user_id).first()
-    
+
     if level:
-        level.level = max(0, level_update.level)
+        level.level = body
+        if hasattr(level, "body_enhance"):
+            level.body_enhance = body
+        if hasattr(level, "ship_grade") and not level.ship_grade:
+            level.ship_grade = "F"
     else:
-        level = EnhancementLevel(user_id=user_id, level=max(0, level_update.level))
+        kwargs = {"user_id": user_id, "level": body}
+        # SQLAlchemy 모델에 신규 컬럼이 있으면 함께 초기화
+        if hasattr(EnhancementLevel, "body_enhance"):
+            kwargs["body_enhance"] = body
+        if hasattr(EnhancementLevel, "ship_grade"):
+            kwargs["ship_grade"] = "F"
+        level = EnhancementLevel(**kwargs)
         db.add(level)
-    
+
     db.commit()
     db.refresh(level)
     return level

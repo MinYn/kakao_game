@@ -469,18 +469,36 @@ class GameEngine:
         return int(game.game_data.get("badge_cycle", 0))
 
     def get_badge_upgrade_stage(self, user_id: str) -> int:
-        """강화 횟수 기반 배지 업그레이드 단계"""
+        """본체 +N 기반 배지 업그레이드 단계 (attempts 기반 폐기)."""
         game = self.active_games.get(user_id)
-        if not game or not hasattr(game, "game_data"):
-            return 0
+        if game and hasattr(game, "get_badge_upgrade_stage"):
+            return int(game.get_badge_upgrade_stage())
+        if game and hasattr(game, "ship_progress"):
+            from games.ship_system import body_enhance_to_upgrade_stage
 
-        attempts = int(game.game_data.get("attempts", 0))
-        if attempts >= 20:
-            return 3
-        if attempts >= 10:
-            return 2
-        if attempts >= 5:
-            return 1
+            return body_enhance_to_upgrade_stage(game.ship_progress.body_enhance)
+        if game and hasattr(game, "current_level"):
+            from games.ship_system import body_enhance_to_upgrade_stage
+
+            return body_enhance_to_upgrade_stage(int(game.current_level))
+        return 0
+
+    def get_badge_ship_grade(self, user_id: str) -> str:
+        """활성 기체 등급(F~S) — 배지 마크용."""
+        game = self.active_games.get(user_id)
+        if game and hasattr(game, "get_ship_grade_value"):
+            return game.get_ship_grade_value()
+        if game and hasattr(game, "ship_progress"):
+            return game.ship_progress.grade.value
+        return "F"
+
+    def get_badge_body_enhance(self, user_id: str) -> int:
+        """활성 기체 본체 +N — 배지 하단 숫자 스타일용."""
+        game = self.active_games.get(user_id)
+        if game and hasattr(game, "ship_progress"):
+            return int(game.ship_progress.body_enhance)
+        if game and hasattr(game, "current_level"):
+            return int(game.current_level)
         return 0
     
     def get_hunt_image_data(self, user_id: str, command: str, response: str) -> Optional[Dict[str, Any]]:

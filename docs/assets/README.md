@@ -1,11 +1,9 @@
 # Preview assets
 
-Binary image previews are intentionally not committed because this review environment may show
-"binary files are not supported" for PNG files.
+- [`pixel_ship_badge_preview.svg`](pixel_ship_badge_preview.svg) — 초기 픽셀 배지 프리뷰
+- [`ship_samples/`](ship_samples/) — 이슈 #15 기체 샘플 (shape / 등급 F~S / 본체 +N / 도감 예시)
 
-Use the SVG preview instead:
-
-- [`pixel_ship_badge_preview.svg`](pixel_ship_badge_preview.svg)
+SVG와 PNG를 함께 커밋합니다. GitHub PR에서 PNG 미리보기가 가능합니다.
 
 To render a local PNG preview when needed:
 

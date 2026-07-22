@@ -371,32 +371,105 @@ class GoldSystemPostgres:
                 return True
     
     def get_enhancement_level(self, user_id: str) -> int:
-        """강화 레벨 조회"""
-        with PostgreSQLManager.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute('SELECT level FROM enhancement_levels WHERE user_id = %s', (user_id,))
-                result = cursor.fetchone()
-                return result[0] if result else 0
+        """기체 본체 +N강 조회 (하위 호환: 기존 level)."""
+        return self.get_ship_progress(user_id).body_enhance
     
     def set_enhancement_level(self, user_id: str, level: int) -> None:
-        """강화 레벨 설정"""
+        """기체 본체 +N강 설정 (등급/파츠 유지)."""
+        progress = self.get_ship_progress(user_id).with_body_enhance(level)
+        self.set_ship_progress(user_id, progress)
+
+    def get_ship_progress(self, user_id: str):
+        """활성 기체 진행 상태 조회."""
+        from games.ship_system import ShipProgress
+
         with PostgreSQLManager.get_connection() as conn:
             with conn.cursor() as cursor:
-                level = max(0, level)
-                cursor.execute('SELECT level FROM enhancement_levels WHERE user_id = %s', (user_id,))
+                cursor.execute(
+                    '''
+                    SELECT level, ship_grade, body_enhance, equipped_ship_id,
+                           part_engine, part_sensor, part_armor
+                    FROM enhancement_levels WHERE user_id = %s
+                    ''',
+                    (user_id,),
+                )
                 result = cursor.fetchone()
-                
-                if result:
+                if not result:
+                    return ShipProgress()
+                return ShipProgress.from_record(
+                    {
+                        "level": result[0],
+                        "ship_grade": result[1],
+                        "body_enhance": result[2],
+                        "equipped_ship_id": result[3],
+                        "part_engine": result[4],
+                        "part_sensor": result[5],
+                        "part_armor": result[6],
+                    },
+                    legacy_level_fallback=False,
+                )
+
+    def set_ship_progress(self, user_id: str, progress) -> None:
+        """활성 기체 진행 상태 저장. level 은 body_enhance 와 동기화."""
+        from games.ship_system import ShipProgress
+
+        if not isinstance(progress, ShipProgress):
+            progress = ShipProgress.from_record(progress)
+        record = progress.to_record()
+        body = max(0, int(record["body_enhance"]))
+        grade = record["ship_grade"] or "F"
+        equipped = record.get("equipped_ship_id")
+        part_engine = max(0, int(record.get("part_engine", 0)))
+        part_sensor = max(0, int(record.get("part_sensor", 0)))
+        part_armor = max(0, int(record.get("part_armor", 0)))
+
+        with PostgreSQLManager.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT user_id FROM enhancement_levels WHERE user_id = %s',
+                    (user_id,),
+                )
+                exists = cursor.fetchone()
+                if exists:
                     cursor.execute(
-                        'UPDATE enhancement_levels SET level = %s, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s',
-                        (level, user_id)
+                        '''
+                        UPDATE enhancement_levels
+                        SET level = %s, ship_grade = %s, body_enhance = %s,
+                            equipped_ship_id = %s, part_engine = %s,
+                            part_sensor = %s, part_armor = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = %s
+                        ''',
+                        (
+                            body,
+                            grade,
+                            body,
+                            equipped,
+                            part_engine,
+                            part_sensor,
+                            part_armor,
+                            user_id,
+                        ),
                     )
                 else:
                     cursor.execute(
-                        'INSERT INTO enhancement_levels (user_id, level) VALUES (%s, %s)',
-                        (user_id, level)
+                        '''
+                        INSERT INTO enhancement_levels (
+                            user_id, level, ship_grade, body_enhance, equipped_ship_id,
+                            part_engine, part_sensor, part_armor
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ''',
+                        (
+                            user_id,
+                            body,
+                            grade,
+                            body,
+                            equipped,
+                            part_engine,
+                            part_sensor,
+                            part_armor,
+                        ),
                     )
-                
                 conn.commit()
     
     def get_game_stats(self, user_id: str) -> dict:

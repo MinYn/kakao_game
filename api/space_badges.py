@@ -17,24 +17,26 @@ gold_system = GoldSystemPostgres()
 
 @router.get("/{user_id}", response_model=SpaceBadgeResponse)
 def get_space_badge(user_id: str):
-    """사용자 배지 조회 (DB 없이 결정적 랜덤)"""
+    """사용자 배지 조회. 저장된 기체 등급·본체 +N 을 SVG 에 반영."""
     variant = service.get_variant_for_user(user_id, offset=0)
     variant_index = service.find_variant_index(variant)
-    stats = gold_system.get_game_stats(user_id)
-    upgrade_stage = service.upgrade_stage_from_attempts(
-        stats.get("enhancement_attempts", 0)
-    )
+    progress = gold_system.get_ship_progress(user_id)
+    grade = progress.grade.value
+    body_enhance = progress.body_enhance
+    upgrade_stage = service.upgrade_stage_from_body_enhance(body_enhance)
     svg_code = generate_svg(
         variant,
         variant_index,
         star_seed=service.stable_seed(user_id),
         upgrade_stage=upgrade_stage,
+        grade=grade,
+        body_enhance=body_enhance,
     )
     now = datetime.utcnow()
     return SpaceBadgeResponse(
         user_id=user_id,
         name=variant.name,
-        sub=variant.sub,
+        sub=f"+{body_enhance}",
         shape=variant.shape.value,
         color=variant.color,
         svg=svg_code,

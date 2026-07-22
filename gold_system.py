@@ -47,15 +47,22 @@ class GoldSystem:
             )
         ''')
         
-        # 강화 레벨 테이블 생성
+        # 강화 레벨 테이블 생성 (기체 등급/본체+N/파츠+N 확장)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS enhancement_levels (
                 user_id TEXT PRIMARY KEY,
                 level INTEGER NOT NULL DEFAULT 0,
+                ship_grade TEXT NOT NULL DEFAULT 'F',
+                body_enhance INTEGER NOT NULL DEFAULT 0,
+                equipped_ship_id TEXT,
+                part_engine INTEGER NOT NULL DEFAULT 0,
+                part_sensor INTEGER NOT NULL DEFAULT 0,
+                part_armor INTEGER NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        self._ensure_enhancement_columns(cursor)
         
         # 게임 통계 테이블 생성
         cursor.execute('''
@@ -91,6 +98,48 @@ class GoldSystem:
         
         conn.commit()
         conn.close()
+
+    def _ensure_enhancement_columns(self, cursor) -> None:
+        """기존 DB에 기체 체계 컬럼을 추가하고 레거시 level 을 1회 이전."""
+        cursor.execute("PRAGMA table_info(enhancement_levels)")
+        existing = {row[1] for row in cursor.fetchall()}
+        body_column_added = "body_enhance" not in existing
+        alterations = {
+            "ship_grade": "TEXT NOT NULL DEFAULT 'F'",
+            "body_enhance": "INTEGER NOT NULL DEFAULT 0",
+            "equipped_ship_id": "TEXT",
+            "part_engine": "INTEGER NOT NULL DEFAULT 0",
+            "part_sensor": "INTEGER NOT NULL DEFAULT 0",
+            "part_armor": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for column, definition in alterations.items():
+            if column not in existing:
+                cursor.execute(
+                    f"ALTER TABLE enhancement_levels ADD COLUMN {column} {definition}"
+                )
+        # 레거시 → 신규 복사는 body_enhance 컬럼을 방금 추가한 최초 1회만 수행한다.
+        # 이후에는 body_enhance 가 원본이고 level 은 하위 호환 mirror 이다.
+        if body_column_added:
+            cursor.execute(
+                """
+                UPDATE enhancement_levels
+                SET body_enhance = MAX(COALESCE(level, 0), 0),
+                    ship_grade = COALESCE(NULLIF(ship_grade, ''), 'F')
+                """
+            )
+        cursor.execute(
+            """
+            UPDATE enhancement_levels
+            SET ship_grade = COALESCE(NULLIF(ship_grade, ''), 'F')
+            """
+        )
+        cursor.execute(
+            """
+            UPDATE enhancement_levels
+            SET level = MAX(COALESCE(body_enhance, 0), 0)
+            WHERE COALESCE(level, 0) <> COALESCE(body_enhance, 0)
+            """
+        )
 
     def add_ship_to_collection(self, user_id: str, ship_id: str) -> dict:
         """우주선 도감에 함선 추가. 중복 획득 시 카운트만 증가."""
@@ -404,36 +453,97 @@ class GoldSystem:
         return True
     
     def get_enhancement_level(self, user_id: str) -> int:
-        """강화 레벨 조회"""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT level FROM enhancement_levels WHERE user_id = ?', (user_id,))
-        result = cursor.fetchone()
-        
-        conn.close()
-        return result['level'] if result else 0
+        """기체 본체 +N강 조회 (하위 호환: 기존 level)."""
+        progress = self.get_ship_progress(user_id)
+        return progress.body_enhance
     
     def set_enhancement_level(self, user_id: str, level: int) -> None:
-        """강화 레벨 설정"""
+        """기체 본체 +N강 설정 (등급/파츠 유지)."""
+        progress = self.get_ship_progress(user_id)
+        progress = progress.with_body_enhance(level)
+        self.set_ship_progress(user_id, progress)
+
+    def get_ship_progress(self, user_id: str):
+        """활성 기체 진행 상태 조회."""
+        from games.ship_system import ShipProgress
+
         conn = self._get_connection()
         cursor = conn.cursor()
-        
-        level = max(0, level)  # 최소 0
-        cursor.execute('SELECT level FROM enhancement_levels WHERE user_id = ?', (user_id,))
+        cursor.execute(
+            '''
+            SELECT level, ship_grade, body_enhance, equipped_ship_id,
+                   part_engine, part_sensor, part_armor
+            FROM enhancement_levels WHERE user_id = ?
+            ''',
+            (user_id,),
+        )
         result = cursor.fetchone()
-        
-        if result:
+        conn.close()
+        if not result:
+            return ShipProgress()
+        # 초기화 시 스키마 이전/단방향 mirror 를 완료했으므로 body_enhance 가 원본이다.
+        return ShipProgress.from_record(
+            dict(result),
+            legacy_level_fallback=False,
+        )
+
+    def set_ship_progress(self, user_id: str, progress) -> None:
+        """활성 기체 진행 상태 저장. level 은 body_enhance 와 동기화."""
+        from games.ship_system import ShipProgress
+
+        if not isinstance(progress, ShipProgress):
+            progress = ShipProgress.from_record(progress)
+        record = progress.to_record()
+        body = max(0, int(record["body_enhance"]))
+        grade = record["ship_grade"] or "F"
+        equipped = record.get("equipped_ship_id")
+        part_engine = max(0, int(record.get("part_engine", 0)))
+        part_sensor = max(0, int(record.get("part_sensor", 0)))
+        part_armor = max(0, int(record.get("part_armor", 0)))
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT user_id FROM enhancement_levels WHERE user_id = ?', (user_id,))
+        exists = cursor.fetchone()
+        if exists:
             cursor.execute(
-                'UPDATE enhancement_levels SET level = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
-                (level, user_id)
+                '''
+                UPDATE enhancement_levels
+                SET level = ?, ship_grade = ?, body_enhance = ?, equipped_ship_id = ?,
+                    part_engine = ?, part_sensor = ?, part_armor = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                ''',
+                (
+                    body,
+                    grade,
+                    body,
+                    equipped,
+                    part_engine,
+                    part_sensor,
+                    part_armor,
+                    user_id,
+                ),
             )
         else:
             cursor.execute(
-                'INSERT INTO enhancement_levels (user_id, level) VALUES (?, ?)',
-                (user_id, level)
+                '''
+                INSERT INTO enhancement_levels (
+                    user_id, level, ship_grade, body_enhance, equipped_ship_id,
+                    part_engine, part_sensor, part_armor
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    user_id,
+                    body,
+                    grade,
+                    body,
+                    equipped,
+                    part_engine,
+                    part_sensor,
+                    part_armor,
+                ),
             )
-        
         conn.commit()
         conn.close()
     

@@ -52,16 +52,29 @@ class BossTicket(Base):
 
 
 class EnhancementLevel(Base):
-    """강화 레벨 테이블 모델"""
+    """강화/기체 진행 테이블 모델.
+
+    level 은 body_enhance 와 동기화되는 하위 호환 필드.
+    기체 등급(F~S), 본체 +N, 파츠별 +N 을 저장한다.
+    """
     __tablename__ = "enhancement_levels"
     
     user_id = Column(String(255), primary_key=True)
     level = Column(Integer, nullable=False, default=0)
+    ship_grade = Column(String(8), nullable=False, default="F")
+    body_enhance = Column(Integer, nullable=False, default=0)
+    equipped_ship_id = Column(String(100), nullable=True)
+    part_engine = Column(Integer, nullable=False, default=0)
+    part_sensor = Column(Integer, nullable=False, default=0)
+    part_armor = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     def __repr__(self):
-        return f"<EnhancementLevel(user_id='{self.user_id}', level={self.level})>"
+        return (
+            f"<EnhancementLevel(user_id='{self.user_id}', grade={self.ship_grade}, "
+            f"body=+{self.body_enhance})>"
+        )
 
 
 class GameStats(Base):

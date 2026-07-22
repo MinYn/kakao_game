@@ -77,15 +77,22 @@ class PostgreSQLManager:
                     )
                 ''')
                 
-                # 강화 레벨 테이블
+                # 강화 레벨 테이블 (기체 등급/본체+N/파츠+N)
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS enhancement_levels (
                         user_id VARCHAR(255) PRIMARY KEY,
                         level INTEGER NOT NULL DEFAULT 0,
+                        ship_grade VARCHAR(8) NOT NULL DEFAULT 'F',
+                        body_enhance INTEGER NOT NULL DEFAULT 0,
+                        equipped_ship_id VARCHAR(100),
+                        part_engine INTEGER NOT NULL DEFAULT 0,
+                        part_sensor INTEGER NOT NULL DEFAULT 0,
+                        part_armor INTEGER NOT NULL DEFAULT 0,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
+                cls._ensure_enhancement_columns(cursor)
                 
                 # 게임 통계 테이블
                 cursor.execute('''
@@ -121,6 +128,58 @@ class PostgreSQLManager:
                 ''')
                 
                 conn.commit()
+
+    @classmethod
+    def _ensure_enhancement_columns(cls, cursor) -> None:
+        """기존 enhancement_levels 에 신규 컬럼을 추가하고 level 을 1회 이전."""
+        columns = {
+            "ship_grade": "VARCHAR(8) NOT NULL DEFAULT 'F'",
+            "body_enhance": "INTEGER NOT NULL DEFAULT 0",
+            "equipped_ship_id": "VARCHAR(100)",
+            "part_engine": "INTEGER NOT NULL DEFAULT 0",
+            "part_sensor": "INTEGER NOT NULL DEFAULT 0",
+            "part_armor": "INTEGER NOT NULL DEFAULT 0",
+        }
+        body_column_added = False
+        for column, definition in columns.items():
+            cursor.execute(
+                '''
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'enhancement_levels'
+                  AND column_name = %s
+                ''',
+                (column,),
+            )
+            if cursor.fetchone() is None:
+                cursor.execute(
+                    f"ALTER TABLE enhancement_levels ADD COLUMN {column} {definition}"
+                )
+                if column == "body_enhance":
+                    body_column_added = True
+        # 레거시 → 신규 복사는 body_enhance 컬럼을 방금 추가한 최초 1회만 수행한다.
+        # 이후에는 body_enhance 가 원본이고 level 은 하위 호환 mirror 이다.
+        if body_column_added:
+            cursor.execute(
+                '''
+                UPDATE enhancement_levels
+                SET body_enhance = GREATEST(COALESCE(level, 0), 0),
+                    ship_grade = COALESCE(NULLIF(ship_grade, ''), 'F')
+                '''
+            )
+        cursor.execute(
+            '''
+            UPDATE enhancement_levels
+            SET ship_grade = COALESCE(NULLIF(ship_grade, ''), 'F')
+            '''
+        )
+        cursor.execute(
+            '''
+            UPDATE enhancement_levels
+            SET level = GREATEST(COALESCE(body_enhance, 0), 0)
+            WHERE COALESCE(level, 0) <> COALESCE(body_enhance, 0)
+            '''
+        )
     
     @classmethod
     @contextmanager
