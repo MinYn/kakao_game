@@ -20,11 +20,63 @@ class AdventureGameTestCase(unittest.TestCase):
         game = AdventureGame(user_id="tester")
         start_message = game.start()
         self.assertIn("우주 탐험", start_message)
+        self.assertIn("출동", start_message)
 
-        random.seed(0)
-        response = game.process_command("정찰")
-        self.assertIn("활동", response)
+        # 성공 판정/보상 롤은 통과시키고 이벤트 타입만 고정
+        scout = game._get_activity_type("정찰")
+        with patch.object(game, "_select_random_activity", return_value=scout), patch(
+            "games.adventure.random.random", return_value=0.0
+        ):
+            response = game.process_command("출동")
+        self.assertIn("정찰 성공", response)
+        self.assertIn("랜덤 이벤트", response)
         self.assertIn("현재 골드", response)
+
+    def test_legacy_activity_commands_alias_to_mission(self):
+        game = AdventureGame(user_id="tester")
+        game.start()
+        scout = game._get_activity_type("정찰")
+        with patch.object(game, "_select_random_activity", return_value=scout) as select_mock, patch(
+            "games.adventure.random.random", return_value=0.0
+        ):
+            for command in ("정찰", "탐사", "구조", "mission", "출동"):
+                response = game.process_command(command)
+                self.assertIn("랜덤 이벤트", response)
+        self.assertEqual(select_mock.call_count, 5)
+
+    def test_mission_excludes_rescue_without_pass(self):
+        with tempfile.NamedTemporaryFile() as db_file:
+            point_system = GoldSystem(db_file.name)
+            game = AdventureGame(user_id="tester", point_system=point_system)
+            game.start()
+            self.assertEqual(point_system.get_boss_tickets("tester"), 0)
+
+            selected = {game._select_random_activity().name for _ in range(80)}
+            self.assertIn("정찰", selected)
+            self.assertIn("탐사", selected)
+            self.assertNotIn("구조", selected)
+
+    def test_mission_can_select_rescue_with_pass(self):
+        with tempfile.NamedTemporaryFile() as db_file:
+            point_system = GoldSystem(db_file.name)
+            game = AdventureGame(user_id="tester", point_system=point_system)
+            game.start()
+            point_system.add_boss_ticket("tester", 3, "test grant")
+
+            selected = {game._select_random_activity().name for _ in range(200)}
+            self.assertIn("구조", selected)
+
+    def test_mission_button_is_unified(self):
+        game = AdventureGame(user_id="tester")
+        game.start()
+        buttons = game.get_command_buttons()
+        labels = [b["label"] for b in buttons]
+        messages = [b["messageText"] for b in buttons]
+        self.assertIn("🚀 출동", labels)
+        self.assertIn("출동", messages)
+        self.assertNotIn("정찰", messages)
+        self.assertNotIn("탐사", messages)
+        self.assertNotIn("구조", messages)
 
     def test_growth_cost_increases(self):
         game = AdventureGame(user_id="tester")

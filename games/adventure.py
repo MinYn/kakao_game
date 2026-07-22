@@ -19,6 +19,9 @@ class ActivityType:
     success_rate: float = 80.0
     success_messages: tuple[str, ...] = ()
     fail_messages: tuple[str, ...] = ()
+    # 통합 출동 시 랜덤 선택 가중치 (높을수록 자주 등장)
+    weight: int = 1
+    icon: str = "🎯"
 
 
 @dataclass(frozen=True)
@@ -197,7 +200,11 @@ class AdventureGame(Game):
         return {"ship_id": ship.ship_id, "is_new": old_count == 0, "count": collection[ship.ship_id]}
 
     def _init_activities(self) -> list:
-        """활동 타입 초기화"""
+        """활동 타입 초기화.
+
+        정찰/탐사/구조는 통합 '출동' 커맨드에서 가중치 랜덤으로 결정된다.
+        weight 합계 기준 대략: 정찰 50% / 탐사 35% / 구조 15% (패스 있을 때).
+        """
         return [
             ActivityType(
                 name="정찰",
@@ -206,6 +213,8 @@ class AdventureGame(Game):
                 multiplier=0.08,
                 prompts=("정찰", "scout", "walk", "n", "1"),
                 success_rate=86.0,
+                weight=50,
+                icon="🛰️",
                 success_messages=(
                     "{pilot}이(가) 저궤도 정찰을 마치고 안전하게 복귀했습니다.",
                     "{pilot} 콜사인이 남긴 센서 로그가 깔끔합니다!",
@@ -224,6 +233,8 @@ class AdventureGame(Game):
                 multiplier=0.12,
                 prompts=("탐사", "survey", "play", "s", "2"),
                 success_rate=78.0,
+                weight=35,
+                icon="🧭",
                 success_messages=(
                     "{pilot}이(가) 샘플 채취에 성공했습니다! 분석 크레딧 확보.",
                     "{pilot}이(가) 지질 코어를 회수하고 보고서를 남겼습니다.",
@@ -242,6 +253,8 @@ class AdventureGame(Game):
                 multiplier=0.17,
                 prompts=("구조", "rescue", "challenge", "boss", "b", "3"),
                 success_rate=64.0,
+                weight=15,
+                icon="🚨",
                 success_messages=(
                     "{pilot}이(가) 조난 신호를 따라가 승선자를 무사히 구출했습니다!",
                     "{pilot} 팀이 위험 구역을 돌파해 화물을 회수했습니다!",
@@ -289,22 +302,37 @@ class AdventureGame(Game):
                 "button": {"label": "🎫 패스", "messageText": "패스"},
             },
             {
-                "key": "scout",
-                "triggers": ["정찰", "walk", "scout", "n", "1"],
-                "handler": lambda: self._perform_activity("정찰"),
-                "button": {"label": "🛰️ 정찰", "messageText": "정찰"},
-            },
-            {
-                "key": "survey",
-                "triggers": ["탐사", "play", "survey", "s", "2", "특별놀이"],
-                "handler": lambda: self._perform_activity("탐사"),
-                "button": {"label": "🧭 탐사", "messageText": "탐사"},
-            },
-            {
-                "key": "rescue",
-                "triggers": ["구조", "challenge", "rescue", "boss", "b", "3"],
-                "handler": lambda: self._perform_activity("구조"),
-                "button": {"label": "🚨 구조", "messageText": "구조"},
+                # 정찰/탐사/구조를 단일 진입점으로 통합. 실행 시 이벤트 종류가 랜덤 결정됨.
+                # 기존 개별 커맨드(정찰/탐사/구조 등)는 alias로 유지해 호환.
+                "key": "mission",
+                "triggers": [
+                    "출동",
+                    "mission",
+                    "탐험",
+                    "go",
+                    "m",
+                    "0",
+                    # 기존 개별 커맨드 alias
+                    "정찰",
+                    "walk",
+                    "scout",
+                    "n",
+                    "1",
+                    "탐사",
+                    "play",
+                    "survey",
+                    "s",
+                    "2",
+                    "특별놀이",
+                    "구조",
+                    "challenge",
+                    "rescue",
+                    "boss",
+                    "b",
+                    "3",
+                ],
+                "handler": self._perform_mission,
+                "button": {"label": "🚀 출동", "messageText": "출동"},
             },
         ]
 
@@ -312,9 +340,7 @@ class AdventureGame(Game):
         """모험 게임용 버튼 우선순위 제공"""
         key_order = [
             "enhance",
-            "scout",
-            "survey",
-            "rescue",
+            "mission",
             "codex",
             "sell",
             "status",
@@ -411,10 +437,9 @@ class AdventureGame(Game):
             "📊 상태보기: '상태'/'status'\n"
             "📚 도감보기: '도감'/'collection'\n\n"
             "🎯 활동:\n"
-            "- '정찰'/'scout': 기본 센서 임무\n"
-            "- '탐사'/'survey': 샘플 채취 (패스 드랍 가능)\n"
-            "- '구조'/'rescue': 패스를 사용한 고난도 구조 임무\n"
-            "- '패스'/'ticket': 보유 구조 패스 확인"
+            "- '출동'/'mission': 랜덤 이벤트(정찰·탐사·구조) 임무 진행\n"
+            "- '패스'/'ticket': 보유 구조 패스 확인\n"
+            "💡 기존 '정찰'/'탐사'/'구조' 입력도 출동으로 연결됩니다."
         )
 
     def process_command(self, command: str) -> str:
@@ -429,7 +454,7 @@ class AdventureGame(Game):
 
         fallback = (
             "알 수 없는 명령입니다.\n"
-            "사용 가능한 명령: 성장, 정산, 정찰, 탐사, 구조, 패스, 상태, 도감"
+            "사용 가능한 명령: 성장, 정산, 출동, 패스, 상태, 도감"
         )
         if start_message:
             return f"{start_message}\n\n{fallback}"
@@ -613,6 +638,39 @@ class AdventureGame(Game):
                 return activity
         return None
 
+    def _has_challenge_pass(self) -> bool:
+        """구조 임무 진행 가능 여부. point_system 없으면 로컬 플레이로 패스 제한 없음."""
+        if not self.point_system:
+            return True
+        return self._get_challenge_passes() > 0
+
+    def _select_random_activity(self) -> ActivityType:
+        """출동 시 이벤트 타입을 가중치 랜덤으로 결정.
+
+        구조 이벤트는 패스가 있을 때만 후보에 포함된다.
+        기존 hunt_normal/special/boss 통계 키는 실제 출현 이벤트 기준으로 유지된다.
+        """
+        candidates: list[ActivityType] = []
+        weights: list[int] = []
+        can_rescue = self._has_challenge_pass()
+
+        for activity in self.activities:
+            if activity.name == "구조" and not can_rescue:
+                continue
+            candidates.append(activity)
+            weights.append(max(activity.weight, 1))
+
+        if not candidates:
+            # 방어적 폴백: 항상 정찰은 존재해야 함
+            return self.activities[0]
+
+        return random.choices(candidates, weights=weights, k=1)[0]
+
+    def _perform_mission(self) -> str:
+        """통합 출동: 랜덤 이벤트를 고른 뒤 기존 활동 보상/실패 흐름을 실행."""
+        activity = self._select_random_activity()
+        return self._perform_activity(activity)
+
     def _calculate_activity_reward(self, activity: ActivityType) -> int:
         reward_multiplier = 1.0 + (
             self.current_level * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER)
@@ -645,10 +703,13 @@ class AdventureGame(Game):
         ship = self._roll_collectible_ship()
         return ship, self._grant_ship_to_collection(ship)
 
-    def _perform_activity(self, activity_name: str) -> str:
-        activity = self._get_activity_type(activity_name)
-        if activity is None:
-            return "❌ 해당 활동을 찾을 수 없습니다. 정찰, 탐사, 구조를 입력해 주세요."
+    def _perform_activity(self, activity: ActivityType | str) -> str:
+        """개별 활동 실행. 통합 출동에서 선택된 ActivityType 또는 이름 문자열을 받는다."""
+        if isinstance(activity, str):
+            resolved = self._get_activity_type(activity)
+            if resolved is None:
+                return "❌ 해당 활동을 찾을 수 없습니다. '출동'으로 임무를 진행해 주세요."
+            activity = resolved
 
         if activity.name == "구조":
             if not self._use_challenge_pass():
@@ -656,11 +717,12 @@ class AdventureGame(Game):
                 return (
                     "❌ 구조 임무 패스가 부족합니다.\n"
                     f"보유 패스: {passes}장\n"
-                    "'탐사'를 하면 패스를 얻을 수 있어요."
+                    "출동 중 탐사 이벤트가 나오면 패스를 얻을 수 있어요."
                 )
 
         success_rate = self._calculate_success_rate(activity)
         pilot_name = self.explorer_profile.call_sign if self.explorer_profile else "탐사대"
+        event_header = f"🎲 랜덤 이벤트: {activity.icon} {activity.name}"
 
         if random.random() * 100 < success_rate:
             reward = self._calculate_activity_reward(activity)
@@ -690,7 +752,8 @@ class AdventureGame(Game):
             description = random.choice(activity.success_messages).format(pilot=pilot_name)
 
             result_lines = [
-                "✅ 활동 성공!",
+                f"✅ {activity.name} 성공!",
+                event_header,
                 "",
                 description,
                 f"💰 리워드 +{reward}G (성장 레벨 +{self.current_level}, 배율 {reward_multiplier:.1f}%)",
@@ -740,9 +803,10 @@ class AdventureGame(Game):
 
         description = random.choice(activity.fail_messages)
         return (
-            "❌ 활동이 잘 풀리지 않았어요...\n\n"
+            f"❌ {activity.name}이(가) 잘 풀리지 않았어요...\n"
+            f"{event_header}\n\n"
             f"{description}\n"
-            "다시 시도해볼까요?"
+            "다시 출동해볼까요?"
             f"\n\n현재 성공 확률: {success_rate:.1f}%"
         )
 
@@ -772,7 +836,9 @@ class AdventureGame(Game):
                     lines.append("- ???")
             lines.append("")
 
-        lines.append("💡 임무 성공 시 정찰 8% / 탐사 18% / 구조 35% 확률로 우주선을 발견합니다.")
+        lines.append(
+            "💡 '출동' 성공 시 이벤트에 따라 정찰 8% / 탐사 18% / 구조 35% 확률로 우주선을 발견합니다."
+        )
         return "\n".join(lines).rstrip()
 
     def _show_passes(self) -> str:
@@ -782,7 +848,8 @@ class AdventureGame(Game):
         return (
             "🎫 구조 임무 패스 현황\n\n"
             f"보유 패스: {passes}장\n\n"
-            f"💡 '탐사'를 하면 {drop_rate_percent:.0f}% 확률로 패스를 얻을 수 있어요!"
+            f"💡 '출동' 중 탐사 이벤트가 나오면 {drop_rate_percent:.0f}% 확률로 패스를 얻을 수 있어요!\n"
+            "패스가 있으면 출동 시 구조 이벤트도 랜덤으로 등장합니다."
         )
 
     def _get_status(self) -> str:
@@ -879,10 +946,12 @@ class AdventureGame(Game):
             "- 실패 직후 5% 구간은 보호막이 단계 하락을 막아줄 수 있어요.\n"
             "- 정산: '정산' 또는 'sell' (강화 리셋 후 보상)\n"
             "- 상태: '상태' 또는 'status'\n\n"
-            "🎯 임무:\n"
-            "- 정찰: '정찰', 'walk', 'scout', '1'\n"
-            f"- 탐사: '탐사', 'survey', 'play', '2' (패스 드랍 확률 {drop_rate:.0f}%)\n"
-            "- 구조: '구조', 'rescue', 'challenge', '3' (패스 1장 소모)\n"
+            "🎯 임무 (통합 출동):\n"
+            "- 출동: '출동', 'mission', '탐험', 'go' (정찰·탐사·구조 중 랜덤 이벤트)\n"
+            f"  · 정찰: 기본 센서 임무 (출현 비중 높음)\n"
+            f"  · 탐사: 샘플 채취, 패스 드랍 확률 {drop_rate:.0f}%\n"
+            "  · 구조: 고난도 구조 임무 (패스 1장 소모, 패스 있을 때만 등장)\n"
+            "- 기존 '정찰'/'탐사'/'구조' 입력도 출동 alias로 동작합니다.\n"
             "- 패스 확인: '패스', 'ticket'\n"
             "- 도감 확인: '도감', 'collection'\n\n"
             "💡 임무 성공 시 우주선 발견/득템 보너스가 낮은 확률로 터집니다."
