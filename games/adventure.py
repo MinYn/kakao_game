@@ -247,16 +247,25 @@ class AdventureGame(Game):
         return {"ship_id": ship.ship_id, "is_new": old_count == 0, "count": collection[ship.ship_id]}
 
     def _maybe_equip_discovered_ship(self, ship: CollectibleShip) -> Optional[str]:
-        """상위 등급 기체 발견 시 장착 + 본체 +N 등가 계승. 파츠 +N은 유지."""
+        """기체 발견 시 장착. 등급이 바뀌면 본체 +N 등가 계승 (첫 장착 포함). 파츠 +N 유지."""
         current = self.ship_progress
+        prev_grade = current.grade
+        prev_title = current.format_title(self._equipped_ship_name())
+
+        # 첫 장착: 항상 equip_ship 경로 (등급 다르면 inherit, 동급이면 +N 유지)
         if current.equipped_ship_id is None:
-            self.ship_progress = ShipProgress(
-                grade=ship.ship_grade,
-                body_enhance=current.body_enhance,
-                equipped_ship_id=ship.ship_id,
-                parts=dict(current.parts),
+            next_progress, _new_n = current.equip_ship(
+                ship.ship_id, ship.grade, inherit=True
             )
+            self.ship_progress = next_progress
             self._persist_ship_progress()
+            if parse_grade(ship.grade) != prev_grade:
+                return (
+                    f"⬆️ 주력 기체 장착 + 등가 계승!\n"
+                    f"  {prev_title}\n"
+                    f"  → {next_progress.format_title(ship.name)}\n"
+                    f"  (본체 +N 등가 환산, 파츠 강화 유지 · {GRADE_TONES[next_progress.grade]})"
+                )
             return (
                 f"🛠️ 주력 기체 장착: {ship.name} {format_grade_mark(ship.grade)} "
                 f"+{self.ship_progress.body_enhance}강"
@@ -265,8 +274,7 @@ class AdventureGame(Game):
         if not is_higher_grade(ship.grade, current.grade):
             return None
 
-        prev_title = current.format_title(self._equipped_ship_name())
-        next_progress, new_n = current.equip_ship(ship.ship_id, ship.grade, inherit=True)
+        next_progress, _new_n = current.equip_ship(ship.ship_id, ship.grade, inherit=True)
         self.ship_progress = next_progress
         self._persist_ship_progress()
         return (
@@ -558,8 +566,12 @@ class AdventureGame(Game):
 
     # ========== 성장 관련 메서드 ==========
 
+    def _effective_power(self) -> float:
+        """등급·본체 +N 등가 스탯. F+100 과 E+1 이 동일 (core_stat)."""
+        return float(self.ship_progress.core_stat())
+
     def _calculate_cost(self) -> int:
-        """본체 +N 강화 비용 계산"""
+        """본체 +N 강화 비용 계산 (현재 등급의 +N 기준 투자)."""
         cost = int(
             self.enhancement_cost_base
             * (self.enhancement_cost_multiplier ** self.ship_progress.body_enhance)
@@ -567,9 +579,10 @@ class AdventureGame(Game):
         return max(cost, 10)
 
     def _calculate_success_rate(self, activity: Optional[ActivityType] = None) -> float:
-        """성공 확률 계산. 본체 +N + 센서 파츠 패시브."""
+        """성공 확률 계산. 등가 스탯(core_stat) + 센서 파츠 패시브."""
         base_rate = activity.success_rate if activity else 80.0
-        body_boost = self.ship_progress.body_enhance * 2
+        # raw body_enhance 가 아니라 등급 등가 스탯 사용 → F+100 ≈ E+1
+        body_boost = self._effective_power() * 2
         sensor_boost = self.ship_progress.part("sensor").passive_value()
         if activity and activity.name != "정찰":
             # 센서 패시브는 정찰에 더 크게, 그 외 활동은 절반 반영
@@ -596,24 +609,25 @@ class AdventureGame(Game):
         return 0 < roll - success_rate <= 5.0
 
     def _calculate_sell_price(self) -> int:
-        """정산 금액 계산"""
-        if self.current_level == 0:
+        """정산 금액 계산 (본체 body_enhance 기준)."""
+        body = self.ship_progress.body_enhance
+        if body == 0:
             return 0
 
         total_invested = 0
-        for level in range(self.current_level):
+        for level in range(body):
             level_cost = int(
                 self.enhancement_cost_base * (self.enhancement_cost_multiplier ** level)
             )
             total_invested += max(level_cost, 10)
 
         sell_price = int(total_invested * self.sell_multiplier)
-        level_bonus_amount = self.current_level * self.level_bonus
+        level_bonus_amount = body * self.level_bonus
         sell_price += level_bonus_amount
 
-        if self.current_level >= 10:
+        if body >= 10:
             sell_price += int(sell_price * 0.2)
-        elif self.current_level >= 5:
+        elif body >= 5:
             sell_price += int(sell_price * 0.1)
 
         return max(sell_price, 10)
@@ -787,9 +801,10 @@ class AdventureGame(Game):
         return self._perform_activity(activity)
 
     def _calculate_activity_reward(self, activity: ActivityType) -> int:
-        body = self.ship_progress.body_enhance
+        # 보상 배율도 등가 스탯 사용 → 승급 계승 후 파워 유지
+        power = self._effective_power()
         reward_multiplier = 1.0 + (
-            body * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER)
+            power * (activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER)
         )
         base_reward = random.randint(*activity.reward_range)
         reward = int((activity.base_reward + base_reward) * reward_multiplier)
@@ -801,7 +816,6 @@ class AdventureGame(Game):
         if engine_bonus > 0:
             reward = int(reward * (1.0 + engine_bonus / 100.0))
 
-        # 기체 도감 grade는 드롭 티어/표시용. 보상 배율은 본체 +N·파츠 패시브가 담당.
         if random.random() < 0.08:
             reward = int(reward * random.choice((1.5, 1.75, 2.0)))
         return max(reward, 1)
@@ -875,12 +889,18 @@ class AdventureGame(Game):
             description = random.choice(activity.success_messages).format(pilot=pilot_name)
 
             ship_title = self.ship_progress.format_title(self._equipped_ship_name())
+            power = self._effective_power()
+            reward_line = (
+                f"💰 리워드 +{reward}G "
+                f"(등가 스탯 {power:.0f} / 본체 +{self.ship_progress.body_enhance}강, "
+                f"배율 {reward_multiplier:.1f}%)"
+            )
             result_lines = [
                 f"✅ {activity.name} 성공!",
                 event_header,
                 "",
                 description,
-                f"💰 리워드 +{reward}G (본체 +{self.ship_progress.body_enhance}강, 배율 {reward_multiplier:.1f}%)",
+                reward_line,
                 f"🚀 현재 기체: {ship_title}",
                 "",
             ]
@@ -1011,7 +1031,8 @@ class AdventureGame(Game):
             f"- 정산 예상 보상: {sell_price}G",
             "",
             "🎯 임무 정보:",
-            f"- 보상 배율: {1.0 + (body * Config.MONSTER_HUNT_REWARD_MULTIPLIER):.2f}배",
+            f"- 등가 스탯: {self._effective_power():.0f}",
+            f"- 보상 배율: {1.0 + (self._effective_power() * Config.MONSTER_HUNT_REWARD_MULTIPLIER):.2f}배",
             f"- 구조 패스: {passes}장",
             "",
             "📈 통계:",

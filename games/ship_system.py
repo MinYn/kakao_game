@@ -361,10 +361,18 @@ class ShipProgress:
     def from_record(cls, record: Mapping | None) -> "ShipProgress":
         if not record:
             return cls()
-        # 마이그레이션: 구 level 만 있으면 grade=F, body_enhance=level
-        body = record.get("body_enhance")
-        if body is None:
-            body = record.get("level", 0)
+        # 마이그레이션:
+        # - body_enhance 컬럼 없음 → level
+        # - body_enhance=0 이고 level>0 → 레거시 writer 가 level 만 갱신한 경우
+        raw_body = record.get("body_enhance")
+        raw_level = record.get("level")
+        level_val = int(raw_level or 0) if raw_level is not None else 0
+        if raw_body is None:
+            body = level_val
+        else:
+            body = int(raw_body or 0)
+            if body == 0 and level_val > 0:
+                body = level_val
         parts = {
             "engine": int(record.get("part_engine", 0) or 0),
             "sensor": int(record.get("part_sensor", 0) or 0),
@@ -372,7 +380,7 @@ class ShipProgress:
         }
         return cls(
             grade=parse_grade(record.get("ship_grade") or record.get("grade") or "F"),
-            body_enhance=int(body or 0),
+            body_enhance=max(0, body),
             equipped_ship_id=record.get("equipped_ship_id") or None,
             parts=parts,
         )

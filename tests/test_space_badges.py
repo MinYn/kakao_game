@@ -44,6 +44,15 @@ class SpaceBadgeGeneratorTestCase(unittest.TestCase):
         self.assertIn(">+30<", svg)
         self.assertIn("#f472b6", svg)  # high-tier plate
 
+    def test_generate_svg_requires_explicit_grade_for_non_f(self):
+        """HTTP 경로처럼 grade 를 넘기지 않으면 F 마크 — 호출부가 등급을 넘겨야 함."""
+        variant = BadgeVariant("API", "+0", ShipShape.SHUTTLE, "white")
+        default_svg = generate_svg(variant, 10, star_seed=1)
+        graded_svg = generate_svg(variant, 11, star_seed=1, grade="S", body_enhance=12)
+        self.assertIn(">F<", default_svg)
+        self.assertIn(">S<", graded_svg)
+        self.assertIn(">+12<", graded_svg)
+
 
 if __name__ == "__main__":
     unittest.main()

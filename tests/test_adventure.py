@@ -145,6 +145,55 @@ class AdventureGameTestCase(unittest.TestCase):
         self.assertEqual(game.ship_progress.grade.value, "E")
         self.assertEqual(game.ship_progress.body_enhance, 1)
 
+    def test_first_equip_higher_grade_uses_inherit_enhance(self):
+        """equipped_ship_id is None 이어도 상위 등급 첫 장착 시 등가 계승."""
+        game = AdventureGame(user_id="tester")
+        game.start()
+        game.ship_progress = game.ship_progress.with_body_enhance(100)
+        self.assertIsNone(game.ship_progress.equipped_ship_id)
+
+        higher = game._get_ship_by_id("ion_falcon")  # E
+        msg = game._maybe_equip_discovered_ship(higher)
+        self.assertIsNotNone(msg)
+        self.assertIn("계승", msg)
+        self.assertEqual(game.ship_progress.grade.value, "E")
+        self.assertEqual(game.ship_progress.body_enhance, 1)
+        self.assertEqual(game.ship_progress.equipped_ship_id, "ion_falcon")
+
+    def test_equivalent_power_preserves_success_rate_and_reward_scale(self):
+        """F+100 과 E+1 의 성공률·보상 배율이 동일해야 한다 (등가 계승)."""
+        from games.ship_system import ShipGrade, ShipProgress
+
+        game = AdventureGame(user_id="tester")
+        game.start()
+        activity = game._get_activity_type("탐사")
+        self.assertIsNotNone(activity)
+
+        game.ship_progress = ShipProgress(grade=ShipGrade.F, body_enhance=100)
+        game._sync_level_from_progress()
+        rate_f = game._calculate_success_rate(activity)
+        power_f = game._effective_power()
+        with patch("games.adventure.random.random", return_value=0.5), patch(
+            "games.adventure.random.randint", return_value=100
+        ):
+            # peak roll 비활성: 0.5 > 0.08
+            reward_f = game._calculate_activity_reward(activity)
+
+        game.ship_progress = ShipProgress(grade=ShipGrade.E, body_enhance=1)
+        game._sync_level_from_progress()
+        rate_e = game._calculate_success_rate(activity)
+        power_e = game._effective_power()
+        with patch("games.adventure.random.random", return_value=0.5), patch(
+            "games.adventure.random.randint", return_value=100
+        ):
+            reward_e = game._calculate_activity_reward(activity)
+
+        self.assertEqual(power_f, power_e)
+        self.assertEqual(rate_f, rate_e)
+        self.assertEqual(reward_f, reward_e)
+        # raw body 를 쓰면 E+1 은 크게 떨어짐 — 등가 모델이면 98% 캡 근처
+        self.assertGreaterEqual(rate_e, 98.0 - 0.01)
+
     def test_collection_without_equip_does_not_change_success_rate(self):
         game = AdventureGame(user_id="tester")
         game.start()

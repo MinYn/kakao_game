@@ -90,6 +90,14 @@ class ShipSystemTestCase(unittest.TestCase):
         self.assertEqual(progress.body_enhance, 3)
         self.assertEqual(progress.to_record()["level"], 3)
 
+    def test_from_record_stale_body_zero_uses_level(self):
+        """마이그레이션 후 level 만 갱신된 행 → body_enhance=0 이어도 level 반영."""
+        progress = ShipProgress.from_record(
+            {"level": 7, "body_enhance": 0, "ship_grade": "F"}
+        )
+        self.assertEqual(progress.body_enhance, 7)
+        self.assertEqual(progress.grade, ShipGrade.F)
+
     def test_body_enhance_upgrade_stage_bands(self):
         self.assertEqual(body_enhance_to_upgrade_stage(0), 0)
         self.assertEqual(body_enhance_to_upgrade_stage(5), 1)
