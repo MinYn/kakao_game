@@ -1,121 +1,196 @@
 from typing import Callable, Optional
 import asyncio
 import os
+import re
 import time
 import discord
 from discord.ext import commands
-from discord.ui import View, Button, Select
+from discord.ui import View, Button, Select, DynamicItem
 from platforms.base_platform import ChatPlatform
 from config import Config
 from image_generator import ImageGenerator
 from space_badges import SpaceBadgeService, generate_svg, generate_svg_frames
 from events.platform_queue import PlatformMessage, PlatformMessageQueue
 
+# 배포 후에도 이전 메시지 버튼이 동작하도록 고정 custom_id 사용
+# Discord custom_id 최대 100자
+CUSTOM_ID_CMD_PREFIX = "kg:cmd:"
+CUSTOM_ID_HUNT = "kg:hunt"
+CUSTOM_ID_HUNT_SELECT = "kg:hunt_select"
+
+
+def _adapter_from_interaction(interaction: discord.Interaction) -> Optional["DiscordAdapter"]:
+    client = interaction.client
+    return getattr(client, "game_adapter", None)
+
+
+def _make_cmd_custom_id(command: str) -> str:
+    """명령어용 안정적 custom_id (재시작 후에도 동일)"""
+    raw = f"{CUSTOM_ID_CMD_PREFIX}{command}"
+    return raw[:100]
+
+
+def _split_label_emoji(label: str) -> tuple[Optional[str], str]:
+    """라벨에서 선두 이모지와 텍스트 분리"""
+    parts = label.split(" ", 1)
+    if len(parts) == 2 and len(parts[0]) <= 2:
+        return parts[0], parts[1][:80]
+    clean = label.split(" ", 1)[-1] if " " in label else label
+    return None, clean[:80]
+
+
+def _hunt_select_options() -> list[discord.SelectOption]:
+    return [
+        discord.SelectOption(
+            label="일반몹", value="일반몹", emoji="🟢", description="기본 보상: 20~50G"
+        ),
+        discord.SelectOption(
+            label="특수몹",
+            value="특수몹",
+            emoji="🟡",
+            description="보상: 80~150G, 입장권 드랍 가능",
+        ),
+        discord.SelectOption(
+            label="보스몹",
+            value="보스몹",
+            emoji="🔴",
+            description="보상: 200~350G, 입장권 필요",
+        ),
+    ]
+
+
+class KgCommandButton(DynamicItem[Button], template=rf"{re.escape(CUSTOM_ID_CMD_PREFIX)}(?P<command>.+)"):
+    """재시작 후에도 동작하는 명령어 버튼 (custom_id 기반)"""
+
+    def __init__(self, command: str, *, label: str, emoji: Optional[str] = None):
+        if emoji is None:
+            emoji_str, text_label = _split_label_emoji(label)
+        else:
+            emoji_str, text_label = emoji, (label[:80] if label else command[:80])
+        kwargs = {
+            "label": text_label or command[:80],
+            "style": discord.ButtonStyle.primary,
+            "custom_id": _make_cmd_custom_id(command),
+        }
+        if emoji_str:
+            kwargs["emoji"] = emoji_str
+        super().__init__(Button(**kwargs))
+        self.command = command
+
+    @classmethod
+    async def from_custom_id(
+        cls,
+        interaction: discord.Interaction,
+        item: Button,
+        match: re.Match[str],
+        /,
+    ):
+        command = match.group("command")
+        label = item.label or command
+        emoji = str(item.emoji) if item.emoji else None
+        return cls(command, label=label, emoji=emoji)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        adapter = _adapter_from_interaction(interaction)
+        if not adapter:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "봇이 아직 준비 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True
+                )
+            return
+        await adapter.handle_command_component(interaction, self.command)
+
+
+class KgHuntButton(DynamicItem[Button], template=rf"{re.escape(CUSTOM_ID_HUNT)}"):
+    """사냥 메뉴를 여는 버튼 (재시작 안전)"""
+
+    def __init__(self):
+        super().__init__(
+            Button(
+                label="사냥",
+                style=discord.ButtonStyle.primary,
+                emoji="🗡️",
+                custom_id=CUSTOM_ID_HUNT,
+            )
+        )
+
+    @classmethod
+    async def from_custom_id(
+        cls,
+        interaction: discord.Interaction,
+        item: Button,
+        match: re.Match[str],
+        /,
+    ):
+        return cls()
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(
+            "🗡️ 사냥할 몬스터를 선택하세요:",
+            view=HuntMenuView(),
+            ephemeral=False,
+        )
+
+
+class KgHuntSelect(DynamicItem[Select], template=rf"{re.escape(CUSTOM_ID_HUNT_SELECT)}"):
+    """사냥 대상 선택 (재시작 안전)"""
+
+    def __init__(self, base: Optional[Select] = None):
+        if base is None:
+            base = Select(
+                placeholder="사냥할 몬스터를 선택하세요",
+                custom_id=CUSTOM_ID_HUNT_SELECT,
+                options=_hunt_select_options(),
+            )
+        super().__init__(base)
+
+    @classmethod
+    async def from_custom_id(
+        cls,
+        interaction: discord.Interaction,
+        item: Select,
+        match: re.Match[str],
+        /,
+    ):
+        return cls(item)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        adapter = _adapter_from_interaction(interaction)
+        if not adapter:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "봇이 아직 준비 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True
+                )
+            return
+        values = []
+        if interaction.data:
+            values = interaction.data.get("values") or []
+        selected = values[0] if values else None
+        if not selected:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("선택이 비어 있습니다.", ephemeral=True)
+            return
+        await adapter.handle_command_component(interaction, selected)
+
 
 class HuntMenuView(View):
-    """사냥 메뉴 뷰 (일반몹/특수몹/보스몹 선택)"""
-    
-    def __init__(self, message_handler, user_id: str, engine=None, adapter=None, timeout: float = 300.0):
-        super().__init__(timeout=timeout)
-        self.message_handler = message_handler
-        self.user_id = user_id
-        self.engine = engine
-        self.adapter = adapter
-        
-        # Select Menu 생성
-        select = Select(
-            placeholder="사냥할 몬스터를 선택하세요",
-            options=[
-                discord.SelectOption(label="일반몹", value="일반몹", emoji="🟢", description="기본 보상: 20~50G"),
-                discord.SelectOption(label="특수몹", value="특수몹", emoji="🟡", description="보상: 80~150G, 입장권 드랍 가능"),
-                discord.SelectOption(label="보스몹", value="보스몹", emoji="🔴", description="보상: 200~350G, 입장권 필요"),
-            ]
-        )
-        select.callback = self._on_select
-        self.add_item(select)
-    
-    async def on_timeout(self):
-        """타임아웃 시 정리"""
-        try:
-            # View 정리
-            for item in self.children:
-                item.disabled = True
-        except:
-            pass
-    
-    async def _on_select(self, interaction: discord.Interaction):
-        """Select Menu 선택 콜백"""
-        try:
-            # 즉시 응답 (타임아웃 방지)
-            await interaction.response.defer(ephemeral=False)
+    """사냥 메뉴 뷰 (일반몹/특수몹/보스몹 선택) — persistent custom_id"""
 
-            selected = interaction.data['values'][0]  # 선택된 값
-            if self.adapter:
-                queued, duplicate = self.adapter._enqueue_incoming(self.user_id, selected)
-                if queued:
-                    await self.adapter._acknowledge_interaction(interaction, duplicate=duplicate)
-                    return
-            if self.message_handler:
-                response = self.message_handler(self.user_id, selected)
-                if response:
-                    # 이미지 생성 (사냥 결과인 경우)
-                    image_path = None
-                    if hasattr(self, 'adapter') and self.adapter:
-                        image_path = self.adapter._generate_image_if_needed(self.user_id, selected, response)
-
-                    await self.adapter._send_interaction_message(
-                        interaction=interaction,
-                        response=response,
-                        view=self._create_view_for_response(selected, response),
-                        image_path=image_path,
-                        user_id=self.user_id,
-                    )
-                else:
-                    await interaction.followup.send("처리되었습니다.", ephemeral=True)
-            else:
-                await interaction.followup.send("처리 중 오류가 발생했습니다.", ephemeral=True)
-        except Exception as e:
-            print(f"[디스코드] Select Menu 오류: {e}")
-            import traceback
-            traceback.print_exc()
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message("처리 중 오류가 발생했습니다.", ephemeral=True)
-                else:
-                    await interaction.followup.send("처리 중 오류가 발생했습니다.", ephemeral=True)
-            except:
-                pass
-    
-    def _create_view_for_response(self, command: Optional[str], response: str):
-        """응답에 따라 적절한 버튼 뷰 생성"""
-        if not self.message_handler:
-            return None
-
-        if self.adapter:
-            buttons = self.adapter._get_button_definitions(self.user_id, command, response)
-        elif self.engine:
-            buttons = self.engine.get_ui_buttons(self.user_id, command, response)
-        else:
-            buttons = []
-
-        return CommandButtonView(
-            buttons,
-            self.message_handler,
-            self.user_id,
-            self.engine,
-            self.adapter,
-            last_command=command,
-        )
+    def __init__(self):
+        # timeout=None: 메시지에 붙은 컴포넌트는 custom_id 로 재시작 후에도 라우팅
+        # 뷰 객체 자체는 메모리에서 정리되지 않도록 짧게 두지 않음 — DynamicItem 이 담당
+        super().__init__(timeout=300.0)
+        self.add_item(KgHuntSelect())
 
 
 class CommandButtonView(View):
-    """명령어 버튼 뷰"""
+    """명령어 버튼 뷰 — 모든 버튼에 안정적 custom_id 부여"""
 
     def __init__(
         self,
         buttons: list,
-        message_handler,
-        user_id: str,
+        message_handler=None,
+        user_id: Optional[str] = None,
         engine=None,
         adapter=None,
         last_command: Optional[str] = None,
@@ -127,131 +202,22 @@ class CommandButtonView(View):
         self.engine = engine
         self.adapter = adapter
         self.last_command = last_command
-        
-        # 버튼 생성 (최대 5개)
+
         for btn_data in buttons[:5]:
-            label = btn_data.get('label', btn_data.get('messageText', '버튼'))
-            message_text = btn_data.get('messageText', label)
-            
-            # "사냥" 버튼은 특별 처리
-            if message_text == '사냥':
-                button = Button(
-                    label="사냥",
-                    style=discord.ButtonStyle.primary,
-                    emoji="🗡️"
-                )
-                button.callback = self._create_hunt_callback()
+            label = btn_data.get("label", btn_data.get("messageText", "버튼"))
+            message_text = btn_data.get("messageText", label)
+
+            if message_text == "사냥":
+                self.add_item(KgHuntButton())
             else:
-                # 이모지와 텍스트 분리
-                parts = label.split(' ', 1)
-                if len(parts) == 2 and len(parts[0]) <= 2:  # 이모지가 있는 경우
-                    emoji_str = parts[0]
-                    text_label = parts[1]
-                    button = Button(
-                        label=text_label[:80],
-                        style=discord.ButtonStyle.primary,
-                        emoji=emoji_str
-                    )
-                else:
-                    # 이모지가 없거나 인식 불가능한 경우
-                    clean_label = label.split(' ', 1)[-1] if ' ' in label else label
-                    button = Button(
-                        label=clean_label[:80],
-                        style=discord.ButtonStyle.primary
-                    )
-                button.callback = self._create_callback(message_text)
-            
-            self.add_item(button)
-    
+                self.add_item(KgCommandButton(message_text, label=label))
+
     async def on_timeout(self):
-        """타임아웃 시 정리"""
         try:
-            # View 정리
             for item in self.children:
                 item.disabled = True
-        except:
+        except Exception:
             pass
-    
-    def _create_hunt_callback(self):
-        """사냥 버튼 클릭 콜백 (서브 메뉴 표시)"""
-        async def callback(interaction: discord.Interaction):
-            # 사냥 메뉴 뷰 생성
-            adapter = None
-            if hasattr(self, 'adapter'):
-                adapter = self.adapter
-            hunt_view = HuntMenuView(self.message_handler, self.user_id, self.engine, adapter)
-            await interaction.response.send_message(
-                "🗡️ 사냥할 몬스터를 선택하세요:",
-                view=hunt_view,
-                ephemeral=False
-            )
-        
-        return callback
-    
-    def _create_callback(self, command: str):
-        """버튼 클릭 콜백 생성"""
-        async def callback(interaction: discord.Interaction):
-            try:
-                # 즉시 응답 (타임아웃 방지)
-                await interaction.response.defer(ephemeral=False)
-
-                if hasattr(self, 'adapter') and self.adapter:
-                    queued, duplicate = self.adapter._enqueue_incoming(self.user_id, command)
-                    if queued:
-                        await self.adapter._acknowledge_interaction(interaction, duplicate=duplicate)
-                        return
-
-                if self.message_handler:
-                    response = self.message_handler(self.user_id, command)
-                    if response:
-                        # 응답에 따라 새로운 버튼 생성
-                        view = self._create_view_for_response(command, response)
-                        image_path = None
-                        if self.adapter:
-                            image_path = self.adapter._generate_image_if_needed(self.user_id, command, response)
-
-                        await self.adapter._send_interaction_message(
-                            interaction=interaction,
-                            response=response,
-                            view=view,
-                            image_path=image_path,
-                            user_id=self.user_id,
-                        )
-                    else:
-                        await interaction.followup.send("처리되었습니다.", ephemeral=True)
-                else:
-                    await interaction.followup.send("처리 중 오류가 발생했습니다.", ephemeral=True)
-            except Exception as e:
-                print(f"[디스코드] 버튼 클릭 오류: {e}")
-                import traceback
-                traceback.print_exc()
-                try:
-                    if not interaction.response.is_done():
-                        await interaction.response.send_message("처리 중 오류가 발생했습니다.", ephemeral=True)
-                    else:
-                        await interaction.followup.send("처리 중 오류가 발생했습니다.", ephemeral=True)
-                except:
-                    pass
-        
-        return callback
-    
-    def _create_view_for_response(self, command: Optional[str], response: str):
-        """응답에 따라 적절한 버튼 뷰 생성"""
-        if self.adapter:
-            buttons = self.adapter._get_button_definitions(self.user_id, command, response)
-        elif self.engine:
-            buttons = self.engine.get_ui_buttons(self.user_id, command, response)
-        else:
-            buttons = []
-
-        return CommandButtonView(
-            buttons,
-            self.message_handler,
-            self.user_id,
-            self.engine,
-            self.adapter,
-            last_command=command,
-        )
 
 
 class DiscordAdapter(ChatPlatform):
@@ -420,6 +386,80 @@ class DiscordAdapter(ChatPlatform):
         if self.engine:
             return self.engine.get_ui_buttons(user_id, command, response)
         return []
+
+    def _bind_interaction_user(self, interaction: discord.Interaction) -> str:
+        """클릭한 유저/채널을 기억하고 user_id 반환"""
+        user_id = str(interaction.user.id)
+        channel = interaction.channel
+        if channel is not None:
+            self.user_channels[user_id] = (channel, channel)
+        if self.engine:
+            self.engine.set_platform_adapter(self)
+        return user_id
+
+    async def handle_command_component(
+        self, interaction: discord.Interaction, command: str
+    ) -> None:
+        """버튼/셀렉트 등 컴포넌트 상호작용 공통 처리 (재시작 후에도 동일 경로)"""
+        try:
+            user_id = self._bind_interaction_user(interaction)
+
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+
+            queued, duplicate = self._enqueue_incoming(user_id, command)
+            if queued:
+                await self._acknowledge_interaction(interaction, duplicate=duplicate)
+                return
+
+            if not self.message_handler:
+                await interaction.followup.send(
+                    "처리 중 오류가 발생했습니다.", ephemeral=True
+                )
+                return
+
+            response = self.message_handler(user_id, command)
+            if not response:
+                await interaction.followup.send("처리되었습니다.", ephemeral=True)
+                return
+
+            view = self._create_button_view(user_id, response, command)
+            image_path = self._generate_image_if_needed(user_id, command, response)
+            await self._send_interaction_message(
+                interaction=interaction,
+                response=response,
+                view=view,
+                image_path=image_path,
+                user_id=user_id,
+            )
+        except Exception as e:
+            print(f"[디스코드] 컴포넌트 처리 오류: {e}")
+            import traceback
+
+            traceback.print_exc()
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "처리 중 오류가 발생했습니다.", ephemeral=True
+                    )
+                else:
+                    await interaction.followup.send(
+                        "처리 중 오류가 발생했습니다.", ephemeral=True
+                    )
+            except Exception:
+                pass
+
+    def _register_persistent_components(self) -> None:
+        """배포/재시작 후에도 이전 메시지 버튼이 동작하도록 DynamicItem 등록"""
+        if not self.client:
+            return
+        self.client.game_adapter = self  # type: ignore[attr-defined]
+        # 중복 등록 방지
+        if getattr(self.client, "_kg_dynamic_registered", False):
+            return
+        self.client.add_dynamic_items(KgCommandButton, KgHuntButton, KgHuntSelect)
+        self.client._kg_dynamic_registered = True  # type: ignore[attr-defined]
+        print("[디스코드] persistent 버튼 라우터 등록 완료 (배포 후에도 이전 버튼 동작)")
     
     def _generate_image_if_needed(self, user_id: str, command: str, response: str) -> Optional[str]:
         """강화/사냥 결과인 경우 이미지 생성"""
@@ -594,10 +634,14 @@ class DiscordAdapter(ChatPlatform):
             command_prefix=self.command_prefix,
             intents=intents
         )
-        
+        # start 전에 등록해야 재시작 직후 클릭도 라우팅됨
+        self._register_persistent_components()
+
         @self.client.event
         async def on_ready():
             self.is_running = True
+            # reconnect 시 adapter 참조 갱신
+            self.client.game_adapter = self  # type: ignore[attr-defined]
             print(f"[디스코드] 봇이 로그인했습니다: {self.client.user}")
             print(f"[디스코드] 서버 수: {len(self.client.guilds)}")
             print(f"[디스코드] 명령어 접두사: {self.command_prefix}")
