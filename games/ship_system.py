@@ -358,12 +358,18 @@ class ShipProgress:
         }
 
     @classmethod
-    def from_record(cls, record: Mapping | None) -> "ShipProgress":
+    def from_record(
+        cls,
+        record: Mapping | None,
+        *,
+        legacy_level_fallback: bool = True,
+    ) -> "ShipProgress":
         if not record:
             return cls()
         # 마이그레이션:
         # - body_enhance 컬럼 없음 → level
-        # - body_enhance=0 이고 level>0 → 레거시 writer 가 level 만 갱신한 경우
+        # - 복구/레거시 입력은 body_enhance=0 이고 level>0 일 때 level 사용
+        # - 마이그레이션이 보장된 DB 저장소는 fallback=False 로 body 를 권위 값으로 사용
         raw_body = record.get("body_enhance")
         raw_level = record.get("level")
         level_val = int(raw_level or 0) if raw_level is not None else 0
@@ -371,7 +377,7 @@ class ShipProgress:
             body = level_val
         else:
             body = int(raw_body or 0)
-            if body == 0 and level_val > 0:
+            if legacy_level_fallback and body == 0 and level_val > 0:
                 body = level_val
         parts = {
             "engine": int(record.get("part_engine", 0) or 0),

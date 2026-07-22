@@ -100,9 +100,10 @@ class GoldSystem:
         conn.close()
 
     def _ensure_enhancement_columns(self, cursor) -> None:
-        """기존 DB에 기체 체계 컬럼 추가 및 level → body_enhance 마이그레이션."""
+        """기존 DB에 기체 체계 컬럼을 추가하고 레거시 level 을 1회 이전."""
         cursor.execute("PRAGMA table_info(enhancement_levels)")
         existing = {row[1] for row in cursor.fetchall()}
+        body_column_added = "body_enhance" not in existing
         alterations = {
             "ship_grade": "TEXT NOT NULL DEFAULT 'F'",
             "body_enhance": "INTEGER NOT NULL DEFAULT 0",
@@ -116,22 +117,27 @@ class GoldSystem:
                 cursor.execute(
                     f"ALTER TABLE enhancement_levels ADD COLUMN {column} {definition}"
                 )
-        # 구 level 값을 신규 body_enhance 로 1회 동기화 (body_enhance 가 0 이고 level>0)
+        # 레거시 → 신규 복사는 body_enhance 컬럼을 방금 추가한 최초 1회만 수행한다.
+        # 이후에는 body_enhance 가 원본이고 level 은 하위 호환 mirror 이다.
+        if body_column_added:
+            cursor.execute(
+                """
+                UPDATE enhancement_levels
+                SET body_enhance = MAX(COALESCE(level, 0), 0),
+                    ship_grade = COALESCE(NULLIF(ship_grade, ''), 'F')
+                """
+            )
         cursor.execute(
             """
             UPDATE enhancement_levels
-            SET body_enhance = level,
-                ship_grade = COALESCE(NULLIF(ship_grade, ''), 'F')
-            WHERE COALESCE(body_enhance, 0) = 0 AND COALESCE(level, 0) > 0
+            SET ship_grade = COALESCE(NULLIF(ship_grade, ''), 'F')
             """
         )
-        # body_enhance 와 level 정합 유지
         cursor.execute(
             """
             UPDATE enhancement_levels
-            SET level = body_enhance
+            SET level = MAX(COALESCE(body_enhance, 0), 0)
             WHERE COALESCE(level, 0) <> COALESCE(body_enhance, 0)
-              AND COALESCE(body_enhance, 0) > 0
             """
         )
 
@@ -475,7 +481,11 @@ class GoldSystem:
         conn.close()
         if not result:
             return ShipProgress()
-        return ShipProgress.from_record(dict(result))
+        # 초기화 시 스키마 이전/단방향 mirror 를 완료했으므로 body_enhance 가 원본이다.
+        return ShipProgress.from_record(
+            dict(result),
+            legacy_level_fallback=False,
+        )
 
     def set_ship_progress(self, user_id: str, progress) -> None:
         """활성 기체 진행 상태 저장. level 은 body_enhance 와 동기화."""

@@ -533,7 +533,7 @@ class DiscordAdapter(ChatPlatform):
             "현재 우주선 강화 레벨" in response
             or "현재 우주선:" in response
             or "콜사인" in response
-            or "★" in response and "강" in response
+            or (("★" in response) and ("강" in response))
         ):
             return True
 

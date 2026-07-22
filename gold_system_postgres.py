@@ -405,7 +405,8 @@ class GoldSystemPostgres:
                         "part_engine": result[4],
                         "part_sensor": result[5],
                         "part_armor": result[6],
-                    }
+                    },
+                    legacy_level_fallback=False,
                 )
 
     def set_ship_progress(self, user_id: str, progress) -> None:

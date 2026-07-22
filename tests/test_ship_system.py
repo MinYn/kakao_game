@@ -98,6 +98,14 @@ class ShipSystemTestCase(unittest.TestCase):
         self.assertEqual(progress.body_enhance, 7)
         self.assertEqual(progress.grade, ShipGrade.F)
 
+    def test_from_record_can_treat_body_as_authoritative_after_migration(self):
+        progress = ShipProgress.from_record(
+            {"level": 7, "body_enhance": 0, "ship_grade": "E"},
+            legacy_level_fallback=False,
+        )
+        self.assertEqual(progress.body_enhance, 0)
+        self.assertEqual(progress.grade, ShipGrade.E)
+
     def test_body_enhance_upgrade_stage_bands(self):
         self.assertEqual(body_enhance_to_upgrade_stage(0), 0)
         self.assertEqual(body_enhance_to_upgrade_stage(5), 1)
