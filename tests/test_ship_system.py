@@ -1,6 +1,7 @@
 import unittest
 
 from games.ship_system import (
+    GRADE_DROP_WEIGHTS,
     LEVELS_PER_GRADE_STEP,
     PART_CATALOG,
     ShipGrade,
@@ -9,6 +10,7 @@ from games.ship_system import (
     equivalence_table,
     inherit_enhance,
     migrate_legacy_level,
+    migrate_legacy_rarity,
     primary_stats,
     stat,
 )
@@ -93,6 +95,18 @@ class ShipSystemTestCase(unittest.TestCase):
         self.assertEqual(body_enhance_to_upgrade_stage(5), 1)
         self.assertEqual(body_enhance_to_upgrade_stage(15), 2)
         self.assertEqual(body_enhance_to_upgrade_stage(30), 3)
+
+    def test_grade_drop_weights_cover_all_grades(self):
+        self.assertEqual(set(GRADE_DROP_WEIGHTS.keys()), set(ShipGrade))
+        self.assertGreater(GRADE_DROP_WEIGHTS[ShipGrade.F], GRADE_DROP_WEIGHTS[ShipGrade.S])
+
+    def test_migrate_legacy_rarity_to_grade(self):
+        self.assertEqual(migrate_legacy_rarity("common"), ShipGrade.F)
+        self.assertEqual(migrate_legacy_rarity("rare"), ShipGrade.E)
+        self.assertEqual(migrate_legacy_rarity("epic"), ShipGrade.C)
+        self.assertEqual(migrate_legacy_rarity("legendary"), ShipGrade.A)
+        self.assertEqual(migrate_legacy_rarity("mythic"), ShipGrade.S)
+        self.assertEqual(migrate_legacy_rarity("B"), ShipGrade.B)
 
 
 if __name__ == "__main__":

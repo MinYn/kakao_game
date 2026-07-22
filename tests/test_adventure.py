@@ -87,12 +87,14 @@ class AdventureGameTestCase(unittest.TestCase):
         next_cost = game._calculate_cost()
         self.assertGreaterEqual(next_cost, base_cost)
 
-    def test_ship_codex_tracks_rarity_as_collection_only(self):
+    def test_ship_codex_groups_by_grade_not_rarity(self):
         game = AdventureGame(user_id="tester")
         game.start()
 
         ship = game._get_ship_by_id("comet_scout")
         self.assertIsNotNone(ship)
+        self.assertEqual(ship.grade, "F")
+        self.assertFalse(hasattr(ship, "rarity"))
 
         result = game._grant_ship_to_collection(ship)
         self.assertTrue(result["is_new"])
@@ -105,8 +107,27 @@ class AdventureGameTestCase(unittest.TestCase):
         response = game.process_command("도감")
         self.assertIn("우주선 도감", response)
         self.assertIn("코멧 스카우트 x2", response)
-        self.assertIn("★F", response)
+        self.assertIn("F ", response)
         self.assertIn("파츠에는 등급이 없고", response)
+        # user-facing 구 희귀도 표기 제거
+        for legacy in (
+            "common",
+            "rare",
+            "epic",
+            "legendary",
+            "mythic",
+            "⚪",
+            "🔵",
+            "🟣",
+            "🟡",
+            "🔴",
+            " 일반",
+            " 희귀",
+            " 영웅",
+            " 전설",
+            " 신화",
+        ):
+            self.assertNotIn(legacy, response)
 
     def test_higher_grade_ship_inherits_body_enhance(self):
         game = AdventureGame(user_id="tester")
@@ -115,15 +136,16 @@ class AdventureGameTestCase(unittest.TestCase):
         game.ship_progress.equipped_ship_id = "comet_scout"
         game._sync_level_from_progress()
 
-        higher = game._get_ship_by_id("lunar_moth")  # E
+        higher = game._get_ship_by_id("ion_falcon")  # E
         self.assertIsNotNone(higher)
+        self.assertEqual(higher.grade, "E")
         msg = game._maybe_equip_discovered_ship(higher)
         self.assertIsNotNone(msg)
         self.assertIn("계승", msg)
         self.assertEqual(game.ship_progress.grade.value, "E")
         self.assertEqual(game.ship_progress.body_enhance, 1)
 
-    def test_collection_rarity_does_not_change_success_rate(self):
+    def test_collection_without_equip_does_not_change_success_rate(self):
         game = AdventureGame(user_id="tester")
         game.start()
         activity = game._get_activity_type("정찰")
@@ -136,6 +158,17 @@ class AdventureGameTestCase(unittest.TestCase):
         game._grant_ship_to_collection(ship)
         # 도감 수집 자체는 성공률에 영향 없음 (장착·계승 전)
         self.assertEqual(game._calculate_success_rate(activity), base_rate)
+
+    def test_catalog_has_only_fs_grades_no_rarity_field(self):
+        game = AdventureGame(user_id="tester")
+        valid = {"F", "E", "D", "C", "B", "A", "S"}
+        for ship in game.ship_catalog:
+            self.assertIn(ship.grade, valid)
+            self.assertFalse(hasattr(ship, "rarity"))
+        # 이슈 매핑 스모크
+        self.assertEqual(game._get_ship_by_id("lunar_moth").grade, "F")
+        self.assertEqual(game._get_ship_by_id("quantum_fox").grade, "C")
+        self.assertEqual(game._get_ship_by_id("event_horizon").grade, "S")
 
     def test_ship_collection_persists_in_gold_system(self):
         with tempfile.NamedTemporaryFile() as db_file:

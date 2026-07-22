@@ -46,6 +46,49 @@ GRADE_TONES: dict[ShipGrade, str] = {
     ShipGrade.S: "최고 티어",
 }
 
+# 도감 드롭 가중치 (F 흔함 → S 희귀). 기존 common~mythic 60/25/10/4/1 감을 7단계로 재분배.
+GRADE_DROP_WEIGHTS: dict[ShipGrade, int] = {
+    ShipGrade.F: 40,
+    ShipGrade.E: 25,
+    ShipGrade.D: 15,
+    ShipGrade.C: 10,
+    ShipGrade.B: 6,
+    ShipGrade.A: 3,
+    ShipGrade.S: 1,
+}
+
+# 레거시 희귀도 키 → 기체 등급 (저장 데이터/구 카탈로그 마이그레이션용)
+LEGACY_RARITY_TO_GRADE: dict[str, ShipGrade] = {
+    "common": ShipGrade.F,
+    "rare": ShipGrade.E,
+    "epic": ShipGrade.C,
+    "legendary": ShipGrade.A,
+    "mythic": ShipGrade.S,
+    "일반": ShipGrade.F,
+    "희귀": ShipGrade.E,
+    "영웅": ShipGrade.C,
+    "전설": ShipGrade.A,
+    "신화": ShipGrade.S,
+}
+
+
+def grade_drop_weight(grade: str | ShipGrade) -> int:
+    return GRADE_DROP_WEIGHTS[parse_grade(grade)]
+
+
+def migrate_legacy_rarity(rarity: str | None) -> ShipGrade:
+    """common/rare/… 또는 한글 희귀도 → F~S. 미지 값은 F."""
+    if rarity is None or str(rarity).strip() == "":
+        return ShipGrade.F
+    key = str(rarity).strip().lower()
+    if key in LEGACY_RARITY_TO_GRADE:
+        return LEGACY_RARITY_TO_GRADE[key]
+    # 이미 grade 문자인 경우
+    try:
+        return parse_grade(rarity)
+    except ValueError:
+        return ShipGrade.F
+
 # 연속 등급 등가: G_i + (STEP+1) ≈ G_{i+1} + 1  →  F+100 ≈ E+1
 LEVELS_PER_GRADE_STEP = 99
 

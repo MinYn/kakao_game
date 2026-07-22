@@ -5,6 +5,8 @@ from typing import Dict, Optional
 
 from games.base_game import Game
 from games.ship_system import (
+    GRADE_DROP_WEIGHTS,
+    GRADE_ORDER,
     GRADE_TONES,
     PART_CATALOG,
     ShipGrade,
@@ -35,27 +37,17 @@ class ActivityType:
 
 
 @dataclass(frozen=True)
-class ShipRarity:
-    """수집용 우주선 희귀도 정보 (전투/보상 스탯과 분리)"""
-
-    name: str
-    icon: str
-    weight: int
-
-
-@dataclass(frozen=True)
 class CollectibleShip:
     """도감에 등록되는 수집형 우주선.
 
-    grade(F~S)는 기체 자체 등급. rarity는 드랍 가중치/수집 표시용 레거시 키.
-    파츠 등급은 없다.
+    기체 티어는 grade(F~S) 만 사용한다.
+    common/rare/epic/legendary/mythic 희귀도 필드는 없다.
     """
 
     ship_id: str
     name: str
-    rarity: str
+    grade: str
     flavor: str
-    grade: str = "F"
 
     @property
     def ship_grade(self) -> ShipGrade:
@@ -139,7 +131,7 @@ class AdventureGame(Game):
         self.enhancement_cost_multiplier = Config.ENHANCEMENT_COST_MULTIPLIER
         self.sell_multiplier = Config.ENHANCEMENT_SELL_MULTIPLIER
         self.level_bonus = Config.ENHANCEMENT_LEVEL_BONUS
-        self.ship_rarities = self._init_ship_rarities()
+        self.grade_drop_weights = dict(GRADE_DROP_WEIGHTS)
         self.ship_catalog = self._init_ship_catalog()
         self.loot_table = self._init_loot_table()
         self.enhancement_celebrations = self._init_enhancement_celebrations()
@@ -152,29 +144,23 @@ class AdventureGame(Game):
         self.command_definitions = self._init_command_definitions()
         self._build_command_index()
 
-    def _init_ship_rarities(self) -> dict[str, ShipRarity]:
-        """수집/드랍 가중치용 레거시 희귀도. 기체 스탯은 grade(F~S)가 담당."""
-        return {
-            "common": ShipRarity("일반", "⚪", 60),
-            "rare": ShipRarity("희귀", "🔵", 25),
-            "epic": ShipRarity("영웅", "🟣", 10),
-            "legendary": ShipRarity("전설", "🟡", 4),
-            "mythic": ShipRarity("신화", "🔴", 1),
-        }
-
     def _init_ship_catalog(self) -> list[CollectibleShip]:
-        """우주선 도감 카탈로그. grade(F~S) + 수집 희귀도 키를 함께 둔다."""
+        """우주선 도감 카탈로그. 티어는 grade(F~S)만 사용 (rarity 필드 없음).
+
+        이슈 #15 매핑 초안:
+          common→F, rare→E/D, epic→C/B, legendary→A, mythic→S
+        """
         return [
-            CollectibleShip("comet_scout", "코멧 스카우트", "common", "근거리 정찰에 최적화된 입문형 기체", "F"),
-            CollectibleShip("cargo_mule", "카고 뮬", "common", "잔해 지대에서 부품을 안정적으로 회수하는 수송선", "F"),
-            CollectibleShip("lunar_moth", "루나 모스", "common", "달빛 반사 도장으로 초보 조종사에게 인기", "E"),
-            CollectibleShip("ion_falcon", "아이온 팔콘", "rare", "이온 항로를 빠르게 가로지르는 민첩한 프리깃", "D"),
-            CollectibleShip("nebula_ray", "네뷸라 레이", "rare", "성운 속 신호 탐지에 강한 센서함", "D"),
-            CollectibleShip("aurora_clip", "오로라 클립", "rare", "극광 입자를 연료로 쓰는 실험기", "C"),
-            CollectibleShip("quantum_fox", "퀀텀 폭스", "epic", "짧은 양자 도약으로 위기 상황을 벗어나는 고급 기체", "B"),
-            CollectibleShip("void_manta", "보이드 만타", "epic", "암흑 물질 표면 코팅을 두른 심우주 탐사선", "B"),
-            CollectibleShip("solar_dragon", "솔라 드래곤", "legendary", "항성풍을 타고 날아가는 전설급 순양함", "A"),
-            CollectibleShip("event_horizon", "이벤트 호라이즌", "mythic", "블랙홀 경계에서 회수된 신화급 함선", "S"),
+            CollectibleShip("comet_scout", "코멧 스카우트", "F", "근거리 정찰에 최적화된 입문형 기체"),
+            CollectibleShip("cargo_mule", "카고 뮬", "F", "잔해 지대에서 부품을 안정적으로 회수하는 수송선"),
+            CollectibleShip("lunar_moth", "루나 모스", "F", "달빛 반사 도장으로 초보 조종사에게 인기"),
+            CollectibleShip("ion_falcon", "아이온 팔콘", "E", "이온 항로를 빠르게 가로지르는 민첩한 프리깃"),
+            CollectibleShip("nebula_ray", "네뷸라 레이", "D", "성운 속 신호 탐지에 강한 센서함"),
+            CollectibleShip("aurora_clip", "오로라 클립", "D", "극광 입자를 연료로 쓰는 실험기"),
+            CollectibleShip("quantum_fox", "퀀텀 폭스", "C", "짧은 양자 도약으로 위기 상황을 벗어나는 고급 기체"),
+            CollectibleShip("void_manta", "보이드 만타", "B", "암흑 물질 표면 코팅을 두른 심우주 탐사선"),
+            CollectibleShip("solar_dragon", "솔라 드래곤", "A", "항성풍을 타고 날아가는 정예 순양함"),
+            CollectibleShip("event_horizon", "이벤트 호라이즌", "S", "블랙홀 경계에서 회수된 최고 티어 함선"),
         ]
 
     def _init_loot_table(self) -> list[LootDrop]:
@@ -233,11 +219,16 @@ class AdventureGame(Game):
         return ShipProgress()
 
     def _roll_collectible_ship(self) -> CollectibleShip:
-        """희귀도 가중치 → 해당 희귀도 내 균등 선택"""
-        rarity_keys = list(self.ship_rarities.keys())
-        weights = [self.ship_rarities[key].weight for key in rarity_keys]
-        selected_rarity = random.choices(rarity_keys, weights=weights, k=1)[0]
-        candidates = [ship for ship in self.ship_catalog if ship.rarity == selected_rarity]
+        """grade 드롭 가중치 → 해당 등급 내 균등 선택."""
+        grades = list(GRADE_ORDER)
+        weights = [self.grade_drop_weights[g] for g in grades]
+        selected_grade = random.choices(grades, weights=weights, k=1)[0]
+        candidates = [
+            ship for ship in self.ship_catalog if ship.ship_grade == selected_grade
+        ]
+        if not candidates:
+            # 해당 등급 기체가 없으면 카탈로그 전체에서 균등
+            return random.choice(self.ship_catalog)
         return random.choice(candidates)
 
     def _get_collection_records(self) -> dict[str, int]:
@@ -810,13 +801,13 @@ class AdventureGame(Game):
         if engine_bonus > 0:
             reward = int(reward * (1.0 + engine_bonus / 100.0))
 
-        # 수집 희귀도(common~mythic)는 경제에 영향 없음. 기체 grade 스탯은 별도 표시용.
+        # 기체 도감 grade는 드롭 티어/표시용. 보상 배율은 본체 +N·파츠 패시브가 담당.
         if random.random() < 0.08:
             reward = int(reward * random.choice((1.5, 1.75, 2.0)))
         return max(reward, 1)
 
     def _try_roll_loot_reward(self) -> Optional[dict]:
-        """낮은 확률의 즉시 득템 보상. 도감 희귀도와 독립된 경제 보상."""
+        """낮은 확률의 즉시 득템 보상. 도감 grade와 독립된 경제 보상."""
         roll = random.random()
         cumulative = 0.0
         for loot in self.loot_table:
@@ -897,11 +888,10 @@ class AdventureGame(Game):
             discovery = self._try_discover_ship(activity)
             if discovery:
                 ship, collection_result = discovery
-                rarity = self.ship_rarities[ship.rarity]
                 new_badge = "NEW!" if collection_result.get("is_new") else f"중복 x{collection_result.get('count', 1)}"
                 result_lines.append(
-                    f"🚀 우주선 발견: {format_grade_mark(ship.grade)} [{ship.name}] "
-                    f"({rarity.icon} 수집 {rarity.name}, {new_badge})"
+                    f"🚀 우주선 발견: 등급 {ship.grade} [{ship.name}] "
+                    f"({GRADE_TONES[ship.ship_grade]}, {new_badge})"
                 )
                 equip_msg = self._maybe_equip_discovered_ship(ship)
                 if equip_msg:
@@ -951,7 +941,7 @@ class AdventureGame(Game):
         )
 
     def _show_ship_codex(self) -> str:
-        """수집한 우주선 도감 표시 (기체 등급 F~S 중심)."""
+        """수집한 우주선 도감 표시 — F~S 등급 단위 그룹핑 (희귀도 그룹 없음)."""
         collection = self._get_collection_records()
         total = len(self.ship_catalog)
         owned = len(collection)
@@ -961,29 +951,27 @@ class AdventureGame(Game):
             "",
             f"수집 현황: {owned}/{total}종 ({owned / total * 100:.0f}%)",
             f"주력 기체: {active}",
-            "기체 등급(F~S)은 본체 티어, 수집 아이콘은 드랍 가중치 표시입니다.",
+            "도감 티어는 기체 등급 F~S 만 사용합니다.",
             "파츠에는 등급이 없고 패시브·+N강만 있습니다.",
             "",
         ]
 
-        for grade in ShipGrade:
-            ships = [ship for ship in self.ship_catalog if ship.grade == grade.value]
-            if not ships:
-                continue
+        for grade in GRADE_ORDER:
+            ships = [ship for ship in self.ship_catalog if ship.ship_grade == grade]
             owned_count = sum(1 for ship in ships if ship.ship_id in collection)
             lines.append(
-                f"{format_grade_mark(grade)} {GRADE_TONES[grade]} {owned_count}/{len(ships)}"
+                f"{grade.value} {owned_count}/{len(ships)} · {GRADE_TONES[grade]}"
             )
+            if not ships:
+                lines.append("- (등록 기체 없음)")
+                lines.append("")
+                continue
             for ship in ships:
                 count = collection.get(ship.ship_id, 0)
-                rarity = self.ship_rarities[ship.rarity]
                 if count:
                     duplicate_text = f" x{count}" if count > 1 else ""
                     equipped = " ★주력" if ship.ship_id == self.ship_progress.equipped_ship_id else ""
-                    lines.append(
-                        f"- {ship.name}{duplicate_text}{equipped} "
-                        f"({rarity.icon}): {ship.flavor}"
-                    )
+                    lines.append(f"- {ship.name}{duplicate_text}{equipped}: {ship.flavor}")
                 else:
                     lines.append("- ???")
             lines.append("")

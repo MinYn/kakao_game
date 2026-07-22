@@ -21,6 +21,30 @@
 
 코드 진입점: `games/ship_system.migrate_legacy_level`, `GoldSystem._ensure_enhancement_columns`, `PostgreSQLManager._ensure_enhancement_columns`.
 
+## 도감 희귀도 제거
+
+| 제거 | 대체 |
+|------|------|
+| `CollectibleShip.rarity` (`common`…`mythic`) | `CollectibleShip.grade` (`F`…`S`) |
+| `ShipRarity` / `_init_ship_rarities` | `GRADE_DROP_WEIGHTS` (F 흔함 → S 희귀) |
+| 도감 섹션 `⚪ 일반` | `F 3/3 · 입문 기체` 형태 |
+| 발견 메시지 `🔵 희귀 [이름]` | `등급 E [이름]` |
+
+레거시 문자열 매핑: `migrate_legacy_rarity()`  
+(`common→F`, `rare→E`, `epic→C`, `legendary→A`, `mythic→S`)
+
+카탈로그 매핑(현행):
+
+| ship_id | grade |
+|---------|-------|
+| comet_scout, cargo_mule, lunar_moth | F |
+| ion_falcon | E |
+| nebula_ray, aurora_clip | D |
+| quantum_fox | C |
+| void_manta | B |
+| solar_dragon | A |
+| event_horizon | S |
+
 ## 등가 계승 앵커
 
 ```
