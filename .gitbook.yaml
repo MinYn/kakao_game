@@ -1,0 +1,6 @@
+# GitBook 설정 — 플레이어 공략집
+# https://docs.gitbook.com/getting-started/git-sync/content-configuration
+root: ./gitbook
+structure:
+  readme: README.md
+  summary: SUMMARY.md
