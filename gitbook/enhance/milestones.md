@@ -1,36 +1,32 @@
-# 마일스톤 · 배지
+# +5, +10 같은 구간 보상
 
-## 본체 마일스톤
-
-다음 본체 단계에 도달하면 연출 + 보너스 골드:
+본체가 특정 단계에 도달하면 축하가 크게 납니다.
 
 **+5, +10, +15, +20, +25, +30**
 
 ```text
 ⬆️ 마일스톤 +N
-배지 stage K · +골드
+배지 단계 올라감 · 보너스 골드
 ```
 
-보너스 골드 ≈ `25 × max(1, N/5)` (기본 상수 기준)
+## 배지 그림이 바뀌는 구간
 
-## 배지 stage (비주얼)
+본체 단계에 따라 배지가 더 화려해집니다.
 
-본체 +N → 배지 디테일 단계:
+| 본체 | 배지 느낌 |
+|------|-----------|
+| 0~4 | 기본 |
+| 5~14 | 한 단계 업 |
+| 15~29 | 더 업 |
+| 30 이상 | 최고 구간 |
 
-| 본체 +N | stage |
-|---------|-------|
-| 0~4 | 0 |
-| 5~14 | 1 |
-| 15~29 | 2 |
-| 30+ | 3 |
-
-![+0 stage0](../assets/ship_samples/enhance_plus0_stage0.png)
-![+5 stage1](../assets/ship_samples/enhance_plus5_stage1.png)
-![+15 stage2](../assets/ship_samples/enhance_plus15_stage2.png)
-![+30 stage3](../assets/ship_samples/enhance_plus30_stage3.png)
+![+0](../assets/ship_samples/enhance_plus0_stage0.png)
+![+5](../assets/ship_samples/enhance_plus5_stage1.png)
+![+15](../assets/ship_samples/enhance_plus15_stage2.png)
+![+30](../assets/ship_samples/enhance_plus30_stage3.png)
 
 ## 공략 포인트
 
-- +4 → +5, +9 → +10 직전은 **세션 목표**로 잡기 좋습니다.  
-- 마일스톤 실패로 -1 되면 다시 직전으로 — pity를 활용해 재도전.  
-- 정산(판매)하면 본체는 0이 되지만 **배지 stage 루프 카운트**는 게임 데이터에 남을 수 있습니다. 등급·파츠는 유지.
+- +4 → +5, +9 → +10 은 **오늘 목표**로 잡기 좋습니다.  
+- 직전에서 실패해 -1 되면 아쉽지만, 연패 보정 보고 다시 도전.  
+- 정산으로 본체를 0으로 돌려도 **부품·등급**은 남습니다.
