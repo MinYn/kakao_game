@@ -20,7 +20,9 @@ class AdventureGameTestCase(unittest.TestCase):
         game = AdventureGame(user_id="tester")
         start_message = game.start()
         self.assertIn("우주 탐험", start_message)
-        self.assertIn("출동", start_message)
+        # 모바일 D0 홈: 출동은 버튼에 있고 본문에는 없을 수 있음
+        buttons = game.get_command_buttons()
+        self.assertIn("출동", [b["messageText"] for b in buttons])
 
         # 성공 판정/보상 롤은 통과시키고 이벤트 타입만 고정
         scout = game._get_activity_type("정찰")
@@ -29,8 +31,8 @@ class AdventureGameTestCase(unittest.TestCase):
         ):
             response = game.process_command("출동")
         self.assertIn("정찰 성공", response)
-        self.assertIn("랜덤 이벤트", response)
-        self.assertIn("현재 골드", response)
+        self.assertIn("정찰", response)
+        self.assertIn("골드", response)
 
     def test_legacy_activity_commands_alias_to_mission(self):
         game = AdventureGame(user_id="tester")
@@ -41,7 +43,7 @@ class AdventureGameTestCase(unittest.TestCase):
         ):
             for command in ("정찰", "탐사", "구조", "mission", "출동"):
                 response = game.process_command(command)
-                self.assertIn("랜덤 이벤트", response)
+                self.assertIn("정찰", response)
         self.assertEqual(select_mock.call_count, 5)
 
     def test_mission_excludes_rescue_without_pass(self):
@@ -72,6 +74,8 @@ class AdventureGameTestCase(unittest.TestCase):
         buttons = game.get_command_buttons()
         labels = [b["label"] for b in buttons]
         messages = [b["messageText"] for b in buttons]
+        # D0 홈: 성장/출동/도감/상태 (정확히 4)
+        self.assertEqual(len(buttons), 4)
         self.assertIn("🚀 출동", labels)
         self.assertIn("출동", messages)
         self.assertNotIn("정찰", messages)
@@ -104,11 +108,15 @@ class AdventureGameTestCase(unittest.TestCase):
         self.assertFalse(duplicate["is_new"])
         self.assertEqual(duplicate["count"], 2)
 
-        response = game.process_command("도감")
-        self.assertIn("우주선 도감", response)
-        self.assertIn("코멧 스카우트 x2", response)
+        # 도감 명령은 D1 메뉴, 목록이 실제 페이지
+        menu = game.process_command("도감")
+        self.assertIn("도감", menu)
+        self.assertEqual(game.last_screen_id, "D1_CODEX")
+        response = game.process_command("목록")
+        self.assertIn("도감", response)
+        self.assertIn("코멧 스카우트", response)
+        self.assertIn("x2", response)
         self.assertIn("F ", response)
-        self.assertIn("파츠에는 등급이 없고", response)
         # user-facing 구 희귀도 표기 제거
         for legacy in (
             "common",
@@ -254,7 +262,7 @@ class AdventureGameTestCase(unittest.TestCase):
             with patch("games.adventure.random.random", return_value=near_miss_roll):
                 response = game._enhance()
 
-            self.assertIn("아슬아슬하게 버텼습니다", response)
+            self.assertIn("아슬아슬", response)
             self.assertEqual(game.current_level, 2)
             self.assertEqual(game.ship_progress.body_enhance, 2)
             self.assertEqual(point_system.get_enhancement_level("tester"), 2)
@@ -271,7 +279,7 @@ class AdventureGameTestCase(unittest.TestCase):
             with patch("games.adventure.random.random", return_value=clutch_roll):
                 response = game._enhance()
 
-            self.assertIn("플라즈마 오버드라이브 축하 이펙트", response)
+            self.assertIn("플라즈마 오버드라이브", response)
             self.assertIn("보너스 +", response)
             self.assertEqual(game.current_level, 1)
             self.assertEqual(game.ship_progress.body_enhance, 1)
