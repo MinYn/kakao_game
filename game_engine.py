@@ -4,6 +4,16 @@ from games.base_game import Game
 from games.adventure import AdventureGame
 from gold_system_postgres import GoldSystemPostgres
 from config import Config
+from ui.mobile_reply import MobileReplyBuilder
+from ui.screens import (
+    D0_HOME,
+    D2_GOLD,
+    D2_HELP,
+    D2_RANK,
+    D2_TRANSFER,
+    get_registry,
+    resolve_screen_for_command,
+)
 
 
 class GameEngine:
@@ -16,6 +26,10 @@ class GameEngine:
         self.command_definitions = self._build_command_definitions()
         self._command_index: Dict[str, Dict[str, Any]] = {}
         self.default_game_class = AdventureGame
+        self._reply_builder = MobileReplyBuilder()
+        # 엔진 레벨 명령(골드/도움말 등)의 마지막 화면
+        self._last_screen_by_user: Dict[str, str] = {}
+        self._last_buttons_by_user: Dict[str, List[Dict[str, str]]] = {}
     
     def process_message(self, user_id: str, message: str, user_name: Optional[str] = None, platform_adapter=None) -> str:
         """사용자 메시지 처리
@@ -37,6 +51,16 @@ class GameEngine:
         
         message = self._normalize_command(message)
 
+        # 홈 명령은 게임 허브로 (엔진 help 대신 D0)
+        if message.strip().lower() in ("홈", "home", "hub", "시작"):
+            self._ensure_active_game(user_id)
+            if user_id in self.active_games:
+                game = self.active_games[user_id]
+                if hasattr(game, "_show_home"):
+                    text = game._show_home()
+                    self._sync_screen_from_game(user_id, game)
+                    return text
+
         # 구조화된 기본 명령어 처리
         handled, command_key = self._run_engine_command(
             user_id,
@@ -53,13 +77,54 @@ class GameEngine:
         if user_id in self.active_games:
             game = self.active_games[user_id]
             if game.is_game_active():
+                # 빈 메시지/순수 시작 → 홈만
+                if not message.strip() and start_response:
+                    self._sync_screen_from_game(user_id, game)
+                    return start_response
                 game_response = game.process_command(message)
-                if start_response and game_response:
-                    return f"{start_response}\n\n{game_response}"
-                return game_response or start_response or ""
+                self._sync_screen_from_game(user_id, game)
+                # 모바일: 시작+결과 중복 연결 금지 — 액션 결과 우선
+                if game_response:
+                    return game_response
+                return start_response or ""
 
-        # 기본 응답
-        return self._get_help()
+        # 기본 응답 → D0 홈 유도
+        return self._format_engine_reply(
+            user_id,
+            D2_HELP,
+            [
+                "❓ 도움말",
+                "홈/성장/출동/도감",
+                "상태·골드·패스",
+                "버튼을 눌러 진행",
+            ],
+        )
+
+    def _sync_screen_from_game(self, user_id: str, game: Game) -> None:
+        screen_id = getattr(game, "last_screen_id", None) or D0_HOME.screen_id
+        self._last_screen_by_user[user_id] = screen_id
+        last_reply = getattr(game, "_last_reply", None)
+        if last_reply is not None and getattr(last_reply, "buttons", None):
+            self._last_buttons_by_user[user_id] = list(last_reply.buttons)
+        else:
+            self._last_buttons_by_user[user_id] = get_registry().buttons_for(screen_id)
+
+    def _format_engine_reply(
+        self,
+        user_id: str,
+        screen,
+        lines: List[str],
+    ) -> str:
+        reply = self._reply_builder.build(
+            lines,
+            screen.layout,
+            screen.button_dicts(),
+            screen_id=screen.screen_id,
+            depth=screen.depth,
+        )
+        self._last_screen_by_user[user_id] = reply.screen_id
+        self._last_buttons_by_user[user_id] = list(reply.buttons)
+        return reply.text
 
     def _normalize_command(self, message: str) -> str:
         message = message.strip()
@@ -102,7 +167,7 @@ class GameEngine:
                 "key": "leaderboard",
                 "label": "🏆 리더보드",
                 "triggers": ['리더보드', '랭킹', 'leaderboard', 'ranking', 'l', 'lb', 'rank', 'r'],
-                "handler": self._get_leaderboard,
+                "handler": self._handle_leaderboard_command,
                 "match": "exact",
                 "button": {"label": "🏆 랭킹", "messageText": "리더보드"},
             },
@@ -110,7 +175,7 @@ class GameEngine:
                 "key": "help",
                 "label": "❓ 도움말",
                 "triggers": ['도움말', 'help', '?', 'h'],
-                "handler": self._get_help,
+                "handler": self._handle_help_command,
                 "match": "exact",
                 "button": {"label": "❓ 도움말", "messageText": "도움말"},
             },
@@ -158,27 +223,26 @@ class GameEngine:
         if not handler:
             return None, None
 
-        if handler in (self._get_leaderboard, self._get_help):
-            result = handler()
-        elif handler is self._handle_transfer_command:
+        if handler is self._handle_transfer_command:
             result = handler(user_id, command)
+        elif handler in (self._handle_help_command, self._handle_leaderboard_command, self._handle_gold_command):
+            result = handler(user_id, user_name=user_name, is_new_user=is_new_user)
         else:
             result = handler(user_id, user_name=user_name, is_new_user=is_new_user)
 
         return result, definition.get("key")
 
     def _handle_gold_command(self, user_id: str, user_name: Optional[str] = None, is_new_user: bool = False) -> str:
-        response = self._get_gold(user_id)
+        gold = self.gold_system.get_gold(user_id)
+        lines = ["💰 내 골드", f"{gold}G"]
         if is_new_user:
-            response = (
-                f"🎉 환영합니다! 신규 사용자에게 "
-                f"{Config.INITIAL_GOLD}G를 지급했습니다!\n\n"
-                f"{response}"
-            )
-        mention = self._get_user_mention(user_id, user_name)
-        if mention:
-            response = f"{mention} {response}"
-        return response
+            lines = [
+                "🎉 환영합니다!",
+                f"신규 {Config.INITIAL_GOLD}G 지급",
+                f"잔액 {gold}G",
+            ]
+        # 멘션은 25자 제한과 충돌할 수 있어 본문에는 넣지 않음
+        return self._format_engine_reply(user_id, D2_GOLD, lines)
 
     def _handle_transfer_command(self, user_id: str, message: str) -> str:
         msg_lower = message.lower()
@@ -188,26 +252,30 @@ class GameEngine:
             message = '골드주기 ' + message[5:]
         return self._transfer_gold(user_id, message)
     
-    def _get_help(self) -> str:
-        """도움말 반환"""
-        help_text = [
-            "🎮 게임 봇 도움말",
-            "",
-            "기본 명령어:",
-            "- 골드 (g, gold, p, pt): 내 골드 조회",
-            "- 골드주기 [사용자] [금액] (pay, send): 다른 사용자에게 골드 전송",
-            "- 리더보드 (l, lb, rank): 골드 랭킹 보기",
-            "- 도움말 (h, ?): 이 도움말 보기",
-            "",
-            "모험 명령어:",
-            "- 성장/강화: '성장', '강화', '업그레이드'",
-            "- 정산/판매: '정산', '판매'",
-            "- 출동: '출동', 'mission' (정찰·탐사·구조 랜덤 이벤트)",
-            "- 상태/패스 확인: '상태', '패스'",
-            "",
-            "첫 메시지를 보내면 바로 우주 탐험이 시작되며 버튼으로 바로 진행할 수 있습니다."
+    def _handle_help_command(
+        self, user_id: str, user_name: Optional[str] = None, is_new_user: bool = False
+    ) -> str:
+        """도움말 — DETAIL 15×25 + 버튼2."""
+        lines = [
+            "🎮 봇 도움말",
+            "홈: 성장·출동",
+            "도감·상태 메뉴",
+            "골드/랭킹/패스",
+            "강화·판매·출동",
+            "버튼으로 이동",
+            "depth 최대 3",
+            "줄당 25자 제한",
         ]
-        return "\n".join(help_text)
+        return self._format_engine_reply(user_id, D2_HELP, lines)
+
+    def _handle_leaderboard_command(
+        self, user_id: str, user_name: Optional[str] = None, is_new_user: bool = False
+    ) -> str:
+        return self._get_leaderboard(user_id=user_id)
+
+    def _get_help(self) -> str:
+        """하위 호환 도움말."""
+        return self._handle_help_command("_help")
 
     def _get_enhancement_level(self, user_id: str) -> int:
         """사용자의 현재 강화 레벨 조회 (AdventureGame에서)"""
@@ -247,9 +315,10 @@ class GameEngine:
         parts = message.replace('골드주기', '').replace('골드전송', '').strip().split()
         
         if len(parts) < 2:
-            return (
-                "❌ 사용법: '골드주기 [사용자] [금액]'\n"
-                "예: 골드주기 alice 50"
+            return self._format_engine_reply(
+                from_user,
+                D2_TRANSFER,
+                ["❌ 사용법", "골드주기 유저 금액", "예: 골드주기 a 50"],
             )
         
         # 금액과 사용자 추출
@@ -265,22 +334,38 @@ class GameEngine:
                 to_user = part
         
         if to_user is None or amount is None:
-            return "❌ 사용법: '골드주기 [사용자] [금액]'\n예: 골드주기 alice 50"
+            return self._format_engine_reply(
+                from_user,
+                D2_TRANSFER,
+                ["❌ 사용법", "골드주기 유저 금액", "예: 골드주기 a 50"],
+            )
         
         if amount <= 0:
-            return "❌ 전송할 골드는 1G 이상이어야 합니다."
+            return self._format_engine_reply(
+                from_user,
+                D2_TRANSFER,
+                ["❌ 금액 오류", "1G 이상 전송"],
+            )
         
         # 자기 자신에게 전송 불가
         if from_user == to_user:
-            return "❌ 자기 자신에게 골드를 전송할 수 없습니다."
+            return self._format_engine_reply(
+                from_user,
+                D2_TRANSFER,
+                ["❌ 전송 불가", "자기 자신 불가"],
+            )
         
         # 골드 확인
         current_gold = self.gold_system.get_gold(from_user)
         if current_gold < amount:
-            return (
-                f"❌ 골드가 부족합니다.\n"
-                f"현재 골드: {current_gold}G\n"
-                f"전송하려는 골드: {amount}G"
+            return self._format_engine_reply(
+                from_user,
+                D2_TRANSFER,
+                [
+                    "❌ 골드 부족",
+                    f"보유 {current_gold}G",
+                    f"필요 {amount}G",
+                ],
             )
         
         # 골드 전송
@@ -292,71 +377,71 @@ class GameEngine:
         )
         
         if result is None:
-            return "❌ 골드 전송에 실패했습니다."
+            return self._format_engine_reply(
+                from_user,
+                D2_TRANSFER,
+                ["❌ 전송 실패"],
+            )
         
-        # 받는 사람 멘션
-        to_user_mention = self._get_user_mention(to_user)
-        
-        response = f"""✅ 골드 전송 완료!
-
-보낸 사람: {from_user}
-받은 사람: {to_user_mention if to_user_mention else to_user}
-전송 금액: {amount}G
-
-{from_user}의 남은 골드: {self.gold_system.get_gold(from_user)}G
-{to_user_mention if to_user_mention else to_user}의 현재 골드: {result}G"""
-        
-        return response
+        remain = self.gold_system.get_gold(from_user)
+        return self._format_engine_reply(
+            from_user,
+            D2_TRANSFER,
+            [
+                "✅ 전송 완료",
+                f"→ {to_user}",
+                f"금액 {amount}G",
+                f"잔액 {remain}G",
+                f"상대 {result}G",
+            ],
+        )
     
-    def _get_leaderboard(self, limit: int = 10) -> str:
-        """리더보드 조회"""
+    def _get_leaderboard(self, limit: int = 10, user_id: str = "_rank") -> str:
+        """리더보드 조회 — DETAIL 모바일 레이아웃."""
         leaderboard = self.gold_system.get_leaderboard(limit)
         
         if not leaderboard:
-            return "📊 아직 랭킹 데이터가 없습니다."
+            return self._format_engine_reply(
+                user_id,
+                D2_RANK,
+                ["🏆 리더보드", "데이터 없음"],
+            )
         
-        result = ["🏆 골드 리더보드", ""]
-        for idx, (user_id, gold) in enumerate(leaderboard, 1):
+        result = ["🏆 골드 랭킹"]
+        for idx, (uid, gold) in enumerate(leaderboard[:12], 1):
             medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else f"{idx}."
-            result.append(f"{medal} {user_id}: {gold}G")
+            # user_id가 길면 앞부분만
+            short = uid if len(uid) <= 12 else uid[:11] + "…"
+            result.append(f"{medal}{short} {gold}G")
         
-        return "\n".join(result)
+        return self._format_engine_reply(user_id, D2_RANK, result)
     
     def get_ui_buttons(self, user_id: str, command: str | None = None, response: str | None = None) -> List[Dict[str, str]]:
-        """UI 버튼 목록 반환 (플랫폼별 UI 생성용)
+        """UI 버튼 목록 — 모바일 규칙: DETAIL=2 / MENU=4 만.
 
-        Args:
-            user_id: 사용자 ID
-            command: 직전에 실행한 명령어 (UI 맥락 판단용)
-            response: 응답 메시지 (선택사항, 후행 UI 판단용)
-
-        Returns:
-            버튼 목록 [{'label': '...', 'messageText': '...'}, ...]
+        마지막 화면 레지스트리 또는 게임 상태를 우선한다.
+        더 이상 게임+베이스를 합쳐 5개로 자르지 않는다.
         """
-        active_game = self.active_games.get(user_id)
-        game_buttons: List[Dict[str, str]] = []
+        # 1) 엔진이 기억한 마지막 버튼
+        cached = self._last_buttons_by_user.get(user_id)
+        if cached and len(cached) in (2, 4):
+            return list(cached)
 
+        # 2) 활성 게임 화면
+        active_game = self.active_games.get(user_id)
         if active_game and active_game.is_game_active():
             if hasattr(active_game, "get_command_buttons"):
                 game_buttons = active_game.get_command_buttons(command) or []
+                if len(game_buttons) in (2, 4):
+                    return list(game_buttons)
 
-        base_buttons = self._build_base_buttons()
-
-        combined = game_buttons + base_buttons
-        # 최대 5개로 제한
-        return combined[:5]
+        # 3) 명령으로 화면 추론
+        screen = resolve_screen_for_command(command)
+        return get_registry().buttons_for(screen.screen_id)
 
     def _build_base_buttons(self) -> List[Dict[str, str]]:
-        buttons: List[Dict[str, str]] = []
-        for definition in self.command_definitions:
-            button_meta = definition.get("button")
-            if not button_meta:
-                continue
-            buttons.append({
-                "label": button_meta.get("label", definition.get("label", "")),
-                "messageText": button_meta.get("messageText", ""),
-            })
-        return buttons
+        """D0 홈 버튼 (레거시 호환)."""
+        return D0_HOME.button_dicts()
     
     def should_generate_image(self, user_id: str, command: str, response: str) -> bool:
         """이미지 생성이 필요한지 확인
@@ -372,11 +457,15 @@ class GameEngine:
         if not response:
             return False
         
-        # 성장 결과 확인
+        # 성장/강화 결과 확인
+        if '강화 성공' in response or '강화 실패' in response or '강화 하락' in response:
+            return user_id in self.active_games
         if '성장 성공' in response or '성장 실패' in response:
             return user_id in self.active_games
 
-        # 활동 결과 확인
+        # 출동/활동 결과 확인
+        if '성공!' in response and ('정찰' in response or '탐사' in response or '구조' in response):
+            return user_id in self.active_games
         if '활동 성공' in response or '활동이 잘 풀리지' in response:
             return user_id in self.active_games
         

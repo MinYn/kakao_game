@@ -84,7 +84,8 @@ class SQLiteShipPersistenceTestCase(unittest.TestCase):
             restarted = GoldSystem(db_file.name)
             progress = restarted.get_ship_progress("pilot")
 
-            self.assertIn("본체 +N만 초기화", response)
+            self.assertIn("정산 완료", response)
+            self.assertIn("파츠 유지", response)
             self.assertEqual(progress.grade, ShipGrade.E)
             self.assertEqual(progress.body_enhance, 0)
             self.assertEqual(progress.equipped_ship_id, "ion_falcon")

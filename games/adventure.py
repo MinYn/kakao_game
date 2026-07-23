@@ -1,7 +1,7 @@
 import hashlib
 import random
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from games.base_game import Game
 from games.ship_system import (
@@ -17,6 +17,23 @@ from games.ship_system import (
     parse_grade,
 )
 from config import Config
+from ui.mobile_reply import MobileReply, MobileReplyBuilder, fit_text
+from ui.screens import (
+    D0_HOME,
+    D1_CODEX,
+    D1_GROW,
+    D1_STATUS,
+    D2_CODEX_PAGE,
+    D2_ENHANCE_RESULT,
+    D2_MISSION_RESULT,
+    D2_PASS,
+    D2_SELL_RESULT,
+    D2_STATUS_DETAIL,
+    D3_CODEX_PAGE,
+    ScreenDef,
+    get_registry,
+    resolve_screen_for_command,
+)
 
 
 @dataclass
@@ -143,6 +160,11 @@ class AdventureGame(Game):
         self.explorer_profile: Optional[ExplorerProfile] = None
         self.command_definitions = self._init_command_definitions()
         self._build_command_index()
+        # 모바일 depth UI 상태
+        self.last_screen_id: str = D0_HOME.screen_id
+        self.codex_page: int = 0
+        self._reply_builder = MobileReplyBuilder()
+        self._last_reply: Optional[MobileReply] = None
 
     def _init_ship_catalog(self) -> list[CollectibleShip]:
         """우주선 도감 카탈로그. 티어는 grade(F~S)만 사용 (rarity 필드 없음).
@@ -361,11 +383,23 @@ class AdventureGame(Game):
         ]
 
     def _init_command_definitions(self) -> list:
-        """구조화된 커맨드/버튼 정의"""
+        """구조화된 커맨드 정의 (모바일 depth 화면과 대응)."""
         return [
             {
+                "key": "home",
+                "triggers": ["홈", "home", "hub", "시작"],
+                "handler": self._show_home,
+            },
+            {
+                # D1 성장 메뉴 (실제 강화는 key=enhance)
+                "key": "grow_menu",
+                "triggers": ["성장", "grow"],
+                "handler": self._show_grow_menu,
+                "button": {"label": "🔨 성장", "messageText": "성장"},
+            },
+            {
                 "key": "enhance",
-                "triggers": ["성장", "train", "강화", "업그레이드", "개조"],
+                "triggers": ["강화", "업그레이드", "개조", "train"],
                 "handler": self._enhance,
                 "button": {"label": "🔨 강화", "messageText": "강화"},
             },
@@ -376,16 +410,34 @@ class AdventureGame(Game):
                 "button": {"label": "💰 판매", "messageText": "판매"},
             },
             {
-                "key": "status",
+                # D1 상태 메뉴
+                "key": "status_menu",
                 "triggers": ["상태", "status", "info"],
-                "handler": self._get_status,
+                "handler": self._show_status_menu,
                 "button": {"label": "📊 상태", "messageText": "상태"},
             },
             {
-                "key": "codex",
+                "key": "status_detail",
+                "triggers": ["상세", "상태상세"],
+                "handler": self._get_status,
+                "button": {"label": "📋 상세", "messageText": "상세"},
+            },
+            {
+                # D1 도감 메뉴
+                "key": "codex_menu",
                 "triggers": ["도감", "collection", "codex", "수집", "ships"],
-                "handler": self._show_ship_codex,
+                "handler": self._show_codex_menu,
                 "button": {"label": "📚 도감", "messageText": "도감"},
+            },
+            {
+                "key": "codex_list",
+                "triggers": ["목록"],
+                "handler": self._show_codex_first_page,
+            },
+            {
+                "key": "codex_next",
+                "triggers": ["다음"],
+                "handler": self._show_codex_next_page,
             },
             {
                 "key": "passes",
@@ -429,35 +481,144 @@ class AdventureGame(Game):
         ]
 
     def get_command_buttons(self, last_command: Optional[str] = None) -> list[dict]:
-        """모험 게임용 버튼 우선순위 제공"""
-        key_order = [
-            "enhance",
-            "mission",
-            "codex",
-            "sell",
-            "status",
-            "passes",
+        """현재(또는 직전 명령) 화면의 모바일 버튼 반환 — 정확히 2 또는 4개."""
+        screen_id = self.last_screen_id
+        if last_command:
+            screen = resolve_screen_for_command(last_command)
+            # 홈/메뉴 명령은 resolve 우선, 결과 화면은 last_screen 유지가 더 정확
+            if screen.screen_id.startswith("D0") or screen.screen_id.startswith("D1"):
+                screen_id = screen.screen_id
+            elif self.last_screen_id:
+                screen_id = self.last_screen_id
+            else:
+                screen_id = screen.screen_id
+
+        if self._last_reply and self._last_reply.buttons:
+            return list(self._last_reply.buttons)
+
+        return get_registry().buttons_for(screen_id or D0_HOME.screen_id)
+
+    def _commit_reply(self, reply: MobileReply) -> str:
+        """화면 상태를 갱신하고 포맷된 텍스트를 반환."""
+        self._last_reply = reply
+        self.last_screen_id = reply.screen_id
+        return reply.text
+
+    def _reply_for_screen(
+        self,
+        screen: ScreenDef,
+        lines: List[str] | str,
+    ) -> str:
+        reply = self._reply_builder.build(
+            lines,
+            screen.layout,
+            screen.button_dicts(),
+            screen_id=screen.screen_id,
+            depth=screen.depth,
+        )
+        return self._commit_reply(reply)
+
+    def _show_home(self) -> str:
+        """D0 홈 MENU."""
+        ship_title = self.ship_progress.format_title(self._equipped_ship_name())
+        gold = self.get_user_points()
+        call_sign = self.explorer_profile.call_sign if self.explorer_profile else "—"
+        lines = [
+            "🛰️ 우주 탐험 홈",
+            f"콜사인 {call_sign}",
+            f"기체 {ship_title}",
+            f"골드 {gold}G",
+            "버튼을 눌러 진행",
         ]
+        return self._reply_for_screen(D0_HOME, lines)
 
-        definition_by_key = {d.get("key"): d for d in self.get_command_definitions()}
-        buttons: list[dict] = []
+    def _show_grow_menu(self) -> str:
+        """D1 성장 MENU."""
+        ship_title = self.ship_progress.format_title(self._equipped_ship_name())
+        cost = self._calculate_cost()
+        rate = self._calculate_success_rate()
+        lines = [
+            "🔨 성장 메뉴",
+            f"{ship_title}",
+            f"강화비용 {cost}G",
+            f"성공률 {rate:.0f}%",
+            f"골드 {self.get_user_points()}G",
+        ]
+        return self._reply_for_screen(D1_GROW, lines)
 
-        for key in key_order:
-            definition = definition_by_key.get(key)
-            if not definition or not definition.get("button"):
-                continue
+    def _show_status_menu(self) -> str:
+        """D1 상태 MENU."""
+        ship_title = self.ship_progress.format_title(self._equipped_ship_name())
+        passes = self._get_challenge_passes()
+        lines = [
+            "📊 상태 메뉴",
+            f"{ship_title}",
+            f"골드 {self.get_user_points()}G",
+            f"패스 {passes}장",
+            "항목을 선택하세요",
+        ]
+        return self._reply_for_screen(D1_STATUS, lines)
 
-            button_meta = definition["button"]
-            label = button_meta.get("label") or definition.get("label")
-            message_text = button_meta.get("messageText") or next(
-                iter(definition.get("triggers", [])),
-                "",
-            )
+    def _show_codex_menu(self) -> str:
+        """D1 도감 MENU."""
+        owned = len(self._get_collection_records())
+        total = len(self.ship_catalog)
+        active = self.ship_progress.format_title(self._equipped_ship_name())
+        lines = [
+            "📚 도감",
+            f"수집 {owned}/{total}종",
+            f"주력 {active}",
+            "목록·다음으로 열람",
+            "내 기체=상세 상태",
+        ]
+        self.codex_page = 0
+        return self._reply_for_screen(D1_CODEX, lines)
 
-            if label and message_text:
-                buttons.append({"label": label, "messageText": message_text})
+    def _codex_page_lines(self, page: int) -> tuple[List[str], int]:
+        """도감 페이지 라인 생성. (lines, total_pages) 반환."""
+        collection = self._get_collection_records()
+        total = len(self.ship_catalog)
+        owned = len(collection)
+        # 페이지당 본문 약 12줄 (헤더 3줄 제외)
+        entries: List[str] = []
+        for grade in GRADE_ORDER:
+            ships = [s for s in self.ship_catalog if s.ship_grade == grade]
+            owned_count = sum(1 for s in ships if s.ship_id in collection)
+            entries.append(f"{grade.value} {owned_count}/{len(ships)}")
+            for ship in ships:
+                count = collection.get(ship.ship_id, 0)
+                if count:
+                    mark = "★" if ship.ship_id == self.ship_progress.equipped_ship_id else ""
+                    dup = f"x{count}" if count > 1 else ""
+                    entries.append(f"-{ship.name}{dup}{mark}")
+                else:
+                    entries.append("-???")
 
-        return buttons[:5]
+        per_page = 12
+        total_pages = max(1, (len(entries) + per_page - 1) // per_page)
+        page = max(0, min(page, total_pages - 1))
+        chunk = entries[page * per_page : (page + 1) * per_page]
+        header = [
+            f"📚 도감 {page + 1}/{total_pages}",
+            f"수집 {owned}/{total}종",
+            f"주력 {self.ship_progress.format_title(self._equipped_ship_name())}",
+        ]
+        return header + chunk, total_pages
+
+    def _show_codex_page(self, page: int) -> str:
+        lines, total_pages = self._codex_page_lines(page)
+        self.codex_page = page
+        # page 0 → D2, page>=1 → D3 (depth 최대 3, 더 깊어지면 홈으로 접히는 대신 D3 유지)
+        screen = D2_CODEX_PAGE if page == 0 else D3_CODEX_PAGE
+        return self._reply_for_screen(screen, lines)
+
+    def _show_codex_first_page(self) -> str:
+        return self._show_codex_page(0)
+
+    def _show_codex_next_page(self) -> str:
+        _, total_pages = self._codex_page_lines(self.codex_page)
+        next_page = (self.codex_page + 1) % total_pages
+        return self._show_codex_page(next_page)
 
     def _load_stats(self) -> Dict[str, int]:
         if self.point_system:
@@ -491,7 +652,7 @@ class AdventureGame(Game):
         }
 
     def start(self) -> str:
-        """게임 시작"""
+        """게임 시작 — D0 홈 MENU (모바일 5줄+버튼4)."""
         self.is_active = True
         self.explorer_profile = ExplorerProfile.from_user_id(self.user_id)
         stats = self._load_stats()
@@ -515,54 +676,20 @@ class AdventureGame(Game):
             "activity_stats": self.activity_stats,
             "badge_cycle": stats.get("badge_cycle", 0),
         }
-
-        challenge_passes = self._get_challenge_passes()
-        ship_title = self.ship_progress.format_title(self._equipped_ship_name())
-        pilot_card = (
-            f"{self.explorer_profile.badge}\n"
-            f"콜사인: {self.explorer_profile.call_sign}\n"
-            f"역할: {self.explorer_profile.role}\n"
-            f"기체: {ship_title}\n"
-            f"모듈: {self.explorer_profile.module}\n"
-            f"기질: {self.explorer_profile.temperament}"
-        )
-
-        return (
-            "🛰️ 우주 탐험 로그를 시작합니다!\n\n"
-            f"{pilot_card}\n\n"
-            f"현재 우주선: {ship_title}\n"
-            f"파츠: {self.ship_progress.format_parts_summary()}\n"
-            f"우주선 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종 수집\n"
-            f"구조 임무 패스: {challenge_passes}장\n\n"
-            "명령어:\n"
-            "✨ 강화: '성장'/'train'/'강화'/'업그레이드' (본체 +N강, 골드 사용)\n"
-            "💾 정산: '정산'/'sell' (본체 강화 초기화 후 보상)\n"
-            "📊 상태보기: '상태'/'status'\n"
-            "📚 도감보기: '도감'/'collection'\n\n"
-            "🎯 활동:\n"
-            "- '출동'/'mission': 랜덤 이벤트(정찰·탐사·구조) 임무 진행\n"
-            "- '패스'/'ticket': 보유 구조 패스 확인\n"
-            "💡 상위 등급 기체 발견 시 본체 +N이 등가 환산으로 계승됩니다.\n"
-            "💡 기존 '정찰'/'탐사'/'구조' 입력도 출동으로 연결됩니다."
-        )
+        self.codex_page = 0
+        return self._show_home()
 
     def process_command(self, command: str) -> str:
-        """명령 처리"""
-        start_message = None
+        """명령 처리 — 모바일 화면 단위 응답. 시작 메시지와 결과 중복 연결 안 함."""
         if not self.is_active:
-            start_message = self.start()
+            self.start()
 
-        response, _ = self.run_structured_command(command)
+        response, key = self.run_structured_command(command)
         if response:
-            return f"{start_message}\n\n{response}" if start_message else response
+            return response
 
-        fallback = (
-            "알 수 없는 명령입니다.\n"
-            "사용 가능한 명령: 성장, 정산, 출동, 패스, 상태, 도감"
-        )
-        if start_message:
-            return f"{start_message}\n\n{fallback}"
-        return fallback
+        # 알 수 없는 명령 → D0 홈
+        return self._show_home()
 
     # ========== 성장 관련 메서드 ==========
 
@@ -633,16 +760,22 @@ class AdventureGame(Game):
         return max(sell_price, 10)
 
     def _enhance(self) -> str:
-        """기체 본체 +N 강화 (파츠 등급 없음)."""
+        """기체 본체 +N 강화 — D2_ENHANCE_RESULT DETAIL."""
         cost = self._calculate_cost()
         before = self.ship_progress.body_enhance
         ship_title = self.ship_progress.format_title(self._equipped_ship_name())
+        screen = D2_ENHANCE_RESULT
 
         if not self.point_system or not self.point_system.has_gold(self.user_id, cost):
-            return (
-                "❌ 우주선 강화를 위한 골드가 부족합니다.\n"
-                f"필요 골드: {cost}G\n현재 골드: {self.get_user_points()}G\n"
-                f"대상: {ship_title}"
+            return self._reply_for_screen(
+                screen,
+                [
+                    "❌ 골드 부족",
+                    f"필요 {cost}G",
+                    f"보유 {self.get_user_points()}G",
+                    f"{ship_title}",
+                    "출동·정산으로 골드 확보",
+                ],
             )
 
         self.deduct_gold(cost, f"본체 강화 시도 ({ship_title} +{before} → +{before + 1})")
@@ -657,7 +790,6 @@ class AdventureGame(Game):
 
         if is_success:
             self.ship_progress = self.ship_progress.with_body_enhance(before + 1)
-            # 성공 시 랜덤 파츠 +1 (패시브 성장)
             part_id = random.choice(list(PART_CATALOG.keys()))
             part_before = self.ship_progress.parts.get(part_id, 0)
             self.ship_progress = self.ship_progress.with_part_enhance(part_id, part_before + 1)
@@ -668,32 +800,26 @@ class AdventureGame(Game):
 
             next_cost = self._calculate_cost()
             celebration = self._get_enhancement_celebration(roll, success_rate)
-            celebration_lines: list[str] = []
+            part_def = PART_CATALOG[part_id]
+            lines = [
+                "✅ 강화 성공!",
+                f"{self.ship_progress.format_title(self._equipped_ship_name())}",
+                f"본체 +{before}→+{before + 1}",
+                f"파츠 {part_def.name}+{part_before + 1}",
+                f"다음비용 {next_cost}G",
+                f"골드 {self.get_user_points()}G",
+            ]
             if celebration:
                 bonus = max(int(cost * celebration.gold_multiplier), 10)
                 self.award_gold(bonus, f"강화 축하 이펙트: {celebration.name}")
-                celebration_lines = [
-                    f"{celebration.icon} {celebration.name} 축하 이펙트!",
-                    f"판정 차이 {success_rate - roll:.1f}%p — {celebration.message}",
-                    f"보너스 +{bonus}G",
-                    "",
-                ]
-
-            part_def = PART_CATALOG[part_id]
-            result_lines = [
-                "✅ 강화 성공!",
-                "",
-                f"기체: {self.ship_progress.format_title(self._equipped_ship_name())}",
-                f"파츠 성장: {part_def.name} +{part_before + 1}강",
-                f"다음 본체 강화 필요 골드: {next_cost}G",
-                f"현재 골드: {self.get_user_points()}G",
-                "",
-            ]
-            result_lines.extend(celebration_lines)
-            result_lines.append(
-                "💡 기체 등급(F~S) · 본체 +N · 파츠 +N 을 구분해 보세요. 파츠에는 등급이 없습니다."
-            )
-            return "\n".join(result_lines)
+                lines.extend(
+                    [
+                        f"{celebration.icon} {celebration.name}",
+                        f"보너스 +{bonus}G",
+                        f"골드 {self.get_user_points()}G",
+                    ]
+                )
+            return self._reply_for_screen(screen, lines)
 
         self.game_data["failures"] = self.game_data.get("failures", 0) + 1
         if self.point_system:
@@ -704,13 +830,17 @@ class AdventureGame(Game):
             self._is_enhancement_near_miss(roll, success_rate)
             or (armor_save > 0 and random.random() * 100 < min(armor_save, 25))
         ):
-            return (
-                "🛡️ 아슬아슬하게 버텼습니다!\n\n"
-                f"성공률 {success_rate:.1f}% / 판정 {roll:.1f}%\n"
-                "보호막/장갑이 간신히 버텨 본체 강화가 내려가지 않았어요.\n"
-                f"기체: {self.ship_progress.format_title(self._equipped_ship_name())}\n"
-                f"현재 골드: {self.get_user_points()}G\n\n"
-                "방금 거의 붙을 뻔했습니다. 한 번 더?"
+            return self._reply_for_screen(
+                screen,
+                [
+                    "🛡️ 아슬아슬 버팀!",
+                    f"성공률 {success_rate:.0f}%",
+                    f"판정 {roll:.0f}%",
+                    "본체 강화 유지",
+                    f"{self.ship_progress.format_title(self._equipped_ship_name())}",
+                    f"골드 {self.get_user_points()}G",
+                    "한 번 더?",
+                ],
             )
 
         if self.ship_progress.body_enhance > 0:
@@ -718,24 +848,39 @@ class AdventureGame(Game):
                 self.ship_progress.body_enhance - 1
             )
             self._persist_ship_progress()
-            return (
-                "❌ 본체 강화가 한 단계 내려갔어요.\n\n"
-                f"기체: {self.ship_progress.format_title(self._equipped_ship_name())}\n"
-                f"현재 골드: {self.get_user_points()}G\n\n"
-                "다시 시도해볼까요?"
+            return self._reply_for_screen(
+                screen,
+                [
+                    "❌ 강화 하락",
+                    f"{self.ship_progress.format_title(self._equipped_ship_name())}",
+                    f"골드 {self.get_user_points()}G",
+                    "다시 시도할까요?",
+                ],
             )
 
-        return (
-            "❌ 강화 실패...\n\n"
-            f"기체: {self.ship_progress.format_title(self._equipped_ship_name())}\n"
-            f"현재 골드: {self.get_user_points()}G\n\n"
-            "다시 한 번 시도해보세요!"
+        return self._reply_for_screen(
+            screen,
+            [
+                "❌ 강화 실패",
+                f"{self.ship_progress.format_title(self._equipped_ship_name())}",
+                f"골드 {self.get_user_points()}G",
+                "다시 시도해보세요",
+            ],
         )
 
     def _sell(self) -> str:
-        """본체 강화 정산 (등급/파츠/장착 기체는 유지)."""
+        """본체 강화 정산 — D2_SELL_RESULT DETAIL."""
+        screen = D2_SELL_RESULT
         if self.ship_progress.body_enhance == 0:
-            return "❌ 정산할 본체 강화가 없습니다. 강화 후 정산해 주세요."
+            return self._reply_for_screen(
+                screen,
+                [
+                    "❌ 정산 불가",
+                    "본체 강화 없음",
+                    "강화 후 정산하세요",
+                    f"골드 {self.get_user_points()}G",
+                ],
+            )
 
         sell_price = self._calculate_sell_price()
         sold_level = self.ship_progress.body_enhance
@@ -748,14 +893,17 @@ class AdventureGame(Game):
         self.game_data["badge_cycle"] = self.game_data.get("badge_cycle", 0) + 1
         self._persist_ship_progress()
 
-        return (
-            "💾 본체 강화를 정산했습니다!\n\n"
-            f"정산 대상: {sold_title}\n"
-            f"정산한 본체 강화: +{sold_level}\n"
-            f"정산 보상: {sell_price}G\n"
-            f"현재 골드: {self.get_user_points()}G\n\n"
-            f"유지: 등급 {self.ship_progress.grade.value} · 파츠 {self.ship_progress.format_parts_summary()}\n"
-            "본체 +N만 초기화됩니다. 다시 업그레이드해봐요!"
+        return self._reply_for_screen(
+            screen,
+            [
+                "💾 정산 완료",
+                f"{sold_title}",
+                f"본체 +{sold_level} 정산",
+                f"보상 +{sell_price}G",
+                f"골드 {self.get_user_points()}G",
+                f"등급 {self.ship_progress.grade.value} 유지",
+                "파츠 유지",
+            ],
         )
 
     # ========== 활동 관련 메서드 ==========
@@ -841,25 +989,31 @@ class AdventureGame(Game):
         return ship, self._grant_ship_to_collection(ship)
 
     def _perform_activity(self, activity: ActivityType | str) -> str:
-        """개별 활동 실행. 통합 출동에서 선택된 ActivityType 또는 이름 문자열을 받는다."""
+        """개별 활동 실행 — D2_MISSION_RESULT DETAIL."""
+        screen = D2_MISSION_RESULT
         if isinstance(activity, str):
             resolved = self._get_activity_type(activity)
             if resolved is None:
-                return "❌ 해당 활동을 찾을 수 없습니다. '출동'으로 임무를 진행해 주세요."
+                return self._reply_for_screen(
+                    screen,
+                    ["❌ 활동 없음", "출동으로 진행하세요"],
+                )
             activity = resolved
 
         if activity.name == "구조":
             if not self._use_challenge_pass():
                 passes = self._get_challenge_passes()
-                return (
-                    "❌ 구조 임무 패스가 부족합니다.\n"
-                    f"보유 패스: {passes}장\n"
-                    "출동 중 탐사 이벤트가 나오면 패스를 얻을 수 있어요."
+                return self._reply_for_screen(
+                    screen,
+                    [
+                        "❌ 패스 부족",
+                        f"보유 {passes}장",
+                        "탐사 이벤트로 패스 획득",
+                    ],
                 )
 
         success_rate = self._calculate_success_rate(activity)
         pilot_name = self.explorer_profile.call_sign if self.explorer_profile else "탐사대"
-        event_header = f"🎲 랜덤 이벤트: {activity.icon} {activity.name}"
 
         if random.random() * 100 < success_rate:
             reward = self._calculate_activity_reward(activity)
@@ -883,41 +1037,28 @@ class AdventureGame(Game):
                 update_params[activity_map[activity.name]] = 1
                 self.point_system.update_game_stats(**update_params)
 
-            reward_multiplier = (
-                activity.multiplier or Config.MONSTER_HUNT_REWARD_MULTIPLIER
-            ) * 100
-            description = random.choice(activity.success_messages).format(pilot=pilot_name)
-
             ship_title = self.ship_progress.format_title(self._equipped_ship_name())
             power = self._effective_power()
-            reward_line = (
-                f"💰 리워드 +{reward}G "
-                f"(등가 스탯 {power:.0f} / 본체 +{self.ship_progress.body_enhance}강, "
-                f"배율 {reward_multiplier:.1f}%)"
-            )
-            result_lines = [
+            lines = [
                 f"✅ {activity.name} 성공!",
-                event_header,
-                "",
-                description,
-                reward_line,
-                f"🚀 현재 기체: {ship_title}",
-                "",
+                f"🎲 {activity.icon} {activity.name}",
+                f"+{reward}G 스탯{power:.0f}",
+                f"🚀 {ship_title}",
             ]
 
             discovery = self._try_discover_ship(activity)
             if discovery:
                 ship, collection_result = discovery
-                new_badge = "NEW!" if collection_result.get("is_new") else f"중복 x{collection_result.get('count', 1)}"
-                result_lines.append(
-                    f"🚀 우주선 발견: 등급 {ship.grade} [{ship.name}] "
-                    f"({GRADE_TONES[ship.ship_grade]}, {new_badge})"
-                )
+                new_badge = "NEW" if collection_result.get("is_new") else f"x{collection_result.get('count', 1)}"
+                lines.append(f"발견 {ship.grade} {ship.name}")
+                lines.append(new_badge)
                 equip_msg = self._maybe_equip_discovered_ship(ship)
                 if equip_msg:
-                    result_lines.append(equip_msg)
-                result_lines.append(f"📚 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종")
-                result_lines.append("")
+                    # 장착 메시지도 짧게
+                    lines.append(fit_text(equip_msg, 2).split("\n")[0])
+                lines.append(
+                    f"도감 {len(self._get_collection_records())}/{len(self.ship_catalog)}"
+                )
 
             loot_reward = self._try_roll_loot_reward()
             if loot_reward:
@@ -927,139 +1068,85 @@ class AdventureGame(Game):
                 self.game_data["total_reward"] = self.total_reward
                 if self.point_system:
                     self.point_system.update_game_stats(user_id=self.user_id, total_hunt_reward=amount)
-                result_lines.append(f"{loot.icon} 득템! {loot.name} +{amount}G")
-                result_lines.append(f"└ {loot.message}")
-                result_lines.append("")
+                lines.append(f"{loot.icon} {loot.name}+{amount}G")
 
             if activity.name == "탐사":
                 if random.random() < Config.BOSS_TICKET_DROP_RATE:
                     new_passes = self._add_challenge_pass()
-                    result_lines.append(f"🎫 구조 임무 패스 획득! (현재: {new_passes}장)")
-                    result_lines.append("")
+                    lines.append(f"🎫 패스 획득({new_passes})")
 
-            result_lines.extend(
+            lines.extend(
                 [
-                    "활동 통계:",
-                    f"- 정찰: {self.activity_stats.get('정찰', 0)}회",
-                    f"- 탐사: {self.activity_stats.get('탐사', 0)}회",
-                    f"- 구조: {self.activity_stats.get('구조', 0)}회",
-                    f"총 활동: {self.activity_count}회",
-                    f"총 획득 골드: {self.total_reward}G",
-                    f"현재 골드: {self.get_user_points()}G",
+                    f"정찰{self.activity_stats.get('정찰', 0)} "
+                    f"탐사{self.activity_stats.get('탐사', 0)} "
+                    f"구조{self.activity_stats.get('구조', 0)}",
+                    f"총 {self.activity_count}회 {self.total_reward}G",
+                    f"골드 {self.get_user_points()}G",
                 ]
             )
-
-            return "\n".join(result_lines)
+            return self._reply_for_screen(screen, lines)
 
         description = random.choice(activity.fail_messages)
-        return (
-            f"❌ {activity.name}이(가) 잘 풀리지 않았어요...\n"
-            f"{event_header}\n\n"
-            f"{description}\n"
-            "다시 출동해볼까요?"
-            f"\n\n현재 성공 확률: {success_rate:.1f}%"
+        return self._reply_for_screen(
+            screen,
+            [
+                f"❌ {activity.name} 실패",
+                f"🎲 {activity.icon} {activity.name}",
+                description,
+                f"성공률 {success_rate:.0f}%",
+                "다시 출동할까요?",
+            ],
         )
 
     def _show_ship_codex(self) -> str:
-        """수집한 우주선 도감 표시 — F~S 등급 단위 그룹핑 (희귀도 그룹 없음)."""
-        collection = self._get_collection_records()
-        total = len(self.ship_catalog)
-        owned = len(collection)
-        active = self.ship_progress.format_title(self._equipped_ship_name())
-        lines = [
-            "📚 우주선 도감",
-            "",
-            f"수집 현황: {owned}/{total}종 ({owned / total * 100:.0f}%)",
-            f"주력 기체: {active}",
-            "도감 티어는 기체 등급 F~S 만 사용합니다.",
-            "파츠에는 등급이 없고 패시브·+N강만 있습니다.",
-            "",
-        ]
-
-        for grade in GRADE_ORDER:
-            ships = [ship for ship in self.ship_catalog if ship.ship_grade == grade]
-            owned_count = sum(1 for ship in ships if ship.ship_id in collection)
-            lines.append(
-                f"{grade.value} {owned_count}/{len(ships)} · {GRADE_TONES[grade]}"
-            )
-            if not ships:
-                lines.append("- (등록 기체 없음)")
-                lines.append("")
-                continue
-            for ship in ships:
-                count = collection.get(ship.ship_id, 0)
-                if count:
-                    duplicate_text = f" x{count}" if count > 1 else ""
-                    equipped = " ★주력" if ship.ship_id == self.ship_progress.equipped_ship_id else ""
-                    lines.append(f"- {ship.name}{duplicate_text}{equipped}: {ship.flavor}")
-                else:
-                    lines.append("- ???")
-            lines.append("")
-
-        lines.append(
-            "💡 '출동' 성공 시 이벤트에 따라 정찰 8% / 탐사 18% / 구조 35% 확률로 우주선을 발견합니다."
-        )
-        lines.append("💡 상위 등급 발견 시 본체 +N이 등가 환산으로 계승됩니다 (예: F+100 → E+1).")
-        return "\n".join(lines).rstrip()
+        """하위 호환: 도감 명령은 메뉴로 진입."""
+        return self._show_codex_menu()
 
     def _show_passes(self) -> str:
         passes = self._get_challenge_passes()
         drop_rate_percent = Config.BOSS_TICKET_DROP_RATE * 100
-
-        return (
-            "🎫 구조 임무 패스 현황\n\n"
-            f"보유 패스: {passes}장\n\n"
-            f"💡 '출동' 중 탐사 이벤트가 나오면 {drop_rate_percent:.0f}% 확률로 패스를 얻을 수 있어요!\n"
-            "패스가 있으면 출동 시 구조 이벤트도 랜덤으로 등장합니다."
+        return self._reply_for_screen(
+            D2_PASS,
+            [
+                "🎫 구조 패스",
+                f"보유 {passes}장",
+                f"탐사 시 {drop_rate_percent:.0f}% 드랍",
+                "패스 있으면 구조 등장",
+                "출동으로 사용",
+            ],
         )
 
     def _get_status(self) -> str:
+        """D2 상태 상세 DETAIL (15줄 이내)."""
         cost = self._calculate_cost()
         success_rate = self._calculate_success_rate()
         sell_price = self._calculate_sell_price()
         passes = self._get_challenge_passes()
-        body = self.ship_progress.body_enhance
+        ship_title = self.ship_progress.format_title(self._equipped_ship_name())
+        power = self._effective_power()
+        call_sign = self.explorer_profile.call_sign if self.explorer_profile else "—"
 
-        status_lines = [
-            "📊 현재 상태",
-            "",
-            "✨ 기체 체계:",
-            *self.ship_progress.format_status_block(self._equipped_ship_name()),
-            f"- 우주선 도감: {len(self._get_collection_records())}/{len(self.ship_catalog)}종",
-            f"- 다음 본체 강화 비용: {cost}G",
-            f"- 강화 성공률: {success_rate:.1f}%",
-            f"- 정산 예상 보상: {sell_price}G",
-            "",
-            "🎯 임무 정보:",
-            f"- 등가 스탯: {self._effective_power():.0f}",
-            f"- 보상 배율: {1.0 + (self._effective_power() * Config.MONSTER_HUNT_REWARD_MULTIPLIER):.2f}배",
-            f"- 구조 패스: {passes}장",
-            "",
-            "📈 통계:",
-            f"- 강화 시도: {self.game_data.get('attempts', 0)}회",
-            f"- 강화 성공: {self.game_data.get('successes', 0)}회",
-            f"- 강화 실패: {self.game_data.get('failures', 0)}회",
-            f"- 정찰: {self.activity_stats.get('정찰', 0)}회",
-            f"- 탐사: {self.activity_stats.get('탐사', 0)}회",
-            f"- 구조: {self.activity_stats.get('구조', 0)}회",
-            f"- 총 활동: {self.activity_count}회",
-            f"- 총 획득 골드: {self.total_reward}G",
-            f"- 현재 골드: {self.get_user_points()}G",
+        lines = [
+            "📊 상태 상세",
+            f"{ship_title}",
+            f"파츠 {self.ship_progress.format_parts_summary()}",
+            f"스탯 {power:.0f}",
+            f"강화 {cost}G {success_rate:.0f}%",
+            f"정산예상 {sell_price}G",
+            f"도감 {len(self._get_collection_records())}/{len(self.ship_catalog)}",
+            f"패스 {passes}장",
+            f"시도{self.game_data.get('attempts', 0)} "
+            f"성공{self.game_data.get('successes', 0)} "
+            f"실패{self.game_data.get('failures', 0)}",
+            f"정찰{self.activity_stats.get('정찰', 0)} "
+            f"탐사{self.activity_stats.get('탐사', 0)} "
+            f"구조{self.activity_stats.get('구조', 0)}",
+            f"총활 {self.activity_count}회",
+            f"획득 {self.total_reward}G",
+            f"골드 {self.get_user_points()}G",
+            f"콜사인 {call_sign}",
         ]
-
-        if self.explorer_profile:
-            status_lines.extend(
-                [
-                    "",
-                    "🛰️ 탐사대 프로필:",
-                    f"- 콜사인: {self.explorer_profile.call_sign}",
-                    f"- 역할: {self.explorer_profile.role}",
-                    f"- 모듈: {self.explorer_profile.module}",
-                    f"- 기질: {self.explorer_profile.temperament}",
-                ]
-            )
-
-        return "\n".join(status_lines)
+        return self._reply_for_screen(D2_STATUS_DETAIL, lines)
 
     def end(self) -> str:
         title = self.ship_progress.format_title(self._equipped_ship_name())
@@ -1103,26 +1190,21 @@ class AdventureGame(Game):
 
     def get_help(self) -> str:
         drop_rate = Config.BOSS_TICKET_DROP_RATE * 100
-        return (
-            "우주 탐험 로그 도움말:\n\n"
-            "✨ 기체 체계 (F~S 등급 · 본체 +N · 파츠 +N):\n"
-            "- 강화: '성장', 'train', '업그레이드' → 본체 +N (+ 랜덤 파츠 +1)\n"
-            "- 파츠에는 등급이 없고 패시브·강화만 있습니다 (엔진/센서/장갑).\n"
-            "- 상위 등급 기체 발견 시 본체 +N이 등가 환산됩니다 (F+100 ≈ E+1).\n"
-            "- 성공선에 가까울수록 더 큰 축하 이펙트/보너스가 터져요.\n"
-            "- 실패 직후 5% 구간·장갑 패시브가 단계 하락을 막을 수 있어요.\n"
-            "- 정산: '정산' 또는 'sell' (본체 +N 리셋 후 보상, 등급/파츠 유지)\n"
-            "- 상태: '상태' 또는 'status'\n\n"
-            "🎯 임무 (통합 출동):\n"
-            "- 출동: '출동', 'mission', '탐험', 'go' (정찰·탐사·구조 중 랜덤 이벤트)\n"
-            f"  · 정찰: 기본 센서 임무 (출현 비중 높음)\n"
-            f"  · 탐사: 샘플 채취, 패스 드랍 확률 {drop_rate:.0f}%\n"
-            "  · 구조: 고난도 구조 임무 (패스 1장 소모, 패스 있을 때만 등장)\n"
-            "- 기존 '정찰'/'탐사'/'구조' 입력도 출동 alias로 동작합니다.\n"
-            "- 패스 확인: '패스', 'ticket'\n"
-            "- 도감 확인: '도감', 'collection'\n\n"
-            "💡 임무 성공 시 우주선 발견/득템 보너스가 낮은 확률로 터집니다."
-        )
+        from ui.screens import D2_HELP
+
+        lines = [
+            "❓ 탐험 도움말",
+            "성장→강화·판매",
+            "출동=랜덤 임무",
+            f"탐사 패스 {drop_rate:.0f}%",
+            "구조=패스 1장",
+            "등급 F~S 본체+N",
+            "파츠+N 패시브",
+            "도감 목록·다음",
+            "상태=상세·골드",
+            "홈으로 복귀",
+        ]
+        return self._reply_for_screen(D2_HELP, lines)
 
     # ========== 패스 관련 유틸리티 ==========
 

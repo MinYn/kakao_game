@@ -203,7 +203,16 @@ class CommandButtonView(View):
         self.adapter = adapter
         self.last_command = last_command
 
-        for btn_data in buttons[:5]:
+        # 모바일 온리: DETAIL=2 / MENU=4 만 허용 (3·1·5 금지)
+        count = len(buttons)
+        if count >= 4:
+            limited = buttons[:4]
+        elif count >= 2:
+            limited = buttons[:2]
+        else:
+            limited = buttons[:4]
+
+        for btn_data in limited:
             label = btn_data.get("label", btn_data.get("messageText", "버튼"))
             message_text = btn_data.get("messageText", label)
 
