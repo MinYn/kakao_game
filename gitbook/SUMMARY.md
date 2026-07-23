@@ -37,3 +37,7 @@
 
 ## 숫자 모음
 * [확률·보상 한눈에](reference/numbers.md)
+
+## 올리기
+* [GitHub Pages로 올리기](PUBLISH.md)
+

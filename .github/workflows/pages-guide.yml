@@ -1,0 +1,44 @@
+# 우주 탐험 공략집 → GitHub Pages
+# 설정: Repo → Settings → Pages → Source = GitHub Actions
+name: Deploy guide (GitHub Pages)
+
+on:
+  push:
+    branches:
+      - master
+      - MinYn/issue-19-cta
+    paths:
+      - 'gitbook/**'
+      - '.github/workflows/pages-guide.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-guide
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: gitbook
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
