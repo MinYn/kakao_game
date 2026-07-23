@@ -5,6 +5,9 @@
   D1 섹션 MENU(5+4) 또는 DETAIL(15+2)
   D2 결과 DETAIL(15+2)
   D3 서브 DETAIL(15+2)
+
+이슈 #19 DDD: D2 루프 결과 화면은 홈 강제 대신
+  루프 유지 CTA 2개 (다시 출동/강화 교차). 홈은 D0·D1 슬롯.
 """
 
 from __future__ import annotations
@@ -94,14 +97,23 @@ D1_STATUS = ScreenDef(
     ),
 )
 
+# 루프 유지 CTA 화면 (이슈 #19) — DETAIL 이지만 홈 필수 아님
+LOOP_RESULT_SCREEN_IDS = frozenset(
+    {
+        "D2_ENHANCE_RESULT",
+        "D2_MISSION_RESULT",
+        "D2_SELL_RESULT",
+    }
+)
+
 D2_ENHANCE_RESULT = ScreenDef(
     screen_id="D2_ENHANCE_RESULT",
     depth=2,
     layout=LayoutMode.DETAIL,
-    description="강화 결과",
+    description="강화 결과 — 루프 CTA [다시 강화][출동]",
     buttons=(
         _btn("🔨 다시 강화", "강화"),
-        _btn("🏠 홈", "홈"),
+        _btn("🚀 출동", "출동"),
     ),
 )
 
@@ -109,10 +121,10 @@ D2_SELL_RESULT = ScreenDef(
     screen_id="D2_SELL_RESULT",
     depth=2,
     layout=LayoutMode.DETAIL,
-    description="판매 결과",
+    description="판매 결과 — 루프 CTA [강화][출동]",
     buttons=(
-        _btn("🔨 성장", "성장"),
-        _btn("🏠 홈", "홈"),
+        _btn("🔨 강화", "강화"),
+        _btn("🚀 출동", "출동"),
     ),
 )
 
@@ -120,10 +132,10 @@ D2_MISSION_RESULT = ScreenDef(
     screen_id="D2_MISSION_RESULT",
     depth=2,
     layout=LayoutMode.DETAIL,
-    description="출동 결과",
+    description="출동 결과 — 루프 CTA [다시 출동][강화]",
     buttons=(
         _btn("🚀 다시 출동", "출동"),
-        _btn("🏠 홈", "홈"),
+        _btn("🔨 강화", "강화"),
     ),
 )
 
@@ -260,7 +272,11 @@ class ScreenRegistry:
         return list(self._by_id.values())
 
     def validate_depth_graph(self) -> List[str]:
-        """depth 0~3 및 DETAIL 홈 복귀 검증."""
+        """depth 0~3 · 버튼 수 · DETAIL 복귀 경로 검증.
+
+        이슈 #19: 루프 결과(D2_MISSION/ENHANCE/SELL)는 홈 대신
+        루프 CTA(출동·강화)로 재탭을 유도한다. 그 외 DETAIL은 홈 필수.
+        """
         errors: List[str] = []
         for screen in self._by_id.values():
             if screen.depth < 0 or screen.depth > 3:
@@ -272,7 +288,13 @@ class ScreenRegistry:
                 )
             if screen.layout is LayoutMode.DETAIL:
                 messages = {b.message_text for b in screen.buttons}
-                if "홈" not in messages:
+                if screen.screen_id in LOOP_RESULT_SCREEN_IDS:
+                    # 루프 유지: 출동 또는 강화 중 최소 하나
+                    if not messages.intersection({"출동", "강화", "성장"}):
+                        errors.append(
+                            f"{screen.screen_id}: loop DETAIL missing CTA"
+                        )
+                elif "홈" not in messages:
                     errors.append(f"{screen.screen_id}: DETAIL missing 홈")
         return errors
 

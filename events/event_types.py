@@ -14,6 +14,12 @@ class EventType(str, Enum):
     GAME_ENDED = "game.ended"
     GAME_ACTION = "game.action"
     STATS_UPDATED = "stats.updated"
+    # 이슈 #19 도파민 루프 계측
+    MISSION_RESULT = "telemetry.mission_result"
+    ENHANCE_RESULT = "telemetry.enhance_result"
+    SHIP_DROP = "telemetry.ship_drop"
+    BUTTON_CLICK = "telemetry.button_click"
+    SESSION_RETAP = "telemetry.session_retap"
 
 
 class EventTopics:

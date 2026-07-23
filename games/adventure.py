@@ -1,7 +1,8 @@
 import hashlib
 import random
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from datetime import date
+from typing import Dict, List, Optional, Sequence
 
 from games.base_game import Game
 from games.ship_system import (
@@ -17,7 +18,18 @@ from games.ship_system import (
     parse_grade,
 )
 from config import Config
+from events.telemetry import (
+    track_enhance_result,
+    track_mission_result,
+    track_screen,
+    track_ship_drop,
+)
 from ui.mobile_reply import MobileReply, MobileReplyBuilder, fit_text
+from ui.result_template import (
+    EMOJI,
+    build_detail_slots,
+    loop_cta_buttons,
+)
 from ui.screens import (
     D0_HOME,
     D1_CODEX,
@@ -165,6 +177,12 @@ class AdventureGame(Game):
         self.codex_page: int = 0
         self._reply_builder = MobileReplyBuilder()
         self._last_reply: Optional[MobileReply] = None
+        # 이슈 #19 soft pity / 일일 목표 (세션 + game_data)
+        self.mission_fail_streak: int = 0
+        self.enhance_fail_streak: int = 0
+        self.daily_date: str = date.today().isoformat()
+        self.daily_missions: int = 0
+        self.daily_enhances: int = 0
 
     def _init_ship_catalog(self) -> list[CollectibleShip]:
         """우주선 도감 카탈로그. 티어는 grade(F~S)만 사용 (rarity 필드 없음).
@@ -269,10 +287,13 @@ class AdventureGame(Game):
         return {"ship_id": ship.ship_id, "is_new": old_count == 0, "count": collection[ship.ship_id]}
 
     def _maybe_equip_discovered_ship(self, ship: CollectibleShip) -> Optional[str]:
-        """기체 발견 시 장착. 등급이 바뀌면 본체 +N 등가 계승 (첫 장착 포함). 파츠 +N 유지."""
+        """기체 발견 시 장착. 등급이 바뀌면 본체 +N 등가 계승 (첫 장착 포함). 파츠 +N 유지.
+
+        반환 문자열은 모바일 슬롯용 짧은 훅 라인 (≤25자 권장).
+        승급/계승 시 전용 피크 문구.
+        """
         current = self.ship_progress
         prev_grade = current.grade
-        prev_title = current.format_title(self._equipped_ship_name())
 
         # 첫 장착: 항상 equip_ship 경로 (등급 다르면 inherit, 동급이면 +N 유지)
         if current.equipped_ship_id is None:
@@ -283,14 +304,11 @@ class AdventureGame(Game):
             self._persist_ship_progress()
             if parse_grade(ship.grade) != prev_grade:
                 return (
-                    f"⬆️ 주력 기체 장착 + 등가 계승!\n"
-                    f"  {prev_title}\n"
-                    f"  → {next_progress.format_title(ship.name)}\n"
-                    f"  (본체 +N 등가 환산, 파츠 강화 유지 · {GRADE_TONES[next_progress.grade]})"
+                    f"{EMOJI['up']} 계승 {prev_grade.value}→"
+                    f"{next_progress.grade.value}+{next_progress.body_enhance}"
                 )
             return (
-                f"🛠️ 주력 기체 장착: {ship.name} {format_grade_mark(ship.grade)} "
-                f"+{self.ship_progress.body_enhance}강"
+                f"🛠️ 장착 {ship.name} {format_grade_mark(ship.grade)}"
             )
 
         if not is_higher_grade(ship.grade, current.grade):
@@ -299,11 +317,79 @@ class AdventureGame(Game):
         next_progress, _new_n = current.equip_ship(ship.ship_id, ship.grade, inherit=True)
         self.ship_progress = next_progress
         self._persist_ship_progress()
+        # F+100→E+1 등 계승 전용 피크
         return (
-            f"⬆️ 상위 등급 기체 계승!\n"
-            f"  {prev_title}\n"
-            f"  → {next_progress.format_title(ship.name)}\n"
-            f"  (본체 +N 등가 환산, 파츠 강화 유지 · {GRADE_TONES[next_progress.grade]})"
+            f"{EMOJI['up']} 계승 {prev_grade.value}→"
+            f"{next_progress.grade.value}+{next_progress.body_enhance}"
+        )
+
+    def _duplicate_ship_gold(self, grade: str) -> int:
+        """도감 중복 획득 시 항상 지급되는 보호 보상."""
+        table = getattr(Config, "DUPLICATE_SHIP_GOLD", None) or {}
+        return int(table.get(str(grade).upper(), 15))
+
+    def _ensure_daily_bucket(self) -> None:
+        """자정 넘기면 일일 카운터 리셋."""
+        today = date.today().isoformat()
+        if self.daily_date != today:
+            self.daily_date = today
+            self.daily_missions = 0
+            self.daily_enhances = 0
+
+    def _bump_daily_mission(self) -> None:
+        self._ensure_daily_bucket()
+        self.daily_missions += 1
+
+    def _bump_daily_enhance(self) -> None:
+        self._ensure_daily_bucket()
+        self.daily_enhances += 1
+
+    def _daily_home_line(self) -> str:
+        """홈 1줄: 일일 미니 목표 진행."""
+        self._ensure_daily_bucket()
+        m_goal = Config.DAILY_MISSION_GOAL
+        e_goal = Config.DAILY_ENHANCE_GOAL
+        return (
+            f"{EMOJI['daily']} 출동{self.daily_missions}/{m_goal} "
+            f"강화{self.daily_enhances}/{e_goal}"
+        )
+
+    def _mission_pity_boost(self) -> float:
+        return min(
+            self.mission_fail_streak * Config.MISSION_PITY_PER_FAIL,
+            Config.MISSION_PITY_CAP,
+        )
+
+    def _enhance_pity_boost(self) -> float:
+        return min(
+            self.enhance_fail_streak * Config.ENHANCE_PITY_PER_FAIL,
+            Config.ENHANCE_PITY_CAP,
+        )
+
+    def _mission_cta_buttons(self) -> list[dict]:
+        rate = self._calculate_success_rate()
+        return loop_cta_buttons(
+            primary_label="🚀 다시 출동",
+            primary_message="출동",
+            secondary_label=f"🔨 강화 {rate:.0f}%",
+            secondary_message="강화",
+        )
+
+    def _enhance_cta_buttons(self) -> list[dict]:
+        rate = self._calculate_success_rate()
+        return loop_cta_buttons(
+            primary_label=f"🔨 다시 {rate:.0f}%",
+            primary_message="강화",
+            secondary_label="🚀 출동",
+            secondary_message="출동",
+        )
+
+    def _sell_cta_buttons(self) -> list[dict]:
+        return loop_cta_buttons(
+            primary_label="🔨 강화",
+            primary_message="강화",
+            secondary_label="🚀 출동",
+            secondary_message="출동",
         )
 
     def get_badge_upgrade_stage(self) -> int:
@@ -508,18 +594,20 @@ class AdventureGame(Game):
         self,
         screen: ScreenDef,
         lines: List[str] | str,
+        buttons: Optional[Sequence[dict]] = None,
     ) -> str:
+        btn_list = list(buttons) if buttons is not None else screen.button_dicts()
         reply = self._reply_builder.build(
             lines,
             screen.layout,
-            screen.button_dicts(),
+            btn_list,
             screen_id=screen.screen_id,
             depth=screen.depth,
         )
         return self._commit_reply(reply)
 
     def _show_home(self) -> str:
-        """D0 홈 MENU."""
+        """D0 홈 MENU — 일일 미니 목표 1줄 포함 (이슈 #19 P4)."""
         ship_title = self.ship_progress.format_title(self._equipped_ship_name())
         gold = self.get_user_points()
         call_sign = self.explorer_profile.call_sign if self.explorer_profile else "—"
@@ -528,8 +616,9 @@ class AdventureGame(Game):
             f"콜사인 {call_sign}",
             f"기체 {ship_title}",
             f"골드 {gold}G",
-            "버튼을 눌러 진행",
+            self._daily_home_line(),
         ]
+        track_screen(self.user_id, D0_HOME.screen_id, command="홈")
         return self._reply_for_screen(D0_HOME, lines)
 
     def _show_grow_menu(self) -> str:
@@ -705,8 +794,13 @@ class AdventureGame(Game):
         )
         return max(cost, 10)
 
-    def _calculate_success_rate(self, activity: Optional[ActivityType] = None) -> float:
-        """성공 확률 계산. 등가 스탯(core_stat) + 센서 파츠 패시브."""
+    def _calculate_success_rate(
+        self,
+        activity: Optional[ActivityType] = None,
+        *,
+        apply_pity: bool = True,
+    ) -> float:
+        """성공 확률 계산. 등가 스탯(core_stat) + 센서 파츠 + soft pity."""
         base_rate = activity.success_rate if activity else 80.0
         # raw body_enhance 가 아니라 등급 등가 스탯 사용 → F+100 ≈ E+1
         body_boost = self._effective_power() * 2
@@ -714,7 +808,13 @@ class AdventureGame(Game):
         if activity and activity.name != "정찰":
             # 센서 패시브는 정찰에 더 크게, 그 외 활동은 절반 반영
             sensor_boost *= 0.5
-        boosted = min(base_rate + body_boost + sensor_boost, 98.0)
+        pity = 0.0
+        if apply_pity:
+            if activity is not None:
+                pity = self._mission_pity_boost()
+            else:
+                pity = self._enhance_pity_boost()
+        boosted = min(base_rate + body_boost + sensor_boost + pity, 98.0)
         return max(boosted, 25.0)
 
     def _get_enhancement_celebration(
@@ -760,25 +860,24 @@ class AdventureGame(Game):
         return max(sell_price, 10)
 
     def _enhance(self) -> str:
-        """기체 본체 +N 강화 — D2_ENHANCE_RESULT DETAIL."""
+        """기체 본체 +N 강화 — D2_ENHANCE_RESULT DETAIL (훅→수치→CTA)."""
         cost = self._calculate_cost()
         before = self.ship_progress.body_enhance
         ship_title = self.ship_progress.format_title(self._equipped_ship_name())
         screen = D2_ENHANCE_RESULT
+        cta_btns = self._enhance_cta_buttons()
 
         if not self.point_system or not self.point_system.has_gold(self.user_id, cost):
-            return self._reply_for_screen(
-                screen,
-                [
-                    "❌ 골드 부족",
-                    f"필요 {cost}G",
-                    f"보유 {self.get_user_points()}G",
-                    f"{ship_title}",
-                    "출동·정산으로 골드 확보",
-                ],
+            lines = build_detail_slots(
+                hook=f"{EMOJI['fail']} 골드 부족",
+                metrics=[f"필요 {cost}G", f"보유 {self.get_user_points()}G", ship_title],
+                progress=[f"다음 성공률 {self._calculate_success_rate():.0f}%"],
+                cta="출동으로 골드 확보",
             )
+            return self._reply_for_screen(screen, lines, buttons=cta_btns)
 
         self.deduct_gold(cost, f"본체 강화 시도 ({ship_title} +{before} → +{before + 1})")
+        self._bump_daily_enhance()
 
         self.game_data["attempts"] = self.game_data.get("attempts", 0) + 1
         if self.point_system:
@@ -787,6 +886,7 @@ class AdventureGame(Game):
         success_rate = self._calculate_success_rate()
         roll = random.random() * 100
         is_success = roll < success_rate
+        margin = success_rate - roll
 
         if is_success:
             self.ship_progress = self.ship_progress.with_body_enhance(before + 1)
@@ -795,52 +895,101 @@ class AdventureGame(Game):
             self.ship_progress = self.ship_progress.with_part_enhance(part_id, part_before + 1)
             self._persist_ship_progress()
             self.game_data["successes"] = self.game_data.get("successes", 0) + 1
+            self.enhance_fail_streak = 0
             if self.point_system:
                 self.point_system.update_game_stats(user_id=self.user_id, enhancement_successes=1)
 
+            after = before + 1
             next_cost = self._calculate_cost()
+            next_rate = self._calculate_success_rate()
             celebration = self._get_enhancement_celebration(roll, success_rate)
             part_def = PART_CATALOG[part_id]
-            lines = [
-                "✅ 강화 성공!",
-                f"{self.ship_progress.format_title(self._equipped_ship_name())}",
-                f"본체 +{before}→+{before + 1}",
-                f"파츠 {part_def.name}+{part_before + 1}",
-                f"다음비용 {next_cost}G",
-                f"골드 {self.get_user_points()}G",
-            ]
+            milestones = set(Config.ENHANCE_MILESTONES)
+
+            bonus_lines: List[str] = []
             if celebration:
                 bonus = max(int(cost * celebration.gold_multiplier), 10)
                 self.award_gold(bonus, f"강화 축하 이펙트: {celebration.name}")
-                lines.extend(
+                bonus_lines.extend(
                     [
                         f"{celebration.icon} {celebration.name}",
                         f"보너스 +{bonus}G",
-                        f"골드 {self.get_user_points()}G",
                     ]
                 )
-            return self._reply_for_screen(screen, lines)
+            if after in milestones:
+                mile_gold = Config.ENHANCE_MILESTONE_GOLD_BASE * max(1, after // 5)
+                self.award_gold(mile_gold, f"강화 마일스톤 +{after}")
+                stage = body_enhance_to_upgrade_stage(after)
+                bonus_lines.extend(
+                    [
+                        f"{EMOJI['up']} 마일스톤 +{after}",
+                        f"배지 stage {stage} ·+{mile_gold}G",
+                    ]
+                )
+
+            lines = build_detail_slots(
+                hook=f"{EMOJI['success']} 강화 성공!",
+                metrics=[
+                    self.ship_progress.format_title(self._equipped_ship_name()),
+                    f"본체 +{before}→+{after}",
+                    f"파츠 {part_def.name}+{part_before + 1}",
+                ],
+                bonus=bonus_lines,
+                progress=[
+                    f"다음 {next_cost}G {next_rate:.0f}%",
+                    f"골드 {self.get_user_points()}G",
+                ],
+                cta="한 번 더 강화?",
+            )
+            track_enhance_result(
+                self.user_id,
+                success=True,
+                margin=margin,
+                celebration=celebration.name if celebration else None,
+                body_enhance=after,
+                extra={"milestone": after in milestones},
+            )
+            return self._reply_for_screen(
+                screen, lines, buttons=self._enhance_cta_buttons()
+            )
 
         self.game_data["failures"] = self.game_data.get("failures", 0) + 1
+        self.enhance_fail_streak += 1
         if self.point_system:
             self.point_system.update_game_stats(user_id=self.user_id, enhancement_failures=1)
 
+        near_miss = self._is_enhancement_near_miss(roll, success_rate)
         armor_save = self.ship_progress.part("armor").passive_value()
-        if self.ship_progress.body_enhance > 0 and (
-            self._is_enhancement_near_miss(roll, success_rate)
-            or (armor_save > 0 and random.random() * 100 < min(armor_save, 25))
-        ):
-            return self._reply_for_screen(
-                screen,
-                [
-                    "🛡️ 아슬아슬 버팀!",
+        armor_proc = (
+            self.ship_progress.body_enhance > 0
+            and armor_save > 0
+            and random.random() * 100 < min(armor_save, 25)
+        )
+
+        if self.ship_progress.body_enhance > 0 and (near_miss or armor_proc):
+            lines = build_detail_slots(
+                hook=f"{EMOJI['near_miss']} 아슬아슬 버팀!",
+                metrics=[
                     f"성공률 {success_rate:.0f}%",
                     f"판정 {roll:.0f}%",
                     "본체 강화 유지",
-                    f"{self.ship_progress.format_title(self._equipped_ship_name())}",
-                    f"골드 {self.get_user_points()}G",
-                    "한 번 더?",
+                    self.ship_progress.format_title(self._equipped_ship_name()),
                 ],
+                progress=[
+                    f"pity +{self._enhance_pity_boost():.0f}%",
+                    f"골드 {self.get_user_points()}G",
+                ],
+                cta="한 번 더?",
+            )
+            track_enhance_result(
+                self.user_id,
+                success=False,
+                margin=margin,
+                near_miss=True,
+                body_enhance=self.ship_progress.body_enhance,
+            )
+            return self._reply_for_screen(
+                screen, lines, buttons=self._enhance_cta_buttons()
             )
 
         if self.ship_progress.body_enhance > 0:
@@ -848,24 +997,44 @@ class AdventureGame(Game):
                 self.ship_progress.body_enhance - 1
             )
             self._persist_ship_progress()
-            return self._reply_for_screen(
-                screen,
-                [
-                    "❌ 강화 하락",
-                    f"{self.ship_progress.format_title(self._equipped_ship_name())}",
+            lines = build_detail_slots(
+                hook=f"{EMOJI['fail']} 강화 하락",
+                metrics=[
+                    self.ship_progress.format_title(self._equipped_ship_name()),
                     f"골드 {self.get_user_points()}G",
-                    "다시 시도할까요?",
                 ],
+                progress=[f"pity +{self._enhance_pity_boost():.0f}%"],
+                cta="다시 도전!",
+            )
+            track_enhance_result(
+                self.user_id,
+                success=False,
+                margin=margin,
+                near_miss=False,
+                body_enhance=self.ship_progress.body_enhance,
+            )
+            return self._reply_for_screen(
+                screen, lines, buttons=self._enhance_cta_buttons()
             )
 
-        return self._reply_for_screen(
-            screen,
-            [
-                "❌ 강화 실패",
-                f"{self.ship_progress.format_title(self._equipped_ship_name())}",
+        lines = build_detail_slots(
+            hook=f"{EMOJI['fail']} 강화 실패",
+            metrics=[
+                self.ship_progress.format_title(self._equipped_ship_name()),
                 f"골드 {self.get_user_points()}G",
-                "다시 시도해보세요",
             ],
+            progress=[f"pity +{self._enhance_pity_boost():.0f}%"],
+            cta="다시 시도!",
+        )
+        track_enhance_result(
+            self.user_id,
+            success=False,
+            margin=margin,
+            near_miss=False,
+            body_enhance=0,
+        )
+        return self._reply_for_screen(
+            screen, lines, buttons=self._enhance_cta_buttons()
         )
 
     def _sell(self) -> str:
@@ -893,18 +1062,21 @@ class AdventureGame(Game):
         self.game_data["badge_cycle"] = self.game_data.get("badge_cycle", 0) + 1
         self._persist_ship_progress()
 
-        return self._reply_for_screen(
-            screen,
-            [
-                "💾 정산 완료",
-                f"{sold_title}",
+        lines = build_detail_slots(
+            hook="💾 정산 완료",
+            metrics=[
+                sold_title,
                 f"본체 +{sold_level} 정산",
                 f"보상 +{sell_price}G",
+            ],
+            progress=[
                 f"골드 {self.get_user_points()}G",
                 f"등급 {self.ship_progress.grade.value} 유지",
                 "파츠 유지",
             ],
+            cta="다시 키워볼까요?",
         )
+        return self._reply_for_screen(screen, lines, buttons=self._sell_cta_buttons())
 
     # ========== 활동 관련 메서드 ==========
 
@@ -989,14 +1161,15 @@ class AdventureGame(Game):
         return ship, self._grant_ship_to_collection(ship)
 
     def _perform_activity(self, activity: ActivityType | str) -> str:
-        """개별 활동 실행 — D2_MISSION_RESULT DETAIL."""
+        """개별 활동 실행 — D2_MISSION_RESULT DETAIL (훅→수치→CTA)."""
         screen = D2_MISSION_RESULT
         if isinstance(activity, str):
             resolved = self._get_activity_type(activity)
             if resolved is None:
                 return self._reply_for_screen(
                     screen,
-                    ["❌ 활동 없음", "출동으로 진행하세요"],
+                    [f"{EMOJI['fail']} 활동 없음", "출동으로 진행하세요"],
+                    buttons=self._mission_cta_buttons(),
                 )
             activity = resolved
 
@@ -1005,15 +1178,18 @@ class AdventureGame(Game):
                 passes = self._get_challenge_passes()
                 return self._reply_for_screen(
                     screen,
-                    [
-                        "❌ 패스 부족",
-                        f"보유 {passes}장",
-                        "탐사 이벤트로 패스 획득",
-                    ],
+                    build_detail_slots(
+                        hook=f"{EMOJI['fail']} 패스 부족",
+                        metrics=[f"보유 {passes}장"],
+                        progress=["탐사로 패스 획득"],
+                        cta="다시 출동!",
+                    ),
+                    buttons=self._mission_cta_buttons(),
                 )
 
         success_rate = self._calculate_success_rate(activity)
         pilot_name = self.explorer_profile.call_sign if self.explorer_profile else "탐사대"
+        self._bump_daily_mission()
 
         if random.random() * 100 < success_rate:
             reward = self._calculate_activity_reward(activity)
@@ -1026,6 +1202,7 @@ class AdventureGame(Game):
             self.game_data["activity_count"] = self.activity_count
             self.game_data["total_reward"] = self.total_reward
             self.game_data["activity_stats"] = self.activity_stats
+            self.mission_fail_streak = 0
 
             if self.point_system:
                 activity_map = {"정찰": "hunt_normal", "탐사": "hunt_special", "구조": "hunt_boss"}
@@ -1039,24 +1216,45 @@ class AdventureGame(Game):
 
             ship_title = self.ship_progress.format_title(self._equipped_ship_name())
             power = self._effective_power()
-            lines = [
-                f"✅ {activity.name} 성공!",
-                f"🎲 {activity.icon} {activity.name}",
+            metrics = [
+                f"{activity.icon} {activity.name}",
                 f"+{reward}G 스탯{power:.0f}",
                 f"🚀 {ship_title}",
             ]
+            bonus_lines: List[str] = []
 
             discovery = self._try_discover_ship(activity)
             if discovery:
                 ship, collection_result = discovery
-                new_badge = "NEW" if collection_result.get("is_new") else f"x{collection_result.get('count', 1)}"
-                lines.append(f"발견 {ship.grade} {ship.name}")
-                lines.append(new_badge)
+                is_new = bool(collection_result.get("is_new"))
+                track_ship_drop(
+                    self.user_id,
+                    grade=ship.grade,
+                    ship_id=ship.ship_id,
+                    is_new=is_new,
+                )
+                if is_new:
+                    # 신규 기체 = 최대 피크 연출
+                    bonus_lines.append(f"{EMOJI['new']} NEW {ship.grade}급!")
+                    bonus_lines.append(f"{EMOJI['celebrate']} {ship.name}")
+                else:
+                    # 중복 = 항상 보호 보상
+                    dup_gold = self._duplicate_ship_gold(ship.grade)
+                    if self.point_system:
+                        self.award_gold(dup_gold, f"도감 중복: {ship.name}")
+                    self.total_reward += dup_gold
+                    self.game_data["total_reward"] = self.total_reward
+                    if self.point_system:
+                        self.point_system.update_game_stats(
+                            user_id=self.user_id, total_hunt_reward=dup_gold
+                        )
+                    count = collection_result.get("count", 1)
+                    bonus_lines.append(f"중복 {ship.name} x{count}")
+                    bonus_lines.append(f"{EMOJI['loot']} 분해 +{dup_gold}G")
                 equip_msg = self._maybe_equip_discovered_ship(ship)
                 if equip_msg:
-                    # 장착 메시지도 짧게
-                    lines.append(fit_text(equip_msg, 2).split("\n")[0])
-                lines.append(
+                    bonus_lines.append(fit_text(equip_msg, 1).split("\n")[0])
+                bonus_lines.append(
                     f"도감 {len(self._get_collection_records())}/{len(self.ship_catalog)}"
                 )
 
@@ -1068,34 +1266,70 @@ class AdventureGame(Game):
                 self.game_data["total_reward"] = self.total_reward
                 if self.point_system:
                     self.point_system.update_game_stats(user_id=self.user_id, total_hunt_reward=amount)
-                lines.append(f"{loot.icon} {loot.name}+{amount}G")
+                bonus_lines.append(f"{loot.icon} {loot.name}+{amount}G")
 
             if activity.name == "탐사":
                 if random.random() < Config.BOSS_TICKET_DROP_RATE:
                     new_passes = self._add_challenge_pass()
-                    lines.append(f"🎫 패스 획득({new_passes})")
+                    bonus_lines.append(f"🎫 패스 획득({new_passes})")
 
-            lines.extend(
-                [
-                    f"정찰{self.activity_stats.get('정찰', 0)} "
-                    f"탐사{self.activity_stats.get('탐사', 0)} "
-                    f"구조{self.activity_stats.get('구조', 0)}",
-                    f"총 {self.activity_count}회 {self.total_reward}G",
-                    f"골드 {self.get_user_points()}G",
-                ]
+            enhance_rate = self._calculate_success_rate()
+            enhance_cost = self._calculate_cost()
+            progress = [
+                f"강화 {enhance_cost}G {enhance_rate:.0f}%",
+                f"골드 {self.get_user_points()}G",
+            ]
+            lines = build_detail_slots(
+                hook=f"{EMOJI['success']} {activity.name} 성공!",
+                metrics=metrics,
+                bonus=bonus_lines,
+                progress=progress,
+                cta="한 번 더 출동?",
             )
-            return self._reply_for_screen(screen, lines)
+            track_mission_result(
+                self.user_id,
+                success=True,
+                activity=activity.name,
+                reward=reward,
+                extra={"discovered": discovery is not None},
+            )
+            return self._reply_for_screen(
+                screen, lines, buttons=self._mission_cta_buttons()
+            )
 
+        # 실패: 소형 보호 보상 + pity 스택 (완전 무보상 금지)
+        self.mission_fail_streak += 1
+        consol_min = Config.MISSION_FAIL_CONSOLATION_MIN
+        consol_max = Config.MISSION_FAIL_CONSOLATION_MAX
+        # 연속 실패 시 위로금 소폭 증가
+        consol = random.randint(consol_min, consol_max) + min(self.mission_fail_streak - 1, 3)
+        if self.point_system:
+            self.award_gold(consol, f"{activity.name} 실패 위로")
         description = random.choice(activity.fail_messages)
-        return self._reply_for_screen(
-            screen,
-            [
-                f"❌ {activity.name} 실패",
-                f"🎲 {activity.icon} {activity.name}",
-                description,
+        short_desc = fit_text(description, 1).split("\n")[0] if description else ""
+        lines = build_detail_slots(
+            hook=f"{EMOJI['fail']} {activity.name} 실패",
+            metrics=[
+                f"{activity.icon} {activity.name}",
+                short_desc,
                 f"성공률 {success_rate:.0f}%",
-                "다시 출동할까요?",
             ],
+            bonus=[f"{EMOJI['pity']} 구조금 +{consol}G"],
+            progress=[
+                f"pity +{self._mission_pity_boost():.0f}%",
+                f"골드 {self.get_user_points()}G",
+            ],
+            cta="다시 출동!",
+        )
+        track_mission_result(
+            self.user_id,
+            success=False,
+            activity=activity.name,
+            reward=consol,
+            extra={"fail_streak": self.mission_fail_streak},
+        )
+        return self._reply_for_screen(
+            screen, lines, buttons=self._mission_cta_buttons()
         )
 
     def _show_ship_codex(self) -> str:
