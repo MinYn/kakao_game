@@ -465,20 +465,26 @@ def _generate_stars(rng: random.Random, count: int) -> str:
 
 
 def _generate_pixel_clouds(badge_id: str) -> str:
+    """Soft pixel nebula blobs — kept sparse so ship silhouettes stay readable."""
     return f"""
 <g fill="#ffc8dd">
-    <rect x="70" y="116" width="44" height="16" />
-    <rect x="86" y="100" width="54" height="16" />
-    <rect x="376" y="146" width="48" height="16" />
-    <rect x="352" y="162" width="72" height="16" />
+    <rect x="64" y="108" width="40" height="12" />
+    <rect x="80" y="96" width="48" height="12" />
+    <rect x="96" y="120" width="24" height="12" />
+    <rect x="368" y="140" width="44" height="12" />
+    <rect x="348" y="152" width="64" height="12" />
+    <rect x="388" y="128" width="20" height="12" />
 </g>
-<g fill="#cdb4db">
-    <rect x="64" y="336" width="56" height="16" />
-    <rect x="392" y="314" width="48" height="16" />
+<g fill="#c4b5fd">
+    <rect x="56" y="328" width="48" height="12" />
+    <rect x="72" y="340" width="32" height="12" />
+    <rect x="384" y="300" width="44" height="12" />
+    <rect x="400" y="312" width="28" height="12" />
 </g>
-<g fill="url(#frame_{badge_id})" opacity="0.45">
-    <rect x="142" y="74" width="8" height="8" />
-    <rect x="362" y="92" width="8" height="8" />
-    <rect x="118" y="270" width="8" height="8" />
+<g fill="url(#frame_{badge_id})" opacity="0.4">
+    <rect x="148" y="70" width="8" height="8" />
+    <rect x="356" y="88" width="8" height="8" />
+    <rect x="112" y="268" width="8" height="8" />
+    <rect x="300" y="240" width="8" height="8" />
 </g>
 """.strip()
