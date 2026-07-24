@@ -113,50 +113,51 @@ _COLOR_FRAME_OVERRIDES: dict[str, tuple[str, str, str]] = {
 }
 
 # 본체 +N 구간별 하단 숫자 플레이트 스타일
+# 시인성 우선: 큰 폰트 + 항상 두꺼운 외곽선(흑) + 밝은 페이스 + 어두운 텍스트
 _ENHANCE_TEXT_STYLES: tuple[dict[str, object], ...] = (
     {  # 0–4
         "min": 0,
-        "plate": "#94a3b8",
-        "plate_hi": "#e2e8f0",
-        "plate_edge": "#475569",
-        "text": "#0f172a",
+        "plate": "#e2e8f0",
+        "plate_hi": "#f8fafc",
+        "plate_edge": "#0f172a",
+        "text": "#020617",
         "stroke": "#ffffff",
-        "stroke_w": 0,
+        "stroke_w": 3,
         "glow": False,
-        "font_size": 18,
+        "font_size": 30,
     },
     {  # 5–14
         "min": 5,
-        "plate": "#22d3ee",
-        "plate_hi": "#a5f3fc",
-        "plate_edge": "#0e7490",
-        "text": "#083344",
-        "stroke": "#ecfeff",
-        "stroke_w": 1,
+        "plate": "#67e8f9",
+        "plate_hi": "#ecfeff",
+        "plate_edge": "#083344",
+        "text": "#042f2e",
+        "stroke": "#ffffff",
+        "stroke_w": 3,
         "glow": False,
-        "font_size": 19,
+        "font_size": 32,
     },
     {  # 15–29
         "min": 15,
-        "plate": "#fbbf24",
-        "plate_hi": "#fef08a",
-        "plate_edge": "#b45309",
-        "text": "#422006",
-        "stroke": "#fffbeb",
-        "stroke_w": 1,
+        "plate": "#fde047",
+        "plate_hi": "#fefce8",
+        "plate_edge": "#422006",
+        "text": "#1c1917",
+        "stroke": "#ffffff",
+        "stroke_w": 3,
         "glow": True,
-        "font_size": 20,
+        "font_size": 34,
     },
     {  # 30+
         "min": 30,
-        "plate": "#f472b6",
-        "plate_hi": "#fce7f3",
-        "plate_edge": "#9d174d",
-        "text": "#500724",
+        "plate": "#f9a8d4",
+        "plate_hi": "#fdf2f8",
+        "plate_edge": "#500724",
+        "text": "#1f0510",
         "stroke": "#ffffff",
-        "stroke_w": 2,
+        "stroke_w": 4,
         "glow": True,
-        "font_size": 22,
+        "font_size": 36,
     },
 )
 
@@ -560,7 +561,7 @@ def _get_name_banner(badge_id: str, name: str, theme: dict[str, object]) -> str:
 
 
 def _get_enhance_plate(badge_id: str, body_enhance: int, fallback_sub: str) -> str:
-    """본체 +N 하단 HUD 칩 — 구간별 색/글로우."""
+    """본체 +N 하단 HUD 칩 — 큰 숫자·고대비·두꺼운 외곽선으로 썸네일 시인성 확보."""
     n = max(0, int(body_enhance))
     if n == 0 and fallback_sub:
         stripped = fallback_sub.strip()
@@ -573,30 +574,35 @@ def _get_enhance_plate(badge_id: str, body_enhance: int, fallback_sub: str) -> s
     label = f"+{n}"
     glow_attr = f' filter="url(#text_glow_{badge_id})"' if style["glow"] else ""
     stroke_w = int(style["stroke_w"])
-    stroke_attr = (
-        f' stroke="{style["stroke"]}" stroke-width="{stroke_w}" paint-order="stroke"'
-        if stroke_w > 0
-        else ""
-    )
     font_size = int(style["font_size"])
+    # 이중 외곽: 바깥 검정 할로 + 안쪽 흰색 스트로크로 배경과 분리
     return f"""
 <g shape-rendering="crispEdges" id="enhance_{badge_id}"{glow_attr}>
+  <!-- outer black frame (rim separation) -->
+  <rect x="148" y="392" width="216" height="76" fill="#050505" opacity="0.55"/>
+  <rect x="152" y="388" width="208" height="76" fill="#050505"/>
   <!-- side bolts -->
-  <rect x="160" y="424" width="16" height="28" fill="{style["plate_edge"]}"/>
-  <rect x="336" y="424" width="16" height="28" fill="{style["plate_edge"]}"/>
-  <rect x="164" y="432" width="8" height="12" fill="{style["plate_hi"]}" opacity="0.7"/>
-  <rect x="340" y="432" width="8" height="12" fill="{style["plate_hi"]}" opacity="0.7"/>
+  <rect x="152" y="408" width="18" height="36" fill="{style["plate_edge"]}"/>
+  <rect x="342" y="408" width="18" height="36" fill="{style["plate_edge"]}"/>
+  <rect x="156" y="416" width="10" height="20" fill="{style["plate_hi"]}"/>
+  <rect x="346" y="416" width="10" height="20" fill="{style["plate_hi"]}"/>
   <!-- chassis -->
-  <rect x="172" y="416" width="168" height="52" fill="#050505" opacity="0.4"/>
-  <rect x="176" y="412" width="160" height="52" fill="{style["plate_edge"]}"/>
-  <rect x="184" y="404" width="144" height="56" fill="{style["plate"]}"/>
-  <!-- top bevel -->
-  <rect x="196" y="396" width="120" height="14" fill="{style["plate_hi"]}"/>
-  <rect x="208" y="396" width="32" height="6" fill="#ffffff" opacity="0.35"/>
+  <rect x="168" y="396" width="176" height="60" fill="{style["plate_edge"]}"/>
+  <rect x="176" y="388" width="160" height="64" fill="{style["plate"]}"/>
+  <!-- top bevel / light bar -->
+  <rect x="184" y="380" width="144" height="16" fill="{style["plate_hi"]}"/>
+  <rect x="196" y="380" width="48" height="8" fill="#ffffff" opacity="0.55"/>
+  <!-- inner number well (darker inset for contrast) -->
+  <rect x="188" y="404" width="136" height="40" fill="#050505" opacity="0.12"/>
   <!-- bottom lip -->
-  <rect x="184" y="452" width="144" height="6" fill="{style["plate_edge"]}" opacity="0.8"/>
-  <text x="256" y="444" font-family="Galmuri11, monospace" font-size="{font_size}" font-weight="bold"
-        fill="{style["text"]}"{stroke_attr} text-anchor="middle" letter-spacing="2">{label}</text>
+  <rect x="176" y="444" width="160" height="8" fill="{style["plate_edge"]}"/>
+  <!-- number: black outline underlay then white stroke + dark fill -->
+  <text x="256" y="436" font-family="Galmuri11, monospace" font-size="{font_size}" font-weight="bold"
+        fill="none" stroke="#050505" stroke-width="{stroke_w + 3}" paint-order="stroke"
+        text-anchor="middle" letter-spacing="1">{label}</text>
+  <text x="256" y="436" font-family="Galmuri11, monospace" font-size="{font_size}" font-weight="bold"
+        fill="{style["text"]}" stroke="{style["stroke"]}" stroke-width="{stroke_w}" paint-order="stroke"
+        text-anchor="middle" letter-spacing="1">{label}</text>
 </g>
 """.strip()
 

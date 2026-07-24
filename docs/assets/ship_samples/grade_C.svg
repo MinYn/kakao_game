@@ -223,21 +223,30 @@
         fill="#1a1020" text-anchor="middle">C</text>
 </g>
     <g shape-rendering="crispEdges" id="enhance_badge_67">
+  <!-- outer black frame (rim separation) -->
+  <rect x="148" y="392" width="216" height="76" fill="#050505" opacity="0.55"/>
+  <rect x="152" y="388" width="208" height="76" fill="#050505"/>
   <!-- side bolts -->
-  <rect x="160" y="424" width="16" height="28" fill="#475569"/>
-  <rect x="336" y="424" width="16" height="28" fill="#475569"/>
-  <rect x="164" y="432" width="8" height="12" fill="#e2e8f0" opacity="0.7"/>
-  <rect x="340" y="432" width="8" height="12" fill="#e2e8f0" opacity="0.7"/>
+  <rect x="152" y="408" width="18" height="36" fill="#0f172a"/>
+  <rect x="342" y="408" width="18" height="36" fill="#0f172a"/>
+  <rect x="156" y="416" width="10" height="20" fill="#f8fafc"/>
+  <rect x="346" y="416" width="10" height="20" fill="#f8fafc"/>
   <!-- chassis -->
-  <rect x="172" y="416" width="168" height="52" fill="#050505" opacity="0.4"/>
-  <rect x="176" y="412" width="160" height="52" fill="#475569"/>
-  <rect x="184" y="404" width="144" height="56" fill="#94a3b8"/>
-  <!-- top bevel -->
-  <rect x="196" y="396" width="120" height="14" fill="#e2e8f0"/>
-  <rect x="208" y="396" width="32" height="6" fill="#ffffff" opacity="0.35"/>
+  <rect x="168" y="396" width="176" height="60" fill="#0f172a"/>
+  <rect x="176" y="388" width="160" height="64" fill="#e2e8f0"/>
+  <!-- top bevel / light bar -->
+  <rect x="184" y="380" width="144" height="16" fill="#f8fafc"/>
+  <rect x="196" y="380" width="48" height="8" fill="#ffffff" opacity="0.55"/>
+  <!-- inner number well (darker inset for contrast) -->
+  <rect x="188" y="404" width="136" height="40" fill="#050505" opacity="0.12"/>
   <!-- bottom lip -->
-  <rect x="184" y="452" width="144" height="6" fill="#475569" opacity="0.8"/>
-  <text x="256" y="444" font-family="Galmuri11, monospace" font-size="18" font-weight="bold"
-        fill="#0f172a" text-anchor="middle" letter-spacing="2">+0</text>
+  <rect x="176" y="444" width="160" height="8" fill="#0f172a"/>
+  <!-- number: black outline underlay then white stroke + dark fill -->
+  <text x="256" y="436" font-family="Galmuri11, monospace" font-size="30" font-weight="bold"
+        fill="none" stroke="#050505" stroke-width="6" paint-order="stroke"
+        text-anchor="middle" letter-spacing="1">+0</text>
+  <text x="256" y="436" font-family="Galmuri11, monospace" font-size="30" font-weight="bold"
+        fill="#020617" stroke="#ffffff" stroke-width="3" paint-order="stroke"
+        text-anchor="middle" letter-spacing="1">+0</text>
 </g>
 </svg>
