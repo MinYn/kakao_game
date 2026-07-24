@@ -1,15 +1,22 @@
-# 우주 탐험 공략집 → GitHub Pages
-# 설정: Repo → Settings → Pages → Source = GitHub Actions
+# 우주 탐험 공략집 → GitHub Pages (docsify / gitbook/)
+#
+# 실패하던 이유:
+#   private + Free 플랜 → Pages API 자체가 안 열림
+#   (Get Pages site failed / plan does not support Pages)
+#
+# 이 워크플로는 Pages를 쓸 수 없으면 **스킵(성공)** 하고 끝냅니다.
+# 실제 배포 조건: 레포 Public 또는 GitHub Pro/Team 등 Pages 허용 플랜
+#   + Settings → Pages → Source = GitHub Actions
 name: Deploy guide (GitHub Pages)
 
 on:
   push:
     branches:
       - master
-      - MinYn/issue-19-cta
     paths:
       - 'gitbook/**'
       - '.github/workflows/pages-guide.yml'
+  # PR 브랜치에서는 배포 시도하지 않음 (체크 빨간불 방지)
   workflow_dispatch:
 
 permissions:
@@ -23,22 +30,70 @@ concurrency:
 
 jobs:
   deploy:
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check if GitHub Pages is available
+        id: pages_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          # 이미 Pages 사이트가 있으면 OK
+          body=$(gh api "repos/${{ github.repository }}/pages" 2>&1)
+          status=$?
+          if [ $status -eq 0 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages site already configured."
+            exit 0
+          fi
+
+          # 없으면 생성 시도 (Public / 유료 플랜에서만 성공)
+          create=$(gh api -X POST "repos/${{ github.repository }}/pages" \
+            -f build_type=workflow 2>&1)
+          status=$?
+          if [ $status -eq 0 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages site created (build_type=workflow)."
+            exit 0
+          fi
+
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::GitHub Pages unavailable for this repository."
+          echo "$create"
+          echo ""
+          echo "Common causes:"
+          echo "  - private repo on Free plan (Pages not supported)"
+          echo "  - Pages not enabled / no permission"
+          echo "Workarounds:"
+          echo "  1) Settings → General → Change visibility → Public"
+          echo "  2) Upgrade to Pro/Team"
+          echo "  3) Host gitbook/ on Cloudflare Pages / Netlify instead"
+          exit 0
+
       - name: Setup Pages
+        if: steps.pages_check.outputs.available == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
+        if: steps.pages_check.outputs.available == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: gitbook
 
       - name: Deploy to GitHub Pages
         id: deployment
+        if: steps.pages_check.outputs.available == 'true'
         uses: actions/deploy-pages@v4
+
+      - name: Skipped notice
+        if: steps.pages_check.outputs.available != 'true'
+        run: |
+          echo "Deploy skipped — GitHub Pages is not available on this repo/plan."
+          echo "Guide content is still in gitbook/ and can be previewed locally:"
+          echo "  cd gitbook && python3 -m http.server 8080"
