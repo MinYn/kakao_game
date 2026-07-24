@@ -1,80 +1,81 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full" shape-rendering="crispEdges">
     <defs>
-    <radialGradient id="bg_badge_4405" cx="38%" cy="32%" r="78%">
+    <radialGradient id="bg_badge_26" cx="38%" cy="32%" r="78%">
         <stop offset="0%" stop-color="#818cf8" stop-opacity="0.55" />
         <stop offset="35%" stop-color="#1e1b4b" />
         <stop offset="72%" stop-color="#0f172a" />
         <stop offset="100%" stop-color="#020617" />
     </radialGradient>
-    <linearGradient id="hull_badge_4405" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="hull_badge_26" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stop-color="#2a2a35" />
         <stop offset="50%" stop-color="#3a3a45" />
         <stop offset="100%" stop-color="#1a1a25" />
     </linearGradient>
-    <linearGradient id="frame_badge_4405" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="frame_badge_26" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stop-color="#a5b4fc" />
         <stop offset="50%" stop-color="#c4b5fd" />
         <stop offset="100%" stop-color="#f0abfc" />
     </linearGradient>
-    <linearGradient id="rim_badge_4405" x1="0%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="rim_badge_26" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stop-color="#a5b4fc" />
         <stop offset="45%" stop-color="#c4b5fd" />
         <stop offset="100%" stop-color="#1e1b4b" />
     </linearGradient>
-    <radialGradient id="vignette_badge_4405" cx="50%" cy="48%" r="55%">
+    <radialGradient id="vignette_badge_26" cx="50%" cy="48%" r="55%">
         <stop offset="55%" stop-color="#000000" stop-opacity="0" />
         <stop offset="100%" stop-color="#000000" stop-opacity="0.42" />
     </radialGradient>
-    <filter id="shadow_badge_4405" x="-50%" y="-50%" width="200%" height="200%">
+    <filter id="shadow_badge_26" x="-50%" y="-50%" width="200%" height="200%">
         <feDropShadow dx="0" dy="6" stdDeviation="0" flood-color="#000" flood-opacity="0.55"/>
     </filter>
-    <filter id="glow_badge_4405">
+    <filter id="glow_badge_26">
         <feGaussianBlur stdDeviation="1.2" result="blur"/>
         <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
-    <filter id="text_glow_badge_4405" x="-50%" y="-50%" width="200%" height="200%">
+    <filter id="text_glow_badge_26" x="-50%" y="-50%" width="200%" height="200%">
         <feGaussianBlur stdDeviation="2" result="blur"/>
         <feMerge>
             <feMergeNode in="blur"/>
             <feMergeNode in="SourceGraphic"/>
         </feMerge>
     </filter>
-    <clipPath id="clip_badge_4405">
+    <clipPath id="clip_badge_26">
         <circle cx="256" cy="256" r="236" />
     </clipPath>
 </defs>
 
-    <g clip-path="url(#clip_badge_4405)">
-        <rect width="512" height="512" fill="url(#bg_badge_4405)" />
+    <g clip-path="url(#clip_badge_26)">
+        <rect width="512" height="512" fill="url(#bg_badge_26)" />
         <g fill="#ffffff" shape-rendering="crispEdges">
-            <rect x="282" y="349" width="10" height="3" fill-opacity="0.9"/>
-<rect x="285" y="346" width="3" height="10" fill-opacity="0.9"/>
-<rect x="248" y="325" width="4" height="4" fill-opacity="0.95"/>
-<rect x="131" y="352" width="4" height="4" fill-opacity="0.85"/>
-<rect x="127" y="356" width="12" height="4" fill-opacity="0.85"/>
-<rect x="131" y="360" width="4" height="4" fill-opacity="0.85"/>
-<rect x="430" y="173" width="3" height="3" fill-opacity="0.95"/>
-<rect x="354" y="68" width="3" height="3" fill-opacity="0.95"/>
-<rect x="338" y="60" width="4" height="4" fill-opacity="0.95"/>
-<rect x="30" y="273" width="4" height="4" fill-opacity="0.85"/>
-<rect x="26" y="277" width="12" height="4" fill-opacity="0.85"/>
-<rect x="30" y="281" width="4" height="4" fill-opacity="0.85"/>
-<rect x="224" y="93" width="10" height="3" fill-opacity="0.9"/>
-<rect x="227" y="90" width="3" height="10" fill-opacity="0.9"/>
-<rect x="209" y="48" width="10" height="3" fill-opacity="0.9"/>
-<rect x="212" y="45" width="3" height="10" fill-opacity="0.9"/>
-<rect x="187" y="417" width="4" height="4" fill-opacity="0.95"/>
-<rect x="237" y="242" width="3" height="3" fill-opacity="0.95"/>
-<rect x="272" y="328" width="4" height="4" fill-opacity="0.85"/>
-<rect x="268" y="332" width="12" height="4" fill-opacity="0.85"/>
-<rect x="272" y="336" width="4" height="4" fill-opacity="0.85"/>
-<rect x="38" y="309" width="10" height="3" fill-opacity="0.9"/>
-<rect x="41" y="306" width="3" height="10" fill-opacity="0.9"/>
-<rect x="226" y="272" width="4" height="4" fill-opacity="0.95"/>
-<rect x="33" y="425" width="4" height="4" fill-opacity="0.95"/>
-<rect x="217" y="107" width="3" height="3" fill-opacity="0.95"/>
-<rect x="297" y="382" width="3" height="3" fill-opacity="0.95"/>
-<rect x="316" y="244" width="3" height="3" fill-opacity="0.95"/>
+            <rect x="203" y="198" width="3" height="3" fill-opacity="0.95"/>
+<rect x="469" y="80" width="4" height="4" fill-opacity="0.85"/>
+<rect x="465" y="84" width="12" height="4" fill-opacity="0.85"/>
+<rect x="469" y="88" width="4" height="4" fill-opacity="0.85"/>
+<rect x="120" y="413" width="4" height="4" fill-opacity="0.95"/>
+<rect x="276" y="182" width="10" height="3" fill-opacity="0.9"/>
+<rect x="279" y="179" width="3" height="10" fill-opacity="0.9"/>
+<rect x="71" y="189" width="4" height="4" fill-opacity="0.95"/>
+<rect x="105" y="48" width="4" height="4" fill-opacity="0.95"/>
+<rect x="66" y="331" width="3" height="3" fill-opacity="0.95"/>
+<rect x="285" y="115" width="3" height="3" fill-opacity="0.95"/>
+<rect x="122" y="247" width="4" height="4" fill-opacity="0.85"/>
+<rect x="118" y="251" width="12" height="4" fill-opacity="0.85"/>
+<rect x="122" y="255" width="4" height="4" fill-opacity="0.85"/>
+<rect x="111" y="402" width="10" height="3" fill-opacity="0.9"/>
+<rect x="114" y="399" width="3" height="10" fill-opacity="0.9"/>
+<rect x="168" y="194" width="4" height="4" fill-opacity="0.85"/>
+<rect x="164" y="198" width="12" height="4" fill-opacity="0.85"/>
+<rect x="168" y="202" width="4" height="4" fill-opacity="0.85"/>
+<rect x="391" y="219" width="3" height="3" fill-opacity="0.95"/>
+<rect x="352" y="381" width="3" height="3" fill-opacity="0.95"/>
+<rect x="385" y="94" width="10" height="3" fill-opacity="0.9"/>
+<rect x="388" y="91" width="3" height="10" fill-opacity="0.9"/>
+<rect x="63" y="396" width="3" height="3" fill-opacity="0.95"/>
+<rect x="257" y="295" width="4" height="4" fill-opacity="0.95"/>
+<rect x="63" y="329" width="4" height="4" fill-opacity="0.85"/>
+<rect x="59" y="333" width="12" height="4" fill-opacity="0.85"/>
+<rect x="63" y="337" width="4" height="4" fill-opacity="0.85"/>
+<rect x="433" y="410" width="3" height="3" fill-opacity="0.95"/>
         </g>
         <g opacity="0.5" shape-rendering="crispEdges">
             <g fill="#f9a8d4">
@@ -91,7 +92,7 @@
     <rect x="376" y="292" width="40" height="10" />
     <rect x="392" y="304" width="24" height="10" />
 </g>
-<g fill="url(#frame_badge_4405)" opacity="0.45">
+<g fill="url(#frame_badge_26)" opacity="0.45">
     <rect x="150" y="64" width="8" height="8" />
     <rect x="348" y="84" width="8" height="8" />
     <rect x="120" y="250" width="8" height="8" />
@@ -106,11 +107,11 @@
                 fill="#c4b5fd" fill-opacity="0.18" />
         <path d="M-40 420 Q256 360 552 420 V520 H-40 Z"
               fill="#c4b5fd" fill-opacity="0.16" />
-        <rect width="512" height="512" fill="url(#vignette_badge_4405)" />
+        <rect width="512" height="512" fill="url(#vignette_badge_26)" />
     </g>
 
     <g transform="translate(256, 252) scale(1.05)"
-       filter="url(#shadow_badge_4405)">
+       filter="url(#shadow_badge_26)">
         <g transform="translate(16, 0)" shape-rendering="crispEdges">
     <rect x="-120" y="-20" width="200" height="40" fill="#050505"/>
     <rect x="-100" y="-32" width="140" height="12" fill="#050505"/>
@@ -161,12 +162,12 @@
     </g>
 
     
-    <g shape-rendering="crispEdges" id="frame_badge_4405_chrome">
+    <g shape-rendering="crispEdges" id="frame_badge_26_chrome">
   <!-- outer dark bevel -->
   <circle cx="256" cy="256" r="248" fill="none" stroke="#1e1b4b" stroke-width="16" />
   <circle cx="256" cy="256" r="248" fill="none" stroke="#050505" stroke-width="4" opacity="0.55" />
   <!-- metallic rim -->
-  <circle cx="256" cy="256" r="236" fill="none" stroke="url(#rim_badge_4405)" stroke-width="14" />
+  <circle cx="256" cy="256" r="236" fill="none" stroke="url(#rim_badge_26)" stroke-width="14" />
   <circle cx="256" cy="256" r="226" fill="none" stroke="#ede9fe" stroke-width="5" opacity="0.9" />
   <!-- inner track + dashed orbit -->
   <circle cx="256" cy="256" r="216" fill="none" stroke="#a78bfa" stroke-width="3" opacity="0.55" />
@@ -179,7 +180,7 @@
   <rect x="454" y="250" width="16" height="12" fill="#ede9fe" />
   <rect x="246" y="18" width="20" height="20" fill="#1e1b4b"/><rect x="250" y="22" width="12" height="12" fill="#ede9fe"/><rect x="254" y="26" width="4" height="4" fill="#a5b4fc"/><rect x="474" y="246" width="20" height="20" fill="#1e1b4b"/><rect x="478" y="250" width="12" height="12" fill="#ede9fe"/><rect x="482" y="254" width="4" height="4" fill="#a5b4fc"/><rect x="246" y="474" width="20" height="20" fill="#1e1b4b"/><rect x="250" y="478" width="12" height="12" fill="#ede9fe"/><rect x="254" y="482" width="4" height="4" fill="#a5b4fc"/><rect x="18" y="246" width="20" height="20" fill="#1e1b4b"/><rect x="22" y="250" width="12" height="12" fill="#ede9fe"/><rect x="26" y="254" width="4" height="4" fill="#a5b4fc"/><rect x="82" y="82" width="8" height="8" fill="#a78bfa" opacity="0.85"/><rect x="422" y="82" width="8" height="8" fill="#a78bfa" opacity="0.85"/><rect x="82" y="422" width="8" height="8" fill="#a78bfa" opacity="0.85"/><rect x="422" y="422" width="8" height="8" fill="#a78bfa" opacity="0.85"/>
 </g>
-    <g shape-rendering="crispEdges" id="name_badge_4405">
+    <g shape-rendering="crispEdges" id="name_badge_26">
   <!-- side wing caps -->
   <rect x="96" y="78" width="20" height="36" fill="#050814"/>
   <rect x="396" y="78" width="20" height="36" fill="#050814"/>
@@ -198,7 +199,7 @@
         fill="#f8fafc" stroke="#02010a" stroke-width="0.9" paint-order="stroke"
         text-anchor="middle" letter-spacing="1.5">INTERCEPT</text>
 </g>
-    <g shape-rendering="crispEdges" id="grade_badge_4405">
+    <g shape-rendering="crispEdges" id="grade_badge_26">
   <!-- outer shield shadow -->
   <rect x="78" y="352" width="72" height="56" fill="#050505" opacity="0.55"/>
   <rect x="74" y="348" width="72" height="56" fill="#1a1020"/>
@@ -217,31 +218,24 @@
   <text x="110" y="384" font-family="Galmuri11, monospace" font-size="28" font-weight="bold"
         fill="#1a1020" text-anchor="middle">F</text>
 </g>
-    <g shape-rendering="crispEdges" id="enhance_badge_4405">
-  <!-- outer black frame (rim separation) -->
-  <rect x="148" y="392" width="216" height="76" fill="#050505" opacity="0.55"/>
-  <rect x="152" y="388" width="208" height="76" fill="#050505"/>
-  <!-- side bolts -->
-  <rect x="152" y="408" width="18" height="36" fill="#0f172a"/>
-  <rect x="342" y="408" width="18" height="36" fill="#0f172a"/>
-  <rect x="156" y="416" width="10" height="20" fill="#f8fafc"/>
-  <rect x="346" y="416" width="10" height="20" fill="#f8fafc"/>
+    <g shape-rendering="crispEdges" id="enhance_badge_26">
+  <!-- soft drop shadow -->
+  <rect x="160" y="400" width="192" height="60" fill="#050505" opacity="0.28"/>
+  <!-- side caps -->
+  <rect x="156" y="408" width="16" height="32" fill="#334155"/>
+  <rect x="340" y="408" width="16" height="32" fill="#334155"/>
+  <rect x="160" y="416" width="8" height="16" fill="#ffffff" opacity="0.85"/>
+  <rect x="344" y="416" width="8" height="16" fill="#ffffff" opacity="0.85"/>
   <!-- chassis -->
-  <rect x="168" y="396" width="176" height="60" fill="#0f172a"/>
-  <rect x="176" y="388" width="160" height="64" fill="#e2e8f0"/>
-  <!-- top bevel / light bar -->
-  <rect x="184" y="380" width="144" height="16" fill="#f8fafc"/>
-  <rect x="196" y="380" width="48" height="8" fill="#ffffff" opacity="0.55"/>
-  <!-- inner number well (darker inset for contrast) -->
-  <rect x="188" y="404" width="136" height="40" fill="#050505" opacity="0.12"/>
+  <rect x="168" y="396" width="176" height="56" fill="#334155"/>
+  <rect x="176" y="388" width="160" height="60" fill="#f1f5f9"/>
+  <!-- top light bar -->
+  <rect x="188" y="380" width="136" height="14" fill="#ffffff"/>
+  <rect x="200" y="380" width="40" height="6" fill="#ffffff" opacity="0.45"/>
   <!-- bottom lip -->
-  <rect x="176" y="444" width="160" height="8" fill="#0f172a"/>
-  <!-- number: black outline underlay then white stroke + dark fill -->
-  <text x="256" y="436" font-family="Galmuri11, monospace" font-size="30" font-weight="bold"
-        fill="none" stroke="#050505" stroke-width="6" paint-order="stroke"
-        text-anchor="middle" letter-spacing="1">+0</text>
-  <text x="256" y="436" font-family="Galmuri11, monospace" font-size="30" font-weight="bold"
-        fill="#020617" stroke="#ffffff" stroke-width="3" paint-order="stroke"
-        text-anchor="middle" letter-spacing="1">+0</text>
+  <rect x="176" y="440" width="160" height="6" fill="#334155" opacity="0.75"/>
+  <!-- clean bold number, no outline -->
+  <text x="256" y="432" font-family="Galmuri11, monospace" font-size="30" font-weight="bold"
+        fill="#0f172a" text-anchor="middle" letter-spacing="1">+0</text>
 </g>
 </svg>

@@ -34,22 +34,24 @@ class SpaceBadgeGeneratorTestCase(unittest.TestCase):
         self.assertIn("#fbbf24", rocket)  # gold override
 
     def test_enhance_text_style_tiers(self):
-        self.assertEqual(enhance_text_style(0)["plate"], "#e2e8f0")
-        self.assertEqual(enhance_text_style(5)["plate"], "#67e8f9")
-        self.assertEqual(enhance_text_style(15)["plate"], "#fde047")
+        self.assertEqual(enhance_text_style(0)["plate"], "#f1f5f9")
+        self.assertEqual(enhance_text_style(5)["plate"], "#a5f3fc")
+        self.assertEqual(enhance_text_style(15)["plate"], "#fde68a")
         self.assertTrue(enhance_text_style(30)["glow"])
-        # 시인성: 전 구간 큰 폰트 + 외곽선
+        # 시인성: 큰 폰트, 글자 외곽선 없음
         self.assertGreaterEqual(int(enhance_text_style(0)["font_size"]), 28)
-        self.assertGreaterEqual(int(enhance_text_style(0)["stroke_w"]), 3)
+        self.assertEqual(int(enhance_text_style(0)["stroke_w"]), 0)
 
     def test_enhance_plate_uses_body_enhance_label(self):
         variant = BadgeVariant("NOVA", "BEEP", ShipShape.ROCKET, "orange")
         svg = generate_svg(variant, 5, grade="S", body_enhance=30)
         self.assertIn(">+30<", svg)
-        self.assertIn("#f9a8d4", svg)  # high-tier plate (readable pink)
-        # 숫자 이중 스트로크(검정 할로 + 흰 외곽)
-        self.assertIn('stroke="#050505"', svg)
+        self.assertIn("#fbcfe8", svg)  # high-tier plate
         self.assertGreaterEqual(int(enhance_text_style(30)["font_size"]), 34)
+        # 숫자 자체에 두꺼운 외곽 스트로크 없음
+        enhance = svg[svg.index('id="enhance_badge_5"') :]
+        enhance = enhance[: enhance.index("</g>") + 4]
+        self.assertNotIn("stroke=", enhance[enhance.index("<text") :])
 
     def test_generate_svg_requires_explicit_grade_for_non_f(self):
         """HTTP 경로처럼 grade 를 넘기지 않으면 F 마크 — 호출부가 등급을 넘겨야 함."""
