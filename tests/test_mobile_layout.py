@@ -60,10 +60,20 @@ class ScreenRegistryTestCase(unittest.TestCase):
             else:
                 self.assertEqual(len(screen.buttons), BUTTONS_DETAIL, screen.screen_id)
 
-    def test_detail_has_home(self):
+    def test_detail_has_home_or_loop_cta(self):
+        """이슈 #19: 루프 결과 화면은 홈 대신 출동/강화 CTA."""
+        from ui.screens import LOOP_RESULT_SCREEN_IDS
+
         for screen in get_registry().all_screens():
-            if screen.layout is LayoutMode.DETAIL:
-                messages = {b.message_text for b in screen.buttons}
+            if screen.layout is not LayoutMode.DETAIL:
+                continue
+            messages = {b.message_text for b in screen.buttons}
+            if screen.screen_id in LOOP_RESULT_SCREEN_IDS:
+                self.assertTrue(
+                    messages.intersection({"출동", "강화", "성장"}),
+                    msg=f"{screen.screen_id} needs loop CTA",
+                )
+            else:
                 self.assertIn("홈", messages, screen.screen_id)
 
     def test_depth_max_3(self):
@@ -153,7 +163,9 @@ class AdventureMobileFlowTestCase(unittest.TestCase):
             self.assertLessEqual(len(line), MAX_LINE_CHARS)
         buttons = game.get_command_buttons()
         self.assertEqual(len(buttons), 2)
-        self.assertEqual(buttons[1]["messageText"], "홈")
+        # 이슈 #19: D2 루프 CTA = 다시 출동 + 강화 (홈 강제 없음)
+        self.assertEqual(buttons[0]["messageText"], "출동")
+        self.assertEqual(buttons[1]["messageText"], "강화")
 
     def test_unknown_command_returns_home(self):
         game = AdventureGame(user_id="mobile-user")

@@ -312,6 +312,107 @@ class AdventureGameTestCase(unittest.TestCase):
         self.assertEqual(loot_reward["loot"].name, "고철 부품 상자")
         self.assertEqual(loot_reward["amount"], 42)
 
+    # ---- 이슈 #19 DDD ----
+
+    def test_mission_fail_grants_consolation_and_pity(self):
+        with tempfile.NamedTemporaryFile() as db_file:
+            point_system = GoldSystem(db_file.name)
+            game = AdventureGame(user_id="tester", point_system=point_system)
+            game.start()
+            point_system.set_gold("tester", 100)
+            before = point_system.get_gold("tester")
+            scout = game._get_activity_type("정찰")
+            # 성공 판정 실패: random() * 100 = 99
+            with patch.object(game, "_select_random_activity", return_value=scout), patch(
+                "games.adventure.random.random", return_value=0.99
+            ), patch("games.adventure.random.randint", return_value=5):
+                response = game.process_command("출동")
+            self.assertIn("실패", response)
+            self.assertIn("구조금", response)
+            self.assertGreater(point_system.get_gold("tester"), before)
+            self.assertEqual(game.mission_fail_streak, 1)
+            self.assertGreater(game._mission_pity_boost(), 0)
+
+    def test_duplicate_ship_always_rewards_gold(self):
+        with tempfile.NamedTemporaryFile() as db_file:
+            point_system = GoldSystem(db_file.name)
+            game = AdventureGame(user_id="tester", point_system=point_system)
+            game.start()
+            ship = game._get_ship_by_id("comet_scout")
+            game._grant_ship_to_collection(ship)
+            before = point_system.get_gold("tester")
+            # 성공 + 발견 강제
+            scout = game._get_activity_type("정찰")
+            with patch.object(game, "_select_random_activity", return_value=scout), patch.object(
+                game, "_try_discover_ship", return_value=(ship, game._grant_ship_to_collection(ship))
+            ), patch.object(game, "_try_roll_loot_reward", return_value=None), patch(
+                "games.adventure.random.random", return_value=0.0
+            ), patch("games.adventure.random.randint", return_value=30):
+                response = game.process_command("출동")
+            self.assertIn("중복", response)
+            self.assertIn("분해", response)
+            self.assertGreater(point_system.get_gold("tester"), before)
+
+    def test_mission_result_loop_cta_buttons(self):
+        game = AdventureGame(user_id="tester")
+        game.start()
+        scout = game._get_activity_type("정찰")
+        with patch.object(game, "_select_random_activity", return_value=scout), patch(
+            "games.adventure.random.random", return_value=0.0
+        ), patch("games.adventure.random.randint", return_value=30):
+            game.process_command("출동")
+        buttons = game.get_command_buttons()
+        messages = [b["messageText"] for b in buttons]
+        self.assertEqual(messages, ["출동", "강화"])
+
+    def test_enhance_result_loop_cta_buttons(self):
+        with tempfile.NamedTemporaryFile() as db_file:
+            point_system = GoldSystem(db_file.name)
+            game = AdventureGame(user_id="tester", point_system=point_system)
+            game.start()
+            point_system.set_gold("tester", 1_000)
+            with patch("games.adventure.random.random", return_value=0.0):
+                game.process_command("강화")
+            buttons = game.get_command_buttons()
+            messages = [b["messageText"] for b in buttons]
+            self.assertEqual(messages, ["강화", "출동"])
+            self.assertIn("성공", game._last_reply.text)
+
+    def test_enhance_milestone_celebration(self):
+        with tempfile.NamedTemporaryFile() as db_file:
+            point_system = GoldSystem(db_file.name)
+            game = AdventureGame(user_id="tester", point_system=point_system)
+            game.start()
+            game.ship_progress = game.ship_progress.with_body_enhance(4)
+            game._persist_ship_progress()
+            point_system.set_gold("tester", 5_000)
+            with patch("games.adventure.random.random", return_value=0.0):
+                response = game._enhance()
+            self.assertIn("마일스톤", response)
+            self.assertEqual(game.ship_progress.body_enhance, 5)
+
+    def test_home_shows_daily_goal_line(self):
+        game = AdventureGame(user_id="tester")
+        text = game.start()
+        self.assertIn("출동", text)
+        self.assertIn("강화", text)
+        # 일일 목표 형태 N/M
+        self.assertRegex(text, r"출동\d+/\d+")
+
+    def test_result_template_slot_order(self):
+        from ui.result_template import build_detail_slots
+
+        lines = build_detail_slots(
+            hook="✅ 성공",
+            metrics=["+10G"],
+            bonus=["🎁 득템"],
+            progress=["강화 40G"],
+            cta="한 번 더?",
+        )
+        self.assertEqual(lines[0], "✅ 성공")
+        self.assertEqual(lines[-1], "한 번 더?")
+        self.assertIn("+10G", lines)
+
 
 if __name__ == "__main__":
     unittest.main()

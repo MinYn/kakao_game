@@ -68,6 +68,28 @@ class Config:
     # 게임 설정 - 몬스터 사냥
     MONSTER_HUNT_REWARD_MULTIPLIER: float = float(os.getenv('MONSTER_HUNT_REWARD_MULTIPLIER', '0.1'))  # 레벨당 보상 배율 (10%)
     BOSS_TICKET_DROP_RATE: float = float(os.getenv('BOSS_TICKET_DROP_RATE', '0.3'))  # 특수몹 사냥 시 보스몹 입장권 드랍 확률 (30%)
+
+    # ---- 이슈 #19 Dopamine loop 튜닝 포인트 (코어 루프 상수) ----
+    # 짧은 루프: 출동 → 결과 → 강화 유혹 → 재탭
+    # 출동 실패 시 소형 보호 보상 (완전 무보상 금지)
+    MISSION_FAIL_CONSOLATION_MIN: int = int(os.getenv('MISSION_FAIL_CONSOLATION_MIN', '3'))
+    MISSION_FAIL_CONSOLATION_MAX: int = int(os.getenv('MISSION_FAIL_CONSOLATION_MAX', '8'))
+    # 연속 출동 실패 soft pity (성공률 % 가산, 캡)
+    MISSION_PITY_PER_FAIL: float = float(os.getenv('MISSION_PITY_PER_FAIL', '3.0'))
+    MISSION_PITY_CAP: float = float(os.getenv('MISSION_PITY_CAP', '15.0'))
+    # 연속 강화 실패 soft pity
+    ENHANCE_PITY_PER_FAIL: float = float(os.getenv('ENHANCE_PITY_PER_FAIL', '2.0'))
+    ENHANCE_PITY_CAP: float = float(os.getenv('ENHANCE_PITY_CAP', '12.0'))
+    # 강화 마일스톤 본체 +N (연출 + 소형 골드)
+    ENHANCE_MILESTONES: tuple = (5, 10, 15, 20, 25, 30)
+    ENHANCE_MILESTONE_GOLD_BASE: int = int(os.getenv('ENHANCE_MILESTONE_GOLD_BASE', '25'))
+    # 도감 중복 = 항상 보상 (등급별 골드)
+    DUPLICATE_SHIP_GOLD: dict = {
+        'F': 12, 'E': 18, 'D': 28, 'C': 45, 'B': 70, 'A': 120, 'S': 250,
+    }
+    # 일일 미니 목표 (홈 1줄)
+    DAILY_MISSION_GOAL: int = int(os.getenv('DAILY_MISSION_GOAL', '5'))
+    DAILY_ENHANCE_GOAL: int = int(os.getenv('DAILY_ENHANCE_GOAL', '3'))
     
     # 서버 설정
     SERVER_HOST: str = os.getenv('SERVER_HOST', '0.0.0.0')
