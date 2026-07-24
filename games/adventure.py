@@ -105,47 +105,26 @@ class EnhancementCelebration:
     message: str
 
 
-@dataclass
+def call_sign_for_user(user_id: str) -> str:
+    """유저별 결정적 콜사인 (플레이버 코드). 정체성 식별은 Discord 멘션·장착 기체가 담당."""
+    seed = int(hashlib.sha256(user_id.encode("utf-8")).hexdigest(), 16)
+    rng = random.Random(seed)
+    return f"STS-{rng.randint(100, 999)}"
+
+
+@dataclass(frozen=True)
 class ExplorerProfile:
-    """사용자별 고유 탐사대 프로필 (로컬 결정적 생성)"""
+    """축소된 프로필: 콜사인만 유지 (#23).
+
+    role / ship_class / module / temperament / ASCII badge 는 제거.
+    UI 주 표기는 장착 기체 + 플랫폼 멘션.
+    """
 
     call_sign: str
-    role: str
-    ship_class: str
-    module: str
-    temperament: str
-    badge: str
 
     @classmethod
     def from_user_id(cls, user_id: str) -> "ExplorerProfile":
-        seed = int(hashlib.sha256(user_id.encode("utf-8")).hexdigest(), 16)
-        rng = random.Random(seed)
-
-        roles = ["궤도 조종사", "심우주 정찰관", "행성 지질학자", "통신 기사", "구조 대원"]
-        ships = ["탐사 셔틀", "정찰 프리깃", "과학 코르벳", "수송 드론", "지원 크루저"]
-        modules = ["과학 모듈", "레이더 팩", "엔진 튠", "차폐 장치", "응급 키트"]
-        temperaments = ["냉정한", "호기심 많은", "신속한", "분석적인", "대담한"]
-
-        role = rng.choice(roles)
-        ship_class = rng.choice(ships)
-        module = rng.choice(modules)
-        temperament = rng.choice(temperaments)
-        call_sign = f"STS-{rng.randint(100, 999)}"
-
-        badge_rng = random.Random(seed ^ 0xABCDEF)
-        nose = badge_rng.choice(["/\\", "^", "Λ", "A", "Δ"])
-        body = badge_rng.choice(["===>", "--->", "-==>", "~=>"])
-        trail = badge_rng.choice(["⋆", "✦", "✧", ""],)
-        badge = f"  {nose}\n{body}🚀{trail}\n  ||"
-
-        return cls(
-            call_sign=call_sign,
-            role=role,
-            ship_class=ship_class,
-            module=module,
-            temperament=temperament,
-            badge=badge,
-        )
+        return cls(call_sign=call_sign_for_user(user_id))
 
 
 class AdventureGame(Game):
@@ -231,9 +210,12 @@ class AdventureGame(Game):
         ship = self._equipped_ship()
         if ship:
             return ship.name
+        return "미장착"
+
+    def _call_sign(self) -> str:
         if self.explorer_profile:
-            return self.explorer_profile.ship_class
-        return "기본 셔틀"
+            return self.explorer_profile.call_sign
+        return call_sign_for_user(self.user_id)
 
     def _sync_level_from_progress(self) -> None:
         self.current_level = self.ship_progress.body_enhance
@@ -417,7 +399,7 @@ class AdventureGame(Game):
                 icon="🛰️",
                 success_messages=(
                     "{pilot}이(가) 저궤도 정찰을 마치고 안전하게 복귀했습니다.",
-                    "{pilot} 콜사인이 남긴 센서 로그가 깔끔합니다!",
+                    "{pilot}이(가) 남긴 센서 로그가 깔끔합니다!",
                     "{pilot}이(가) 잔해 지대를 스캔해 유용한 데이터를 확보했어요.",
                 ),
                 fail_messages=(
@@ -607,16 +589,15 @@ class AdventureGame(Game):
         return self._commit_reply(reply)
 
     def _show_home(self) -> str:
-        """D0 홈 MENU — 일일 미니 목표 1줄 포함 (이슈 #19 P4)."""
+        """D0 홈 MENU — 기체·골드·일일 목표 (식별은 멘션/기체, #23)."""
         ship_title = self.ship_progress.format_title(self._equipped_ship_name())
         gold = self.get_user_points()
-        call_sign = self.explorer_profile.call_sign if self.explorer_profile else "—"
         lines = [
             "🛰️ 우주 탐험 홈",
-            f"콜사인 {call_sign}",
             f"기체 {ship_title}",
             f"골드 {gold}G",
             self._daily_home_line(),
+            "버튼을 눌러 진행",
         ]
         track_screen(self.user_id, D0_HOME.screen_id, command="홈")
         return self._reply_for_screen(D0_HOME, lines)
@@ -1188,7 +1169,8 @@ class AdventureGame(Game):
                 )
 
         success_rate = self._calculate_success_rate(activity)
-        pilot_name = self.explorer_profile.call_sign if self.explorer_profile else "탐사대"
+        # 로그/플레이버용 짧은 코드. 유저 식별은 멘션·기체명 (#23)
+        pilot_name = self._call_sign()
         self._bump_daily_mission()
 
         if random.random() * 100 < success_rate:
@@ -1358,7 +1340,6 @@ class AdventureGame(Game):
         passes = self._get_challenge_passes()
         ship_title = self.ship_progress.format_title(self._equipped_ship_name())
         power = self._effective_power()
-        call_sign = self.explorer_profile.call_sign if self.explorer_profile else "—"
 
         lines = [
             "📊 상태 상세",
@@ -1378,7 +1359,8 @@ class AdventureGame(Game):
             f"총활 {self.activity_count}회",
             f"획득 {self.total_reward}G",
             f"골드 {self.get_user_points()}G",
-            f"콜사인 {call_sign}",
+            self._daily_home_line(),
+            "성장·출동으로 진행",
         ]
         return self._reply_for_screen(D2_STATUS_DETAIL, lines)
 

@@ -8,13 +8,26 @@ from gold_system import GoldSystem
 
 
 class AdventureGameTestCase(unittest.TestCase):
-    def test_explorer_profile_is_deterministic(self):
+    def test_call_sign_only_profile_is_deterministic(self):
+        """#23: 프로필은 콜사인만. role/ship_class 등 없음."""
+        from games.adventure import call_sign_for_user
+
         first = ExplorerProfile.from_user_id("user-123")
         second = ExplorerProfile.from_user_id("user-123")
         other = ExplorerProfile.from_user_id("another-user")
 
         self.assertEqual(first, second)
         self.assertNotEqual(first, other)
+        self.assertEqual(first.call_sign, call_sign_for_user("user-123"))
+        self.assertTrue(first.call_sign.startswith("STS-"))
+        # 축소 필드만 존재
+        self.assertEqual(first.__dataclass_fields__.keys(), {"call_sign"})
+
+    def test_home_shows_ship_not_callsign(self):
+        game = AdventureGame(user_id="tester")
+        home = game.start()
+        self.assertIn("기체", home)
+        self.assertNotIn("콜사인", home)
 
     def test_activity_flow_returns_success_message(self):
         game = AdventureGame(user_id="tester")
