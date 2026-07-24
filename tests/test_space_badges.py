@@ -9,9 +9,10 @@ class SpaceBadgeGeneratorTestCase(unittest.TestCase):
         variant = BadgeVariant("TEST", "+0", ShipShape.SHUTTLE, "white")
         svg = generate_svg(variant, 1, star_seed=1, grade="S", body_enhance=0)
         self.assertIn('id="grade_badge_1"', svg)
-        # 좌하단 안쪽 배치 (기존 48,48 바깥 코너 아님)
-        self.assertIn('x="86" y="348"', svg)
+        # 좌하단 안쪽 젬 프레임 (바깥 코너 48,48 아님)
+        self.assertIn('x="74" y="348"', svg)
         self.assertNotIn('x="48" y="48"', svg)
+        self.assertIn(">S<", svg)
 
     def test_name_is_horizontal_banner_not_textpath(self):
         variant = BadgeVariant("COMET", "+0", ShipShape.SHUTTLE, "white")

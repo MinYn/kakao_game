@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full" shape-rendering="crispEdges">
     <defs>
-    <linearGradient id="bg_badge_67" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#7dd3fc" />
-        <stop offset="55%" stop-color="#c4b5fd" />
-        <stop offset="100%" stop-color="#f9a8d4" />
-    </linearGradient>
+    <radialGradient id="bg_badge_67" cx="38%" cy="32%" r="78%">
+        <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.55" />
+        <stop offset="35%" stop-color="#0c4a6e" />
+        <stop offset="72%" stop-color="#5b21b6" />
+        <stop offset="100%" stop-color="#9d174d" />
+    </radialGradient>
     <linearGradient id="hull_badge_67" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stop-color="#e0e0e0" />
         <stop offset="50%" stop-color="#ffffff" />
@@ -15,11 +16,20 @@
         <stop offset="50%" stop-color="#fce7f3" />
         <stop offset="100%" stop-color="#fef9c3" />
     </linearGradient>
+    <linearGradient id="rim_badge_67" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#e0f2fe" />
+        <stop offset="45%" stop-color="#fce7f3" />
+        <stop offset="100%" stop-color="#1e3a5f" />
+    </linearGradient>
+    <radialGradient id="vignette_badge_67" cx="50%" cy="48%" r="55%">
+        <stop offset="55%" stop-color="#000000" stop-opacity="0" />
+        <stop offset="100%" stop-color="#000000" stop-opacity="0.42" />
+    </radialGradient>
     <filter id="shadow_badge_67" x="-50%" y="-50%" width="200%" height="200%">
-        <feDropShadow dx="0" dy="4" stdDeviation="0" flood-color="#000" flood-opacity="0.6"/>
+        <feDropShadow dx="0" dy="6" stdDeviation="0" flood-color="#000" flood-opacity="0.55"/>
     </filter>
     <filter id="glow_badge_67">
-        <feGaussianBlur stdDeviation="1" result="blur"/>
+        <feGaussianBlur stdDeviation="1.2" result="blur"/>
         <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
     <filter id="text_glow_badge_67" x="-50%" y="-50%" width="200%" height="200%">
@@ -30,55 +40,83 @@
         </feMerge>
     </filter>
     <clipPath id="clip_badge_67">
-        <circle cx="256" cy="256" r="240" />
+        <circle cx="256" cy="256" r="236" />
     </clipPath>
 </defs>
 
     <g clip-path="url(#clip_badge_67)">
         <rect width="512" height="512" fill="url(#bg_badge_67)" />
-        <g fill="#ffffff" fill-opacity="0.95" shape-rendering="crispEdges">
-            <rect x="51" y="315" width="6" height="6" />
-<rect x="215" y="380" width="4" height="4" />
-<rect x="314" y="371" width="4" height="4" />
-<rect x="35" y="103" width="4" height="4" />
-<rect x="226" y="84" width="4" height="4" />
-<rect x="163" y="184" width="6" height="6" />
-<rect x="22" y="273" width="6" height="6" />
-<rect x="368" y="97" width="4" height="4" />
-<rect x="194" y="42" width="6" height="6" />
-<rect x="382" y="331" width="4" height="4" />
-<rect x="489" y="179" width="4" height="4" />
-<rect x="187" y="196" width="6" height="6" />
-<rect x="17" y="348" width="4" height="4" />
-<rect x="28" y="257" width="6" height="6" />
+        <g fill="#ffffff" shape-rendering="crispEdges">
+            <rect x="64" y="342" width="4" height="4" fill-opacity="0.85"/>
+<rect x="60" y="346" width="12" height="4" fill-opacity="0.85"/>
+<rect x="64" y="350" width="4" height="4" fill-opacity="0.85"/>
+<rect x="217" y="413" width="4" height="4" fill-opacity="0.95"/>
+<rect x="448" y="117" width="3" height="3" fill-opacity="0.95"/>
+<rect x="42" y="211" width="3" height="3" fill-opacity="0.95"/>
+<rect x="171" y="196" width="4" height="4" fill-opacity="0.85"/>
+<rect x="167" y="200" width="12" height="4" fill-opacity="0.85"/>
+<rect x="171" y="204" width="4" height="4" fill-opacity="0.85"/>
+<rect x="35" y="295" width="4" height="4" fill-opacity="0.85"/>
+<rect x="31" y="299" width="12" height="4" fill-opacity="0.85"/>
+<rect x="35" y="303" width="4" height="4" fill-opacity="0.85"/>
+<rect x="363" y="100" width="3" height="3" fill-opacity="0.95"/>
+<rect x="29" y="426" width="10" height="3" fill-opacity="0.9"/>
+<rect x="32" y="423" width="3" height="10" fill-opacity="0.9"/>
+<rect x="401" y="296" width="4" height="4" fill-opacity="0.85"/>
+<rect x="397" y="300" width="12" height="4" fill-opacity="0.85"/>
+<rect x="401" y="304" width="4" height="4" fill-opacity="0.85"/>
+<rect x="204" y="52" width="3" height="3" fill-opacity="0.95"/>
+<rect x="401" y="37" width="4" height="4" fill-opacity="0.85"/>
+<rect x="397" y="41" width="12" height="4" fill-opacity="0.85"/>
+<rect x="401" y="45" width="4" height="4" fill-opacity="0.85"/>
+<rect x="186" y="49" width="10" height="3" fill-opacity="0.9"/>
+<rect x="189" y="46" width="3" height="10" fill-opacity="0.9"/>
+<rect x="427" y="282" width="10" height="3" fill-opacity="0.9"/>
+<rect x="430" y="279" width="3" height="10" fill-opacity="0.9"/>
+<rect x="228" y="194" width="4" height="4" fill-opacity="0.95"/>
+<rect x="290" y="89" width="4" height="4" fill-opacity="0.95"/>
+<rect x="344" y="416" width="4" height="4" fill-opacity="0.95"/>
+<rect x="351" y="61" width="4" height="4" fill-opacity="0.85"/>
+<rect x="347" y="65" width="12" height="4" fill-opacity="0.85"/>
+<rect x="351" y="69" width="4" height="4" fill-opacity="0.85"/>
+<rect x="205" y="430" width="4" height="4" fill-opacity="0.85"/>
+<rect x="201" y="434" width="12" height="4" fill-opacity="0.85"/>
+<rect x="205" y="438" width="4" height="4" fill-opacity="0.85"/>
         </g>
-        <g opacity="0.55" shape-rendering="crispEdges">
-            <g fill="#ffc8dd">
-    <rect x="64" y="108" width="40" height="12" />
-    <rect x="80" y="96" width="48" height="12" />
-    <rect x="96" y="120" width="24" height="12" />
-    <rect x="368" y="140" width="44" height="12" />
-    <rect x="348" y="152" width="64" height="12" />
-    <rect x="388" y="128" width="20" height="12" />
+        <g opacity="0.5" shape-rendering="crispEdges">
+            <g fill="#f9a8d4">
+    <rect x="56" y="100" width="36" height="10" />
+    <rect x="72" y="90" width="44" height="10" />
+    <rect x="88" y="110" width="22" height="10" />
+    <rect x="360" y="128" width="40" height="10" />
+    <rect x="344" y="140" width="56" height="10" />
+    <rect x="380" y="118" width="18" height="10" />
 </g>
-<g fill="#c4b5fd">
-    <rect x="56" y="328" width="48" height="12" />
-    <rect x="72" y="340" width="32" height="12" />
-    <rect x="384" y="300" width="44" height="12" />
-    <rect x="400" y="312" width="28" height="12" />
+<g fill="#38bdf8" opacity="0.7">
+    <rect x="48" y="320" width="40" height="10" />
+    <rect x="64" y="332" width="28" height="10" />
+    <rect x="376" y="292" width="40" height="10" />
+    <rect x="392" y="304" width="24" height="10" />
 </g>
-<g fill="url(#frame_badge_67)" opacity="0.4">
-    <rect x="148" y="70" width="8" height="8" />
-    <rect x="356" y="88" width="8" height="8" />
-    <rect x="112" y="268" width="8" height="8" />
-    <rect x="300" y="240" width="8" height="8" />
+<g fill="url(#frame_badge_67)" opacity="0.45">
+    <rect x="150" y="64" width="8" height="8" />
+    <rect x="348" y="84" width="8" height="8" />
+    <rect x="120" y="250" width="8" height="8" />
+    <rect x="300" y="230" width="8" height="8" />
+    <rect x="200" y="300" width="6" height="6" />
 </g>
         </g>
-        <path d="M-100 438 Q256 374 612 438 V512 H-100 Z"
-              fill="#93c5fd" fill-opacity="0.32" />
+        <!-- distant planet limb -->
+        <circle cx="380" cy="400" r="88"
+                fill="#6366f1" fill-opacity="0.35" />
+        <circle cx="362" cy="386" r="29"
+                fill="#67e8f9" fill-opacity="0.18" />
+        <path d="M-40 420 Q256 360 552 420 V520 H-40 Z"
+              fill="#67e8f9" fill-opacity="0.16" />
+        <rect width="512" height="512" fill="url(#vignette_badge_67)" />
     </g>
 
-    <g transform="translate(256, 268) scale(1.1)"
+    <g transform="translate(256, 252) scale(1.05)"
        filter="url(#shadow_badge_67)">
         <g transform="translate(20, -2)" shape-rendering="crispEdges">
     <rect x="-140" y="-48" width="200" height="16" fill="#050505"/>
@@ -128,36 +166,78 @@
     </g>
 
     
-
-    <g shape-rendering="crispEdges">
-        <circle cx="256" cy="256" r="238" fill="none" stroke="#60a5fa" stroke-width="12" />
-        <circle cx="256" cy="256" r="226" fill="none" stroke="#dbeafe" stroke-width="10" />
-        <circle cx="256" cy="256" r="214" fill="none" stroke="#3b82f6"
-                stroke-width="8" stroke-dasharray="12 10" />
-        <path d="M256 24 V48 M488 256 H464 M256 488 V464 M24 256 H48"
-              stroke="#3b1d2f" stroke-width="8" opacity="0.45" />
-    </g>
-
+    <g shape-rendering="crispEdges" id="frame_badge_67_chrome">
+  <!-- outer dark bevel -->
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#1e3a5f" stroke-width="16" />
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#050505" stroke-width="4" opacity="0.55" />
+  <!-- metallic rim -->
+  <circle cx="256" cy="256" r="236" fill="none" stroke="url(#rim_badge_67)" stroke-width="14" />
+  <circle cx="256" cy="256" r="226" fill="none" stroke="#e0f2fe" stroke-width="5" opacity="0.9" />
+  <!-- inner track + dashed orbit -->
+  <circle cx="256" cy="256" r="216" fill="none" stroke="#7dd3fc" stroke-width="3" opacity="0.55" />
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#38bdf8"
+          stroke-width="6" stroke-dasharray="10 14" opacity="0.95" />
+  <!-- pixel tick notches on cardinals (inner) -->
+  <rect x="250" y="42" width="12" height="16" fill="#e0f2fe" />
+  <rect x="250" y="454" width="12" height="16" fill="#e0f2fe" />
+  <rect x="42" y="250" width="16" height="12" fill="#e0f2fe" />
+  <rect x="454" y="250" width="16" height="12" fill="#e0f2fe" />
+  <rect x="246" y="18" width="20" height="20" fill="#1e3a5f"/><rect x="250" y="22" width="12" height="12" fill="#e0f2fe"/><rect x="254" y="26" width="4" height="4" fill="#38bdf8"/><rect x="474" y="246" width="20" height="20" fill="#1e3a5f"/><rect x="478" y="250" width="12" height="12" fill="#e0f2fe"/><rect x="482" y="254" width="4" height="4" fill="#38bdf8"/><rect x="246" y="474" width="20" height="20" fill="#1e3a5f"/><rect x="250" y="478" width="12" height="12" fill="#e0f2fe"/><rect x="254" y="482" width="4" height="4" fill="#38bdf8"/><rect x="18" y="246" width="20" height="20" fill="#1e3a5f"/><rect x="22" y="250" width="12" height="12" fill="#e0f2fe"/><rect x="26" y="254" width="4" height="4" fill="#38bdf8"/><rect x="82" y="82" width="8" height="8" fill="#7dd3fc" opacity="0.85"/><rect x="422" y="82" width="8" height="8" fill="#7dd3fc" opacity="0.85"/><rect x="82" y="422" width="8" height="8" fill="#7dd3fc" opacity="0.85"/><rect x="422" y="422" width="8" height="8" fill="#7dd3fc" opacity="0.85"/>
+</g>
     <g shape-rendering="crispEdges" id="name_badge_67">
-  <rect x="118" y="72" width="276" height="44" fill="#1e3a5f" opacity="0.94"/>
-  <rect x="124" y="66" width="264" height="10" fill="#eff6ff" opacity="0.2"/>
-  <rect x="124" y="78" width="264" height="32" fill="#1e3a5f"/>
-  <text x="256" y="101" font-family="Galmuri11, monospace" font-size="20" font-weight="bold"
-        fill="#eff6ff" stroke="#0f172a" stroke-width="0.8" paint-order="stroke"
-        text-anchor="middle" letter-spacing="1">GRADE</text>
+  <!-- side wing caps -->
+  <rect x="96" y="78" width="20" height="36" fill="#0f2744"/>
+  <rect x="396" y="78" width="20" height="36" fill="#0f2744"/>
+  <rect x="88" y="86" width="16" height="20" fill="#38bdf8" opacity="0.85"/>
+  <rect x="408" y="86" width="16" height="20" fill="#38bdf8" opacity="0.85"/>
+  <!-- main plate -->
+  <rect x="112" y="70" width="288" height="52" fill="#050505" opacity="0.35"/>
+  <rect x="116" y="66" width="280" height="52" fill="#0f2744"/>
+  <rect x="124" y="74" width="264" height="36" fill="#0f2744"/>
+  <!-- top accent strip -->
+  <rect x="124" y="66" width="264" height="8" fill="#38bdf8"/>
+  <rect x="132" y="66" width="40" height="8" fill="#ffffff" opacity="0.35"/>
+  <!-- bottom rail -->
+  <rect x="124" y="110" width="264" height="4" fill="#38bdf8" opacity="0.55"/>
+  <text x="256" y="100" font-family="Galmuri11, monospace" font-size="20" font-weight="bold"
+        fill="#f0f9ff" stroke="#020617" stroke-width="0.9" paint-order="stroke"
+        text-anchor="middle" letter-spacing="1.5">GRADE</text>
 </g>
     <g shape-rendering="crispEdges" id="grade_badge_67">
-  <rect x="86" y="348" width="64" height="48" fill="#3b1d2f" opacity="0.92"/>
-  <rect x="90" y="352" width="56" height="40" fill="#ce93d8"/>
-  <rect x="94" y="356" width="16" height="8" fill="#ffffff" opacity="0.35"/>
-  <text x="118" y="382" font-family="Galmuri11, monospace" font-size="26" font-weight="bold"
-        fill="#3b1d2f" text-anchor="middle">C</text>
+  <!-- outer shield shadow -->
+  <rect x="78" y="352" width="72" height="56" fill="#050505" opacity="0.55"/>
+  <rect x="74" y="348" width="72" height="56" fill="#1a1020"/>
+  <!-- top gem cut -->
+  <rect x="86" y="340" width="48" height="12" fill="#1a1020"/>
+  <rect x="94" y="336" width="32" height="8" fill="#1a1020"/>
+  <!-- face -->
+  <rect x="82" y="352" width="56" height="44" fill="#ce93d8"/>
+  <rect x="90" y="344" width="40" height="12" fill="#ce93d8"/>
+  <rect x="98" y="340" width="24" height="8" fill="#ce93d8"/>
+  <!-- shine -->
+  <rect x="86" y="356" width="16" height="8" fill="#ffffff" opacity="0.4"/>
+  <rect x="90" y="348" width="12" height="6" fill="#ffffff" opacity="0.25"/>
+  <!-- bottom lip -->
+  <rect x="82" y="388" width="56" height="6" fill="#050505" opacity="0.2"/>
+  <text x="110" y="384" font-family="Galmuri11, monospace" font-size="28" font-weight="bold"
+        fill="#1a1020" text-anchor="middle">C</text>
 </g>
     <g shape-rendering="crispEdges" id="enhance_badge_67">
-  <rect x="178" y="420" width="156" height="48" fill="#475569"/>
-  <rect x="186" y="408" width="140" height="56" fill="#94a3b8"/>
-  <rect x="198" y="400" width="116" height="12" fill="#e2e8f0"/>
-  <text x="256" y="448" font-family="Galmuri11, monospace" font-size="16" font-weight="bold"
+  <!-- side bolts -->
+  <rect x="160" y="424" width="16" height="28" fill="#475569"/>
+  <rect x="336" y="424" width="16" height="28" fill="#475569"/>
+  <rect x="164" y="432" width="8" height="12" fill="#e2e8f0" opacity="0.7"/>
+  <rect x="340" y="432" width="8" height="12" fill="#e2e8f0" opacity="0.7"/>
+  <!-- chassis -->
+  <rect x="172" y="416" width="168" height="52" fill="#050505" opacity="0.4"/>
+  <rect x="176" y="412" width="160" height="52" fill="#475569"/>
+  <rect x="184" y="404" width="144" height="56" fill="#94a3b8"/>
+  <!-- top bevel -->
+  <rect x="196" y="396" width="120" height="14" fill="#e2e8f0"/>
+  <rect x="208" y="396" width="32" height="6" fill="#ffffff" opacity="0.35"/>
+  <!-- bottom lip -->
+  <rect x="184" y="452" width="144" height="6" fill="#475569" opacity="0.8"/>
+  <text x="256" y="444" font-family="Galmuri11, monospace" font-size="18" font-weight="bold"
         fill="#0f172a" text-anchor="middle" letter-spacing="2">+0</text>
 </g>
 </svg>

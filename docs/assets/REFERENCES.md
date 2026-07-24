@@ -44,12 +44,26 @@ These pages informed **composition only**. We did **not** copy pixel data into t
 | Engine animation hint | 2-frame plume length via `frame_index` |
 | Detail density | Drop micro-pixels that vanish at Discord thumbnail size |
 
+## Badge chrome (frame / HUD)
+
+Ship art is only half the look. `generator.py` also rebuilds the **medal shell**:
+
+| Layer | Design |
+|-------|--------|
+| Background | Radial deep-space gradient + shape-tinted planet limb + vignette |
+| Stars | Mixed square / plus / diamond pixel sparkles |
+| Rim | Dark outer bevel, metallic gradient ring, dashed orbit track, cardinal studs |
+| Name | HUD plate with side wing caps + accent rail |
+| Grade | Shield gem (inset lower-left), not a flat corner square |
+| Enhance | Bottom chip with side bolts; tier colors unchanged (grey → cyan → gold → pink) |
+| Upgrade | Orbit ticks / nodes at stage 2–3 |
+
 ## Implementation map
 
 | File | Role |
 |------|------|
 | `space_badges/ships.py` | Shape renderers + pixel rect art |
-| `space_badges/generator.py` | 512×512 circular badge, stars, clouds, overlays |
+| `space_badges/generator.py` | 512×512 circular badge chrome, scene, overlays |
 | `space_badges/registry.py` | Variant names / colors / shapes (game data; not art) |
 | `docs/assets/pixel_ship_badge_preview.svg` | Single-badge preview |
 | `docs/assets/ship_samples/` | Shape / grade / enhance / catalog samples |
