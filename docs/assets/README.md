@@ -1,7 +1,8 @@
 # Preview assets
 
-- [`pixel_ship_badge_preview.svg`](pixel_ship_badge_preview.svg) — 초기 픽셀 배지 프리뷰
-- [`ship_samples/`](ship_samples/) — 이슈 #15 기체 샘플 (shape / 등급 F~S / 본체 +N / 도감 예시)
+- [`pixel_ship_badge_preview.svg`](pixel_ship_badge_preview.svg) — 픽셀 배지 프리뷰 (이슈 #21 재구성)
+- [`ship_samples/`](ship_samples/) — shape / 등급 F~S / 본체 +N / 도감 예시
+- [`REFERENCES.md`](REFERENCES.md) — 무료 픽셀 우주선 **레퍼런스 출처·라이선스** (원본 바이너리 미포함)
 
 SVG와 PNG를 함께 커밋합니다. GitHub PR에서 PNG 미리보기가 가능합니다.
 
